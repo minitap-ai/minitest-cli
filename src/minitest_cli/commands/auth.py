@@ -80,11 +80,9 @@ def status() -> None:
         return
 
     if method == "oauth":
+        # get_auth_method already validated/refreshed credentials, so this is safe
         creds = load_or_refresh_credentials(settings)
-        if creds is None:
-            # Refresh failed — credentials are stale
-            print_error("Session expired and refresh failed. Please run `minitest auth login`.")
-            raise typer.Exit(code=2)
+        assert creds is not None  # guaranteed by get_auth_method returning "oauth"
         expires_at_iso = datetime.fromtimestamp(creds.expires_at, tz=UTC).isoformat()
         data: AuthStatus = {
             "token_configured": True,

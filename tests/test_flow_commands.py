@@ -71,6 +71,7 @@ class TestCreateFlow:
             settings,
         )
         assert result.exit_code != 0
+        assert "invalid_type" in result.output.lower() or "invalid" in result.output.lower()
 
     def test_network_error_exits_3(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -84,6 +85,7 @@ class TestCreateFlow:
                 settings,
             )
         assert result.exit_code == 3
+        assert "network error" in result.output.lower() or "error" in result.output.lower()
 
 
 class TestListFlows:
@@ -91,6 +93,7 @@ class TestListFlows:
         settings = _make_settings(tmp_path)
         result = _run_with_context(["list", "--type", "bad_type"], settings)
         assert result.exit_code != 0
+        assert "bad_type" in result.output.lower() or "invalid" in result.output.lower()
 
     def test_all_flag_fetches_multiple_pages(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -123,6 +126,7 @@ class TestGetFlow:
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(["get", "flow-1"], settings)
         assert result.exit_code == 4
+        assert "not found" in result.output.lower()
 
 
 class TestUpdateFlow:
@@ -144,7 +148,8 @@ class TestUpdateFlow:
         assert result.exit_code == 0
         instance.get.assert_called_once()
         call_kwargs = instance.patch.call_args
-        criteria = call_kwargs.kwargs["json"]["acceptance_criteria"]
+        payload = call_kwargs.kwargs["json"]
+        criteria = payload.get("acceptanceCriteria") or payload.get("acceptance_criteria")
         assert "User can log in" in criteria
         assert "Error shown on bad password" in criteria
         assert "New criterion" in criteria
@@ -170,6 +175,7 @@ class TestDeleteFlow:
         settings = _make_settings(tmp_path)
         result = _run_with_context(["delete", "flow-1"], settings)
         assert result.exit_code == 1
+        assert "--force" in result.output
 
     def test_not_found_exits_4(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -181,3 +187,4 @@ class TestDeleteFlow:
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(["delete", "flow-1", "--force"], settings)
         assert result.exit_code == 4
+        assert "not found" in result.output.lower()

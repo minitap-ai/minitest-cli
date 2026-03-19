@@ -5,9 +5,9 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands import flow_modify
 from minitest_cli.commands.flow_helpers import (
     FLOW_TABLE_HEADERS,
-    FlowType,
     base_path,
     format_flow_row,
     format_pagination_info,
@@ -17,14 +17,13 @@ from minitest_cli.commands.flow_helpers import (
     is_json_mode,
     run_api_call,
 )
-from minitest_cli.commands import flow_modify
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
-from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
+from minitest_cli.models.flow_template import FlowType
+from minitest_cli.utils.output import output, print_info, print_success, print_table
 
 app = typer.Typer(name="flow", help="Testing flow operations.")
 
-# Register update and delete commands from flow_modify module
 app.command(name="update")(flow_modify.update_flow)
 app.command(name="delete")(flow_modify.delete_flow)
 
@@ -68,8 +67,10 @@ def list_flows(
     flow_type: Annotated[
         FlowType | None, typer.Option("--type", help="Filter by flow type.")
     ] = None,
-    page: Annotated[int, typer.Option("--page", help="Page number.")] = 1,
-    page_size: Annotated[int, typer.Option("--page-size", help="Items per page.")] = 20,
+    page: Annotated[int, typer.Option("--page", min=1, help="Page number.")] = 1,
+    page_size: Annotated[
+        int, typer.Option("--page-size", min=1, max=100, help="Items per page.")
+    ] = 20,
     all_flows: Annotated[
         bool, typer.Option("--all", help="Fetch all flows (ignores --page and --page-size).")
     ] = False,
@@ -80,7 +81,7 @@ def list_flows(
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
     if all_flows:
-        page, page_size = 1, 100  # API max page size
+        page, page_size = 1, 100
 
     params: dict[str, Any] = {"page": page, "page_size": page_size}
     if flow_type is not None:
@@ -121,14 +122,16 @@ def list_flows(
 
     items = data if isinstance(data, list) else data.get("items", data.get("results", []))
     if not items:
-        print_error("No flows found.")
+        print_info("No flows found.")
         return
 
     if all_flows:
         title = f"Flows (showing all {len(items)} flows)"
         tip = None
-    else:
+    elif isinstance(data, dict):
         title, tip = format_pagination_info(data, page, page_size)
+    else:
+        title, tip = "Flows", None
     rows = [format_flow_row(f) for f in items]
     print_table(FLOW_TABLE_HEADERS, rows, title=title)
     if tip:

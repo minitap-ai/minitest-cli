@@ -76,9 +76,6 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     digest = hashlib.sha256(code_verifier.encode()).digest()
     code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
-    # CSRF protection: random state validated in callback
-    expected_state = secrets.token_urlsafe(32)
-
     # Start callback server
     auth_code_holder: dict[str, str | None] = {"code": None, "error": None}
     ready_event = Event()
@@ -88,12 +85,8 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
             params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             code = params.get("code", [None])[0]
             error = params.get("error_description", params.get("error", [None]))[0]
-            state = params.get("state", [None])[0]
 
-            if state != expected_state:
-                auth_code_holder["error"] = "State mismatch — possible CSRF attack"
-                self._respond("Login failed: invalid state", is_success=False)
-            elif code:
+            if code:
                 auth_code_holder["code"] = code
                 self._respond("Login successful!", is_success=True)
             else:
@@ -121,7 +114,6 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     port = server.server_address[1]
     redirect_uri = f"http://127.0.0.1:{port}/callback"
 
-    # Build authorize URL
     authorize_params = urllib.parse.urlencode(
         {
             "provider": "google",
@@ -129,7 +121,6 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "redirect_to": redirect_uri,
-            "state": expected_state,
         }
     )
     authorize_url = f"{supabase_url}/auth/v1/authorize?{authorize_params}"

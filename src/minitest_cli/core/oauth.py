@@ -119,7 +119,7 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
 
     server = HTTPServer(("127.0.0.1", 0), _CallbackHandler)
     port = server.server_address[1]
-    redirect_uri = f"http://localhost:{port}/callback"
+    redirect_uri = f"http://127.0.0.1:{port}/callback"
 
     # Build authorize URL
     authorize_params = urllib.parse.urlencode(

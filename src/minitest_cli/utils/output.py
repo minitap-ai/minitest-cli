@@ -36,6 +36,11 @@ def print_success(message: str) -> None:
     err_console.print(f"[bold green]✓[/bold green] {message}")
 
 
+def print_info(message: str) -> None:
+    """Print an informational message to stderr."""
+    err_console.print(f"[dim]{message}[/dim]")
+
+
 def print_table(
     headers: list[str],
     rows: list[list[str]],

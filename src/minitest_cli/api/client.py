@@ -10,6 +10,7 @@ from minitest_cli.core.config import Settings
 CHANNEL_HEADER = "X-Minitest-Channel"
 CHANNEL_VALUE = "cli"
 DEFAULT_TIMEOUT = 30.0
+UPLOAD_TIMEOUT = 300.0  # 5 minutes for large file uploads
 
 
 class ApiClient:
@@ -67,3 +68,22 @@ class ApiClient:
     async def delete(self, path: str, **kwargs: Any) -> httpx.Response:
         """Send a DELETE request."""
         return await self._ensure_client().delete(path, **kwargs)
+
+    async def upload_file(
+        self,
+        path: str,
+        *,
+        files: dict[str, Any],
+        data: dict[str, str] | None = None,
+        timeout: float = UPLOAD_TIMEOUT,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """Send a POST request with multipart file upload and extended timeout."""
+        client = self._ensure_client()
+        return await client.post(
+            path,
+            files=files,
+            data=data or {},
+            timeout=timeout,
+            **kwargs,
+        )

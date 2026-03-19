@@ -5,9 +5,10 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-DEFAULT_API_URL = "https://api.minitap.ai"
+DEFAULT_API_URL = "https://testing-service.app.minitap.ai"
 DEFAULT_CONFIG_DIR = Path.home() / ".minitest"
+DEFAULT_SUPABASE_URL = "https://auth.minitap.ai"
+DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_mlpTSxXqh7L3p5EY8FBEDA_yWma_vrf"
 
 
 class Settings(BaseSettings):
@@ -35,6 +36,14 @@ class Settings(BaseSettings):
     app_id: str | None = Field(
         default=None,
         description="Default app ID (MINITEST_APP_ID)",
+    )
+    supabase_url: str = Field(
+        default=DEFAULT_SUPABASE_URL,
+        description="Supabase project URL for OAuth (MINITEST_SUPABASE_URL)",
+    )
+    supabase_publishable_key: str = Field(
+        default=DEFAULT_SUPABASE_PUBLISHABLE_KEY,
+        description="Supabase publishable key (MINITEST_SUPABASE_PUBLISHABLE_KEY)",
     )
 
     def ensure_config_dir(self) -> Path:

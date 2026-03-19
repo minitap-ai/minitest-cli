@@ -86,8 +86,13 @@ def run_api_call[T](coro: Coroutine[Any, Any, T]) -> T:
 
 def format_flow_row(flow: dict[str, Any]) -> list[str]:
     """Format a flow dict as a table row."""
-    criteria = flow.get("acceptance_criteria") or []
-    criteria_str = "; ".join(criteria) if criteria else ""
+    raw_criteria = flow.get("acceptance_criteria")
+    if raw_criteria is None:
+        raw_criteria = flow.get("acceptanceCriteria") or []
+    criteria = [
+        item.get("content", "") if isinstance(item, dict) else str(item) for item in raw_criteria
+    ]
+    criteria_str = "; ".join(filter(None, criteria))
     return [
         str(flow.get("id", "")),
         flow.get("name", ""),
@@ -95,3 +100,55 @@ def format_flow_row(flow: dict[str, Any]) -> list[str]:
         flow.get("description", "") or "",
         criteria_str,
     ]
+
+
+def format_pagination_info(
+    data: dict[str, Any] | list[Any],
+    page: int,
+    page_size: int,
+) -> tuple[str, str | None]:
+    """Format pagination info for list output.
+
+    Returns:
+        (title, tip) where tip is None if no more pages
+    """
+    items = data if isinstance(data, list) else data.get("items", data.get("results", []))
+    total = data.get("total", len(items)) if isinstance(data, dict) else len(items)
+    current_page = data.get("page", page) if isinstance(data, dict) else page
+    current_page_size = data.get("pageSize", page_size) if isinstance(data, dict) else page_size
+
+    start = (current_page - 1) * current_page_size + 1
+    end = min(start + len(items) - 1, total)
+    total_pages = (
+        (total + current_page_size - 1) // current_page_size if current_page_size > 0 else 1
+    )
+
+    title = f"Flows (Page {current_page} of {total_pages}, showing {start}-{end} of {total})"
+
+    tip = None
+    if current_page < total_pages:
+        next_page = current_page + 1
+        tip = f"\n💡 Tip: Use --page {next_page} to see more, or --all to fetch all {total} flows"
+    elif total > current_page_size and current_page_size < 100:
+        tip = f"\n💡 Tip: Use --all to fetch all {total} flows in one request"
+
+    return title, tip
+
+
+def build_update_payload(
+    name: str | None,
+    flow_type: FlowType | None,
+    description: str | None,
+    criteria: list[str] | None,
+) -> dict[str, Any]:
+    """Build update payload from provided fields."""
+    payload: dict[str, Any] = {}
+    if name is not None:
+        payload["name"] = name
+    if flow_type is not None:
+        payload["type"] = flow_type.value
+    if description is not None:
+        payload["description"] = description
+    if criteria is not None:
+        payload["acceptance_criteria"] = list(criteria)
+    return payload

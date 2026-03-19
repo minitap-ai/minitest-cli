@@ -76,6 +76,14 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     digest = hashlib.sha256(code_verifier.encode()).digest()
     code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
+    # CSRF protection: We do NOT generate our own state parameter.
+    # Supabase internally uses 'state' as a FlowState UUID (database key) to track
+    # the OAuth flow context (redirect_to, PKCE params, etc.). If we override it,
+    # Supabase can't find the FlowState record and falls back to Site URL.
+    # We still have CSRF protection via:
+    #   1. Supabase's FlowState UUID (validated on callback)
+    #   2. PKCE (code_challenge + code_verifier) per OAuth 2.1
+
     # Start callback server
     auth_code_holder: dict[str, str | None] = {"code": None, "error": None}
     ready_event = Event()
@@ -114,6 +122,7 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     port = server.server_address[1]
     redirect_uri = f"http://127.0.0.1:{port}/callback"
 
+    # Build authorize URL (no custom state - see comment above)
     authorize_params = urllib.parse.urlencode(
         {
             "provider": "google",

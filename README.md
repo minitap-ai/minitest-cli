@@ -4,8 +4,33 @@ Command-line interface for the Minitest testing platform.
 
 ## Installation
 
+### pip (recommended)
+
 ```bash
 pip install minitest-cli
+```
+
+### uvx (zero-install)
+
+Run without installing:
+
+```bash
+uvx --from minitest-cli minitest --help
+```
+
+### Homebrew
+
+```bash
+brew install minitap-ai/tap/minitest-cli
+```
+
+### From source
+
+```bash
+git clone https://github.com/minitap-ai/minitest-cli.git
+cd minitest-cli
+uv sync
+uv run minitest --help
 ```
 
 ## Quick Start

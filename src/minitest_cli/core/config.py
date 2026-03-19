@@ -1,0 +1,48 @@
+"""Application configuration via pydantic-settings."""
+
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+DEFAULT_API_URL = "https://api.minitap.ai"
+DEFAULT_CONFIG_DIR = Path.home() / ".minitest"
+
+
+class Settings(BaseSettings):
+    """Global CLI configuration loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="MINITEST_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    api_url: str = Field(
+        default=DEFAULT_API_URL,
+        description="Base URL of the Minitest API",
+    )
+    config_dir: Path = Field(
+        default=DEFAULT_CONFIG_DIR,
+        description="Directory for CLI config and cache files (~/.minitest)",
+    )
+    token: str | None = Field(
+        default=None,
+        description="API authentication token (MINITEST_TOKEN)",
+    )
+    app_id: str | None = Field(
+        default=None,
+        description="Default app ID (MINITEST_APP_ID)",
+    )
+
+    def ensure_config_dir(self) -> Path:
+        """Create the config directory if it doesn't exist and return the path."""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        return self.config_dir
+
+
+def get_settings() -> Settings:
+    """Create and return a Settings instance."""
+    return Settings()

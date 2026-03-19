@@ -1,5 +1,6 @@
 """Testing flow commands: create, list, get, update, delete."""
 
+import sys
 from typing import Annotated, Any
 
 import typer
@@ -155,8 +156,10 @@ def update_flow(
                 get_resp = await client.get(path)
                 handle_response_error(get_resp)
                 current = get_resp.json()
-                existing = current.get("acceptance_criteria") or []
-                payload["acceptance_criteria"] = existing + list(add_criteria)
+                existing = current.get("acceptanceCriteria") or []
+                # Extract content strings from existing criteria objects
+                existing_content = [c["content"] for c in existing]
+                payload["acceptance_criteria"] = existing_content + list(add_criteria)
             resp = await client.patch(path, json=payload)
             handle_response_error(resp)
             return resp.json()

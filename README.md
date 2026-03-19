@@ -1,0 +1,78 @@
+# minitest-cli
+
+Command-line interface for the Minitest testing platform.
+
+## Installation
+
+```bash
+pip install minitest-cli
+```
+
+## Quick Start
+
+```bash
+# Authenticate
+minitest auth login
+
+# List your apps
+minitest apps list
+
+# Run tests
+minitest run --app <app-id>
+```
+
+## Configuration
+
+| Environment Variable | Description | Required |
+|---------------------|-------------|----------|
+| `MINITEST_TOKEN` | API authentication token | Yes (or use `minitest auth login`) |
+| `MINITEST_APP_ID` | Default app ID | No (can use `--app` flag) |
+| `MINITEST_API_URL` | API base URL | No (defaults to production) |
+
+## Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output JSON to stdout (diagnostics go to stderr) |
+| `--app <id-or-name>` | Target app for commands that require one |
+| `--version` | Show CLI version |
+| `--help` | Show help |
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `minitest auth` | Authentication management |
+| `minitest apps` | App management |
+| `minitest flow` | Testing flow operations |
+| `minitest build` | Build management |
+| `minitest run` | Test execution |
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | General error |
+| 2 | Authentication error |
+| 3 | Network / API error |
+| 4 | Resource not found |
+
+## Development
+
+```bash
+# Install dependencies
+uv sync --dev
+
+# Run linter
+uv run ruff check .
+
+# Run formatter
+uv run ruff format .
+
+# Run type checker
+uv run pyright
+
+# Run tests
+uv run pytest
+```

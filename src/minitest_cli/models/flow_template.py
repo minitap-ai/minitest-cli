@@ -4,16 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
-
-def _to_camel(string: str) -> str:
-    components = string.split("_")
-    return components[0] + "".join(x.title() for x in components[1:])
-
-
-class CamelModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, alias_generator=_to_camel)
+from minitest_cli.models.base import CamelModel
 
 
 class FlowType(StrEnum):

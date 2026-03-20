@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from minitest_cli import __version__
-from minitest_cli.commands import apps, auth, build, flow, run
+from minitest_cli.commands import apps, auth, build, flow, run, skill
 from minitest_cli.core.config import get_settings
 from minitest_cli.utils.update_check import check_for_updates
 
@@ -22,6 +22,7 @@ app.add_typer(apps.app)
 app.add_typer(flow.app)
 app.add_typer(build.app)
 app.add_typer(run.app)
+app.add_typer(skill.app)
 
 
 def _version_callback(value: bool) -> None:

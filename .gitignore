@@ -80,5 +80,6 @@ dmypy.json
 # macOS
 .DS_Store
 
-# Opencode (local agent config)
-.opencode/
+# Opencode (local agent config — keep skills tracked)
+.opencode/*
+!.opencode/skill/

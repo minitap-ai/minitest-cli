@@ -9,7 +9,9 @@ from minitest_cli.utils.output import err_console, print_error
 
 app = typer.Typer(name="skill", help="Retrieve the minitest CLI skill for AI agents.")
 
-SKILL_URL = "https://raw.githubusercontent.com/minitap-ai/minitest-cli/main/SKILL.md"
+SKILL_URL = (
+    "https://raw.githubusercontent.com/minitap-ai/agent-skills/main/skills/minitest-cli/SKILL.md"
+)
 
 EXIT_NETWORK_ERROR = 3
 

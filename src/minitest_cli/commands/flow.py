@@ -16,10 +16,10 @@ from minitest_cli.commands.flow_helpers import (
     handle_response_error,
     is_json_mode,
     run_api_call,
+    validate_flow_type,
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
-from minitest_cli.models.flow_template import FlowType
 from minitest_cli.utils.output import output, print_info, print_success, print_table
 
 app = typer.Typer(name="flow", help="Testing flow operations.")
@@ -31,7 +31,7 @@ app.command(name="delete")(flow_modify.delete_flow)
 @app.command(name="create")
 def create_flow(
     name: Annotated[str, typer.Option("--name", help="Flow name.")],
-    flow_type: Annotated[FlowType, typer.Option("--type", help="Flow type.")],
+    flow_type: Annotated[str, typer.Option("--type", help="Flow type.")],
     description: Annotated[
         str | None, typer.Option("--description", help="Flow description.")
     ] = None,
@@ -44,7 +44,8 @@ def create_flow(
     json_mode = is_json_mode()
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
-    payload: dict[str, Any] = {"name": name, "type": flow_type.value}
+    validate_flow_type(flow_type, settings)
+    payload: dict[str, Any] = {"name": name, "type": flow_type}
     if description is not None:
         payload["description"] = description
     if criteria:
@@ -64,9 +65,7 @@ def create_flow(
 
 @app.command(name="list")
 def list_flows(
-    flow_type: Annotated[
-        FlowType | None, typer.Option("--type", help="Filter by flow type.")
-    ] = None,
+    flow_type: Annotated[str | None, typer.Option("--type", help="Filter by flow type.")] = None,
     page: Annotated[int, typer.Option("--page", min=1, help="Page number.")] = 1,
     page_size: Annotated[
         int, typer.Option("--page-size", min=1, max=100, help="Items per page.")
@@ -80,12 +79,14 @@ def list_flows(
     json_mode = is_json_mode()
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
+    if flow_type is not None:
+        validate_flow_type(flow_type, settings)
     if all_flows:
         page, page_size = 1, 100
 
     params: dict[str, Any] = {"page": page, "page_size": page_size}
     if flow_type is not None:
-        params["type"] = flow_type.value
+        params["type"] = flow_type
 
     async def _run() -> Any:
         async with ApiClient(settings) as client:

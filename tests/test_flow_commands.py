@@ -4,6 +4,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 import typer
 from typer.testing import CliRunner
 
@@ -11,6 +12,8 @@ from minitest_cli.commands.flow import app as flow_app
 from minitest_cli.core.config import Settings
 
 runner = CliRunner()
+
+VALID_FLOW_TYPES = ["login", "registration", "checkout", "onboarding", "other"]
 
 
 def _make_settings(tmp_path, **overrides):
@@ -66,16 +69,26 @@ SAMPLE_FLOW = {
 class TestCreateFlow:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
-        result = _run_with_context(
-            ["create", "--name", "Bad Flow", "--type", "invalid_type"],
-            settings,
-        )
+        with patch(
+            "minitest_cli.commands.flow_helpers.fetch_flow_types",
+            return_value=VALID_FLOW_TYPES,
+        ):
+            result = _run_with_context(
+                ["create", "--name", "Bad Flow", "--type", "invalid_type"],
+                settings,
+            )
         assert result.exit_code != 0
-        assert "invalid_type" in result.output.lower() or "invalid" in result.output.lower()
+        assert "invalid" in result.output.lower()
 
     def test_network_error_exits_3(self, tmp_path):
         settings = _make_settings(tmp_path)
-        with patch("minitest_cli.commands.flow.ApiClient") as MockClient:
+        with (
+            patch(
+                "minitest_cli.commands.flow_helpers.fetch_flow_types",
+                return_value=VALID_FLOW_TYPES,
+            ),
+            patch("minitest_cli.commands.flow.ApiClient") as MockClient,
+        ):
             instance = AsyncMock()
             instance.post.side_effect = httpx.ConnectError("Connection refused")
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -87,11 +100,35 @@ class TestCreateFlow:
         assert result.exit_code == 3
         assert "network error" in result.output.lower() or "error" in result.output.lower()
 
+    def test_valid_type_accepted(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        mock_resp = _mock_response(201, {"id": "new-flow", "name": "Flow", "type": "login"})
+        with (
+            patch(
+                "minitest_cli.commands.flow_helpers.fetch_flow_types",
+                return_value=VALID_FLOW_TYPES,
+            ),
+            patch("minitest_cli.commands.flow.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["create", "--name", "Flow", "--type", "login"],
+                settings,
+            )
+        assert result.exit_code == 0
+
 
 class TestListFlows:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
-        result = _run_with_context(["list", "--type", "bad_type"], settings)
+        with patch(
+            "minitest_cli.commands.flow_helpers.fetch_flow_types",
+            return_value=VALID_FLOW_TYPES,
+        ):
+            result = _run_with_context(["list", "--type", "bad_type"], settings)
         assert result.exit_code != 0
         assert "bad_type" in result.output.lower() or "invalid" in result.output.lower()
 
@@ -169,6 +206,19 @@ class TestUpdateFlow:
         assert result.exit_code == 1
         assert "Use either --criteria or --add-criteria, not both" in result.output
 
+    def test_invalid_type_rejected(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        with patch(
+            "minitest_cli.commands.flow_helpers.fetch_flow_types",
+            return_value=VALID_FLOW_TYPES,
+        ):
+            result = _run_with_context(
+                ["update", "flow-1", "--type", "nonsense"],
+                settings,
+            )
+        assert result.exit_code != 0
+        assert "invalid" in result.output.lower() or "nonsense" in result.output.lower()
+
 
 class TestDeleteFlow:
     def test_requires_force_flag(self, tmp_path):
@@ -188,3 +238,50 @@ class TestDeleteFlow:
             result = _run_with_context(["delete", "flow-1", "--force"], settings)
         assert result.exit_code == 4
         assert "not found" in result.output.lower()
+
+
+class TestFetchFlowTypes:
+    """Tests for the fetch_flow_types helper."""
+
+    def test_returns_api_types_on_success(self, tmp_path):
+        from minitest_cli.commands.flow_helpers import fetch_flow_types
+
+        settings = _make_settings(tmp_path)
+        api_types = ["login", "registration", "checkout", "new_type"]
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = api_types
+        with patch("minitest_cli.commands.flow_helpers.httpx.get", return_value=mock_resp):
+            result = fetch_flow_types(settings)
+        assert result == api_types
+
+    def test_network_error_exits_3(self, tmp_path):
+        from click.exceptions import Exit
+
+        from minitest_cli.commands.flow_helpers import fetch_flow_types
+
+        settings = _make_settings(tmp_path)
+        with (
+            patch(
+                "minitest_cli.commands.flow_helpers.httpx.get",
+                side_effect=httpx.ConnectError("fail"),
+            ),
+            pytest.raises(Exit) as exc_info,
+        ):
+            fetch_flow_types(settings)
+        assert exc_info.value.exit_code == 3
+
+    def test_non_200_exits_3(self, tmp_path):
+        from click.exceptions import Exit
+
+        from minitest_cli.commands.flow_helpers import fetch_flow_types
+
+        settings = _make_settings(tmp_path)
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 500
+        with (
+            patch("minitest_cli.commands.flow_helpers.httpx.get", return_value=mock_resp),
+            pytest.raises(Exit) as exc_info,
+        ):
+            fetch_flow_types(settings)
+        assert exc_info.value.exit_code == 3

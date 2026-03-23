@@ -20,6 +20,35 @@ EXIT_NOT_FOUND = 4
 FLOW_TABLE_HEADERS = ["ID", "Name", "Type", "Description", "Acceptance Criteria"]
 
 
+def fetch_flow_types(settings: Settings) -> list[str]:
+    """Fetch valid flow types from the API."""
+    try:
+        resp = httpx.get(
+            f"{settings.api_url}/api/v1/flow-types",
+            timeout=10,
+        )
+    except httpx.HTTPError as exc:
+        print_error(f"Failed to fetch flow types: {exc}")
+        raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
+    if resp.status_code != 200:
+        print_error(f"Failed to fetch flow types: HTTP {resp.status_code}")
+        raise typer.Exit(code=EXIT_NETWORK_ERROR)
+    data = resp.json()
+    if not isinstance(data, list) or not data:
+        print_error("Invalid response from flow types endpoint.")
+        raise typer.Exit(code=EXIT_NETWORK_ERROR)
+    return data
+
+
+def validate_flow_type(value: str, settings: Settings) -> str:
+    """Validate a flow type value against types from the API."""
+    valid = fetch_flow_types(settings)
+    if value not in valid:
+        print_error(f"Invalid flow type '{value}'. Valid types: {', '.join(valid)}")
+        raise typer.Exit(code=1)
+    return value
+
+
 def get_settings() -> Settings:
     return typer.Context.settings  # type: ignore[attr-defined]
 

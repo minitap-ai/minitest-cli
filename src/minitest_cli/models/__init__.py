@@ -18,7 +18,6 @@ from minitest_cli.models.flow_template import (
     FlowTemplateDetailResponse,
     FlowTemplateListResponse,
     FlowTemplateResponse,
-    FlowType,
     UpdateFlowTemplateRequest,
 )
 
@@ -39,7 +38,6 @@ __all__ = [
     "FlowTemplateDetailResponse",
     "FlowTemplateListResponse",
     "FlowTemplateResponse",
-    "FlowType",
     "RunStatus",
     "UpdateFlowTemplateRequest",
 ]

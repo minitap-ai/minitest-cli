@@ -75,5 +75,5 @@ class TestSkillCommand:
 
     def test_skill_url_points_to_raw_github(self) -> None:
         assert "raw.githubusercontent.com" in SKILL_URL
-        assert "minitap-ai/minitest-cli" in SKILL_URL
-        assert "SKILL.md" in SKILL_URL
+        assert "minitap-ai/agent-skills" in SKILL_URL
+        assert "skills/minitest-cli/SKILL.md" in SKILL_URL

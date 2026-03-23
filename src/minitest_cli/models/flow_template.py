@@ -1,23 +1,9 @@
 """Pydantic models for the flow-template API, mirroring testing-service schemas."""
 
 from datetime import datetime
-from enum import StrEnum
 from typing import Any
 
 from minitest_cli.models.base import CamelModel
-
-
-class FlowType(StrEnum):
-    login = "login"
-    registration = "registration"
-    checkout = "checkout"
-    onboarding = "onboarding"
-    search = "search"
-    settings = "settings"
-    navigation = "navigation"
-    form = "form"
-    profile = "profile"
-    other = "other"
 
 
 class AcceptanceCriteriaResponse(CamelModel):
@@ -32,7 +18,7 @@ class FlowTemplateResponse(CamelModel):
     app_id: str
     name: str
     description: str | None = None
-    type: FlowType
+    type: str
     created_at: datetime
 
 
@@ -50,14 +36,14 @@ class FlowTemplateListResponse(CamelModel):
 class CreateFlowTemplateRequest(CamelModel):
     name: str
     description: str | None = None
-    type: FlowType = FlowType.other  # type: ignore[assignment]
+    type: str = "other"
     acceptance_criteria: list[str] = []
 
 
 class UpdateFlowTemplateRequest(CamelModel):
     name: str | None = None
     description: str | None = None
-    type: FlowType | None = None
+    type: str | None = None
     acceptance_criteria: list[str] | None = None
 
     def has_changes(self) -> bool:

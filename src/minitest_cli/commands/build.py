@@ -35,7 +35,7 @@ def upload(
     file: Annotated[
         Path,
         typer.Argument(
-            help="Path to the build file (.apk or .app).",
+            help="Path to the build file (.apk or .ipa).",
             exists=True,
             readable=True,
         ),

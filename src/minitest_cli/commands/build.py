@@ -45,7 +45,7 @@ def upload(
         typer.Option(help="Target platform. Auto-detected from file extension."),
     ] = None,
 ) -> None:
-    """Upload a new build."""
+    """Upload a build file (.apk for Android, .ipa for iOS)."""
     settings, app_id, json_mode = resolve_app()
     resolved_platform = platform.value if platform else detect_platform(file)
 

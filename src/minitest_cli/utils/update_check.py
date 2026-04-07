@@ -55,6 +55,19 @@ def _is_brew_install() -> bool:
     return "/Cellar/" in exe or "/homebrew/" in exe.lower()
 
 
+def _version_tuple(v: str) -> tuple[int, ...]:
+    """Parse a version string like '0.4.3' into a comparable tuple (0, 4, 3)."""
+    try:
+        return tuple(int(x) for x in v.split("."))
+    except (ValueError, AttributeError):
+        return (0,)
+
+
+def _is_newer(latest: str, current: str) -> bool:
+    """Return True if latest is strictly newer than current."""
+    return _version_tuple(latest) > _version_tuple(current)
+
+
 def _upgrade_command() -> str:
     """Return the appropriate upgrade command based on install method."""
     if _is_brew_install():
@@ -77,7 +90,7 @@ def check_for_updates(settings: Settings) -> None:
             latest = response.json()["info"]["version"]
             _write_cache(settings, latest)
 
-        if latest != __version__:
+        if _is_newer(latest, __version__):
             upgrade_cmd = _upgrade_command()
             print_warning(
                 f"A new version of minitest-cli is available: {latest} "

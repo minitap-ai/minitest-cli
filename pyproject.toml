@@ -1,6 +1,6 @@
 [project]
 name = "minitest-cli"
-version = "0.4.3"
+version = "0.4.4"
 description = "Minitest CLI – command-line interface for the Minitest testing platform"
 readme = "README.md"
 license = "MIT"

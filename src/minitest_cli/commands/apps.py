@@ -1,4 +1,4 @@
-"""App management commands: list, show."""
+"""App management commands: list."""
 
 import asyncio
 
@@ -14,6 +14,12 @@ from minitest_cli.utils.output import print_error, print_json, print_table
 EXIT_NETWORK_ERROR = 3
 
 app = typer.Typer(name="apps", help="App management.")
+
+
+@app.callback()
+def _callback() -> None:
+    """App management."""
+
 
 APP_TABLE_HEADERS = ["ID", "Name"]
 
@@ -60,11 +66,3 @@ def list_apps() -> None:
 
     rows = [[a.id, a.name] for a in data.apps]
     print_table(APP_TABLE_HEADERS, rows, title="Apps")
-
-
-@app.command()
-def show() -> None:
-    """Show details for a specific app."""
-    require_auth(_get_settings())
-    typer.echo("apps show – not yet implemented", err=True)
-    raise typer.Exit(code=1)

@@ -83,6 +83,28 @@ minitest run --app <app-id>
 | 3 | Network / API error |
 | 4 | Resource not found |
 
+## Using the Dev Environment
+
+To point the CLI at the **dev** environment instead of production, set these environment variables when running `minitest`:
+
+```bash
+MINITEST_SUPABASE_URL=https://qrezuucghnmfvaxghqsv.supabase.co \
+MINITEST_SUPABASE_PUBLISHABLE_KEY=sb_publishable_4JRhoCm8pa5PbII0dhS09A_jhpkQhmy \
+MINITEST_API_URL=https://testing-service.dev.minitap.ai \
+minitest auth login
+```
+
+This authenticates against the dev environment and stores a dev-specific auth token. After logging in, keep the same variables set for all subsequent commands:
+
+```bash
+MINITEST_SUPABASE_URL=https://qrezuucghnmfvaxghqsv.supabase.co \
+MINITEST_SUPABASE_PUBLISHABLE_KEY=sb_publishable_4JRhoCm8pa5PbII0dhS09A_jhpkQhmy \
+MINITEST_API_URL=https://testing-service.dev.minitap.ai \
+minitest apps list
+```
+
+> **Tip:** You can `export` these variables in your shell session (or add them to a `.envrc` / `.env` file) to avoid repeating them on every invocation.
+
 ## Development
 
 ```bash

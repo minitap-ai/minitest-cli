@@ -1,6 +1,8 @@
 """PyPI version check – cached for 24 hours, non-blocking, max 2s timeout."""
 
 import json
+import shutil
+import sys
 import time
 from pathlib import Path
 
@@ -45,6 +47,21 @@ def _write_cache(settings: Settings, latest_version: str) -> None:
         pass
 
 
+def _is_brew_install() -> bool:
+    """Detect if the running minitest binary was installed via Homebrew."""
+    exe = shutil.which("minitest")
+    if exe is None:
+        exe = sys.executable
+    return "/Cellar/" in exe or "/homebrew/" in exe.lower()
+
+
+def _upgrade_command() -> str:
+    """Return the appropriate upgrade command based on install method."""
+    if _is_brew_install():
+        return "brew upgrade minitest-cli"
+    return "pip install --upgrade minitest-cli"
+
+
 def check_for_updates(settings: Settings) -> None:
     """Check PyPI for a newer version and warn on stderr if available.
 
@@ -61,10 +78,11 @@ def check_for_updates(settings: Settings) -> None:
             _write_cache(settings, latest)
 
         if latest != __version__:
+            upgrade_cmd = _upgrade_command()
             print_warning(
                 f"A new version of minitest-cli is available: {latest} "
                 f"(current: {__version__}). "
-                f"Update with: pip install --upgrade minitest-cli"
+                f"Update with: {upgrade_cmd}"
             )
     except Exception:  # noqa: BLE001
         # Never block or crash the CLI for an update check failure

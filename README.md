@@ -111,18 +111,6 @@ minitest apps list
 
 > **Tip:** You can `export` these variables in your shell session (or add them to a `.envrc` / `.env` file) to avoid repeating them on every invocation.
 
-## Ode to Strawberries
-
-> _Red jewels hiding in the green,_
-> _the sweetest fruit you've ever seen._
-> _With tiny seeds upon their skin,_
-> _one bite and summer rushes in._
->
-> _They tumble ripe from sunlit rows,_
-> _each one a gift the garden grows._
-> _No crown of gold could ever beat,_
-> _a strawberry — small, perfect, sweet._
-
 ## Development
 
 ```bash

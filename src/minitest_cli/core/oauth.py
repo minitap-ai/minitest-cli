@@ -1,4 +1,4 @@
-"""OAuth PKCE login flow and token refresh."""
+"""OAuth PKCE login flow via Supabase OAuth2 server, and token refresh."""
 
 from __future__ import annotations
 
@@ -20,9 +20,8 @@ from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import Credentials
 from minitest_cli.core.token_exchange import (
     auth_error,
-    get_apikey_header,
     parse_and_save_token_response,
-    require_supabase_url,
+    register_oauth_client,
 )
 
 _ASSETS = importlib.resources.files("minitest_cli.assets")
@@ -59,30 +58,23 @@ def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
 
 
 def oauth_pkce_login(settings: Settings) -> Credentials:
-    """Run the full OAuth PKCE login flow.
+    """Run the full OAuth PKCE login flow via Supabase's OAuth2 server.
 
     Steps:
-      1. Generate code verifier + challenge
-      2. Start local callback server
-      3. Open browser to Supabase authorize endpoint
-      4. Wait for callback with auth code
-      5. Exchange code for tokens
-      6. Save and return credentials
+      1. Start local callback server
+      2. Dynamically register an OAuth2 client with Supabase
+      3. Generate PKCE code verifier + challenge
+      4. Open browser to Supabase authorize endpoint (shows hosted sign-in page)
+      5. Wait for callback with authorization code
+      6. Exchange code + verifier for tokens at Supabase token endpoint
+      7. Save and return credentials
     """
-    supabase_url = require_supabase_url(settings)
+    supabase_url = settings.supabase_url.rstrip("/")
 
     # PKCE challenge: base64url(sha256(verifier)) without padding
     code_verifier = secrets.token_urlsafe(64)
     digest = hashlib.sha256(code_verifier.encode()).digest()
     code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
-
-    # CSRF protection: We do NOT generate our own state parameter.
-    # Supabase internally uses 'state' as a FlowState UUID (database key) to track
-    # the OAuth flow context (redirect_to, PKCE params, etc.). If we override it,
-    # Supabase can't find the FlowState record and falls back to Site URL.
-    # We still have CSRF protection via:
-    #   1. Supabase's FlowState UUID (validated on callback)
-    #   2. PKCE (code_challenge + code_verifier) per OAuth 2.1
 
     # Start callback server
     auth_code_holder: dict[str, str | None] = {"code": None, "error": None}
@@ -122,17 +114,21 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     port = server.server_address[1]
     redirect_uri = f"http://127.0.0.1:{port}/callback"
 
-    # Build authorize URL (no custom state - see comment above)
+    # Register OAuth client with Supabase (dynamic client registration)
+    client_id = register_oauth_client(supabase_url, redirect_uri)
+
+    # Build authorize URL — Supabase's OAuth2 server shows its hosted sign-in page
     authorize_params = urllib.parse.urlencode(
         {
-            "provider": "google",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
             "response_type": "code",
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
-            "redirect_to": redirect_uri,
+            "scope": "openid email profile",
         }
     )
-    authorize_url = f"{supabase_url}/auth/v1/authorize?{authorize_params}"
+    authorize_url = f"{supabase_url}/auth/v1/oauth/authorize?{authorize_params}"
 
     print("Opening browser for authentication...", file=sys.stderr)  # noqa: T201
     print(f"If the browser doesn't open, visit:\n{authorize_url}", file=sys.stderr)  # noqa: T201
@@ -156,16 +152,19 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     if not auth_code:
         auth_error("No authorization code received.")
 
-    # Exchange code for tokens (Supabase uses grant_type=pkce for PKCE flow)
+    # Exchange code for tokens at Supabase's OAuth2 token endpoint
     assert auth_code is not None  # for type narrowing
     try:
         token_response = httpx.post(
-            f"{supabase_url}/auth/v1/token?grant_type=pkce",
-            json={
-                "auth_code": auth_code,
+            f"{supabase_url}/auth/v1/oauth/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": auth_code,
+                "redirect_uri": redirect_uri,
+                "client_id": client_id,
                 "code_verifier": code_verifier,
             },
-            headers={"Content-Type": "application/json", "apikey": get_apikey_header(settings)},
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=15.0,
         )
     except httpx.HTTPError as exc:

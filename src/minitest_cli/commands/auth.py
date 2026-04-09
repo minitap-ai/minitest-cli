@@ -1,7 +1,8 @@
 """Authentication commands: login, logout, status."""
 
+import json
+import subprocess
 from datetime import UTC, datetime
-from pathlib import Path
 
 import typer
 
@@ -18,33 +19,31 @@ from minitest_cli.utils.output import output, print_error, print_info, print_suc
 
 app = typer.Typer(name="auth", help="Authentication management.")
 
-# Directories where agent skills are typically installed (relative to project root)
-_SKILL_DIRS = [
-    ".agents/skills",
-    ".claude/skills",
-    ".cursor/skills",
-    ".windsurf/skills",
-    ".cline/skills",
-    ".roo/skills",
-    ".aider/skills",
-    ".codex/skills",
-    ".copilot/skills",
-    ".bolt/skills",
-    ".augment/skills",
-    ".devin/skills",
-    ".v0/skills",
-]
-
+SKILL_NAME = "minitest-cli"
 SKILL_INSTALL_CMD = "npx skills add minitap-ai/agent-skills --skill minitest-cli"
 
 
 def _is_skill_installed() -> bool:
-    """Check if the minitest-cli skill is installed in any known agent skill directory."""
-    cwd = Path.cwd()
-    for skill_dir in _SKILL_DIRS:
-        skill_path = cwd / skill_dir / "minitest-cli" / "SKILL.md"
-        if skill_path.is_file():
-            return True
+    """Check if the minitest-cli skill is installed via ``npx skills ls``.
+
+    Queries both project-level and global scopes so the detection stays in
+    sync with whatever directories the ``skills`` CLI manages.
+    """
+    for flags in (["--json"], ["--json", "-g"]):
+        try:
+            result = subprocess.run(
+                ["npx", "skills", "ls", *flags],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                skills = json.loads(result.stdout)
+                if any(s.get("name") == SKILL_NAME for s in skills):
+                    return True
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError, OSError):
+            # npx not available or unexpected output – fall through
+            pass
     return False
 
 

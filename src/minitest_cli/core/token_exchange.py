@@ -51,6 +51,37 @@ def parse_and_save_token_response(settings: Settings, data: dict[str, Any]) -> C
         return None
 
 
+def register_oauth_client(supabase_url: str, redirect_uri: str) -> str:
+    """Dynamically register an OAuth2 client with Supabase and return the client_id."""
+    import httpx
+
+    register_url = f"{supabase_url}/auth/v1/oauth/clients/register"
+    try:
+        resp = httpx.post(
+            register_url,
+            json={
+                "client_name": "minitest-cli",
+                "redirect_uris": [redirect_uri],
+                "grant_types": ["authorization_code", "refresh_token"],
+                "response_types": ["code"],
+                "token_endpoint_auth_method": "none",
+            },
+            headers={"Content-Type": "application/json"},
+            timeout=15.0,
+        )
+    except httpx.HTTPError as exc:
+        auth_error(f"Failed to register OAuth client: {exc}")
+
+    if resp.status_code not in (200, 201):
+        auth_error(f"OAuth client registration failed: {resp.text}")
+
+    data = resp.json()
+    client_id: str | None = data.get("client_id")
+    if not client_id:
+        auth_error("OAuth client registration returned no client_id.")
+    return client_id  # type: ignore[return-value]
+
+
 def auth_error(message: str) -> NoReturn:
     """Print auth error to stderr and exit with code 2."""
     print(f"Error: {message}", file=sys.stderr)  # noqa: T201

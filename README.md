@@ -19,7 +19,7 @@ brew install minitap-ai/tap/minitest-cli
 ### pip
 
 ```bash
-pip install minitest-cli
+python3 -m pip install --user minitest-cli
 ```
 
 ### uvx (zero-install)

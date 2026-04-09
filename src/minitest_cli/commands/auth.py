@@ -1,6 +1,7 @@
 """Authentication commands: login, logout, status."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import typer
 
@@ -13,9 +14,38 @@ from minitest_cli.core.auth import (
     oauth_pkce_login,
 )
 from minitest_cli.core.config import Settings
-from minitest_cli.utils.output import output, print_error, print_success
+from minitest_cli.utils.output import output, print_error, print_info, print_success
 
 app = typer.Typer(name="auth", help="Authentication management.")
+
+# Directories where agent skills are typically installed (relative to project root)
+_SKILL_DIRS = [
+    ".agents/skills",
+    ".claude/skills",
+    ".cursor/skills",
+    ".windsurf/skills",
+    ".cline/skills",
+    ".roo/skills",
+    ".aider/skills",
+    ".codex/skills",
+    ".copilot/skills",
+    ".bolt/skills",
+    ".augment/skills",
+    ".devin/skills",
+    ".v0/skills",
+]
+
+SKILL_INSTALL_CMD = "npx skills add minitap-ai/agent-skills --skill minitest-cli"
+
+
+def _is_skill_installed() -> bool:
+    """Check if the minitest-cli skill is installed in any known agent skill directory."""
+    cwd = Path.cwd()
+    for skill_dir in _SKILL_DIRS:
+        skill_path = cwd / skill_dir / "minitest-cli" / "SKILL.md"
+        if skill_path.is_file():
+            return True
+    return False
 
 
 def _get_settings() -> Settings:
@@ -39,6 +69,15 @@ def login() -> None:
 
     creds = oauth_pkce_login(settings)
     print_success(f"Authenticated as {creds.email}")
+
+    # Check if the minitest-cli agent skill is installed
+    if not _is_skill_installed():
+        print_info("")
+        print_info("💡 The minitest-cli agent skill is not installed in this project.")
+        print_info("   Install it so your AI agent knows how to use minitest:")
+        print_info("")
+        print_info(f"   {SKILL_INSTALL_CMD}")
+        print_info("")
 
 
 @app.command()

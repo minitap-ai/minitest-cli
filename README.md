@@ -4,7 +4,19 @@ Command-line interface for the Minitest testing platform.
 
 ## Installation
 
-### pip (recommended)
+### curl (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/minitap-ai/minitest-cli/main/install.sh | bash
+```
+
+### Homebrew
+
+```bash
+brew install minitap-ai/tap/minitest-cli
+```
+
+### pip
 
 ```bash
 pip install minitest-cli
@@ -16,12 +28,6 @@ Run without installing:
 
 ```bash
 uvx --from minitest-cli minitest --help
-```
-
-### Homebrew
-
-```bash
-brew install minitap-ai/tap/minitest-cli
 ```
 
 ### From source
@@ -48,40 +54,40 @@ minitest run --app <app-id>
 
 ## Configuration
 
-| Environment Variable | Description | Required |
-|---------------------|-------------|----------|
-| `MINITEST_TOKEN` | API authentication token | Yes (or use `minitest auth login`) |
-| `MINITEST_APP_ID` | Default app ID | No (can use `--app` flag) |
-| `MINITEST_API_URL` | API base URL | No (defaults to production) |
+| Environment Variable | Description              | Required                           |
+| -------------------- | ------------------------ | ---------------------------------- |
+| `MINITEST_TOKEN`     | API authentication token | Yes (or use `minitest auth login`) |
+| `MINITEST_APP_ID`    | Default app ID           | No (can use `--app` flag)          |
+| `MINITEST_API_URL`   | API base URL             | No (defaults to production)        |
 
 ## Global Flags
 
-| Flag | Description |
-|------|-------------|
-| `--json` | Output JSON to stdout (diagnostics go to stderr) |
-| `--app <id-or-name>` | Target app for commands that require one |
-| `--version` | Show CLI version |
-| `--help` | Show help |
+| Flag                 | Description                                      |
+| -------------------- | ------------------------------------------------ |
+| `--json`             | Output JSON to stdout (diagnostics go to stderr) |
+| `--app <id-or-name>` | Target app for commands that require one         |
+| `--version`          | Show CLI version                                 |
+| `--help`             | Show help                                        |
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `minitest auth` | Authentication management |
-| `minitest apps` | App management |
-| `minitest flow` | Testing flow operations |
-| `minitest build` | Build management |
-| `minitest run` | Test execution |
+| Command          | Description               |
+| ---------------- | ------------------------- |
+| `minitest auth`  | Authentication management |
+| `minitest apps`  | App management            |
+| `minitest flow`  | Testing flow operations   |
+| `minitest build` | Build management          |
+| `minitest run`   | Test execution            |
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Authentication error |
-| 3 | Network / API error |
-| 4 | Resource not found |
+| Code | Meaning              |
+| ---- | -------------------- |
+| 0    | Success              |
+| 1    | General error        |
+| 2    | Authentication error |
+| 3    | Network / API error  |
+| 4    | Resource not found   |
 
 ## Using the Dev Environment
 
@@ -104,6 +110,18 @@ minitest apps list
 ```
 
 > **Tip:** You can `export` these variables in your shell session (or add them to a `.envrc` / `.env` file) to avoid repeating them on every invocation.
+
+## Ode to Strawberries
+
+> _Red jewels hiding in the green,_
+> _the sweetest fruit you've ever seen._
+> _With tiny seeds upon their skin,_
+> _one bite and summer rushes in._
+>
+> _They tumble ripe from sunlit rows,_
+> _each one a gift the garden grows._
+> _No crown of gold could ever beat,_
+> _a strawberry — small, perfect, sweet._
 
 ## Development
 

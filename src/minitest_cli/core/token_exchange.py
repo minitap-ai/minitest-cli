@@ -6,6 +6,8 @@ import sys
 import time
 from typing import Any, NoReturn
 
+import httpx
+
 from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import Credentials, save_credentials
 
@@ -53,8 +55,6 @@ def parse_and_save_token_response(settings: Settings, data: dict[str, Any]) -> C
 
 def register_oauth_client(supabase_url: str, redirect_uri: str) -> str:
     """Dynamically register an OAuth2 client with Supabase and return the client_id."""
-    import httpx
-
     register_url = f"{supabase_url}/auth/v1/oauth/clients/register"
     try:
         resp = httpx.post(
@@ -75,7 +75,14 @@ def register_oauth_client(supabase_url: str, redirect_uri: str) -> str:
     if resp.status_code not in (200, 201):
         auth_error(f"OAuth client registration failed: {resp.text}")
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError:
+        auth_error(
+            f"OAuth client registration returned invalid response "
+            f"(HTTP {resp.status_code}): {resp.text}"
+        )
+
     client_id: str | None = data.get("client_id")
     if not client_id:
         auth_error("OAuth client registration returned no client_id.")

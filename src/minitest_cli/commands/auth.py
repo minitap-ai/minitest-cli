@@ -73,10 +73,23 @@ def login() -> None:
     if not _is_skill_installed():
         print_info("")
         print_info("💡 The minitest-cli agent skill is not installed in this project.")
-        print_info("   Install it so your AI agent knows how to use minitest:")
+        print_info("   Your AI agent needs it to know how to use minitest.")
         print_info("")
-        print_info(f"   {SKILL_INSTALL_CMD}")
-        print_info("")
+        try:
+            answer = input("   Install it now? [Y/n] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = "n"
+            print()  # newline after ^C / ^D
+        if answer in ("", "y", "yes"):
+            print_info("")
+            print_info(f"   Running: {SKILL_INSTALL_CMD}")
+            print_info("")
+            subprocess.run(SKILL_INSTALL_CMD.split(), check=False)
+        else:
+            print_info("")
+            print_info("   You can install it later with:")
+            print_info(f"   {SKILL_INSTALL_CMD}")
+            print_info("")
 
 
 @app.command()

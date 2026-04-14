@@ -10,16 +10,19 @@ Command-line interface for the Minitest testing platform.
 curl -fsSL https://raw.githubusercontent.com/minitap-ai/minitest-cli/main/install.sh | bash
 ```
 
+This auto-detects and uses the fastest available method (`uv` > `brew`).
+If neither is installed, it bootstraps `uv` automatically.
+
+### uv
+
+```bash
+uv tool install minitest-cli
+```
+
 ### Homebrew
 
 ```bash
 brew install minitap-ai/tap/minitest-cli
-```
-
-### pip
-
-```bash
-python3 -m pip install --user minitest-cli
 ```
 
 ### uvx (zero-install)

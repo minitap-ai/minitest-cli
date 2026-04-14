@@ -1,4 +1,4 @@
-# install.ps1 — Install minitest-cli via uv (installs uv if not installed)
+# install.ps1 - Install minitest-cli via uv (installs uv if not installed)
 #
 # Usage:
 #   powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/minitap-ai/minitest-cli/main/install.ps1 | iex"
@@ -13,12 +13,31 @@ function Write-Ok    { param([string]$Message) Write-Host "==> $Message" -Foregr
 function Write-Warn  { param([string]$Message) Write-Host "Warning: $Message" -ForegroundColor Yellow }
 function Write-Err   { param([string]$Message) Write-Host "Error: $Message" -ForegroundColor Red }
 
+function Get-UvToolBinDir {
+    $dir = & uv tool dir --bin 2>$null
+    if ($dir) { return $dir }
+    return "$env:USERPROFILE\.local\bin"
+}
+
+function Add-PathEntryIfMissing {
+    param([string]$Entry)
+    $normalizedEntry = $Entry.TrimEnd('\')
+    $pathEntries = ($env:PATH -split ';' | Where-Object { $_ }) | ForEach-Object { $_.TrimEnd('\') }
+    if (-not ($pathEntries | Where-Object { $_ -ieq $normalizedEntry })) {
+        $env:PATH = "$Entry;$env:PATH"
+    }
+}
+
 function Install-WithUv {
     Write-Info "Installing $Package with uv..."
     try {
-        uv tool install $Package --force 2>&1 | Write-Host
-        $script:InstalledVia = "uv"
-        return $true
+        & uv tool install $Package --force 2>&1 | Write-Host
+        if ($LASTEXITCODE -eq 0) {
+            $script:InstalledVia = "uv"
+            return $true
+        }
+        Write-Warn "uv tool install failed with exit code $LASTEXITCODE."
+        return $false
     } catch {
         Write-Warn "uv tool install failed."
         return $false
@@ -31,14 +50,10 @@ function Install-Uv {
         & ([scriptblock]::Create((Invoke-RestMethod "https://astral.sh/uv/install.ps1")))
         # Refresh PATH so uv is available in this session
         $uvPath = "$env:USERPROFILE\.local\bin"
-        if ($env:PATH -notlike "*$uvPath*") {
-            $env:PATH = "$uvPath;$env:PATH"
-        }
+        Add-PathEntryIfMissing -Entry $uvPath
         # Also check cargo bin (uv may install there on some setups)
         $cargoPath = "$env:USERPROFILE\.cargo\bin"
-        if ($env:PATH -notlike "*$cargoPath*") {
-            $env:PATH = "$cargoPath;$env:PATH"
-        }
+        Add-PathEntryIfMissing -Entry $cargoPath
         return $true
     } catch {
         Write-Warn "Failed to install uv."
@@ -55,7 +70,7 @@ if (Get-Command uv -ErrorAction SilentlyContinue) {
     Install-WithUv | Out-Null
 }
 
-# 2. No uv — bootstrap it
+# 2. No uv - bootstrap it
 if (-not $InstalledVia) {
     if (Install-Uv) {
         Install-WithUv | Out-Null
@@ -82,8 +97,9 @@ if (Get-Command minitest -ErrorAction SilentlyContinue) {
     Write-Host "  minitest apps list        # list your apps"
     Write-Host "  minitest --help           # see all commands"
 } else {
-    # Check common uv tool bin locations
-    $uvBin = "$env:USERPROFILE\.local\bin\minitest.exe"
+    # Check uv tool bin directory
+    $toolBinDir = Get-UvToolBinDir
+    $uvBin = Join-Path $toolBinDir "minitest.exe"
     if (Test-Path $uvBin) {
         Write-Ok "minitest-cli installed successfully!"
         & $uvBin --version

@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — Install minitest-cli via uv
-#
-# If uv is already installed, uses it directly (~1s).
-# Otherwise, installs uv first (~5s total).
+# install.sh — Install minitest-cli via uv (installs uv if not installed)
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/minitap-ai/minitest-cli/main/install.sh | bash
@@ -89,12 +86,12 @@ bootstrap_uv() {
 # Main: use uv if available, otherwise bootstrap it
 # -------------------------------------------------------------------
 
-# 1. uv already installed? Use it (~1s)
+# 1. uv already installed? Use it
 if command -v uv &>/dev/null; then
   install_with_uv || true
 fi
 
-# 2. No uv — bootstrap it (~5s)
+# 2. No uv — bootstrap it
 if [[ -z "${INSTALLED_VIA}" ]]; then
   bootstrap_uv || true
 fi

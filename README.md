@@ -4,36 +4,43 @@ Command-line interface for the Minitest testing platform.
 
 ## Installation
 
-### curl (recommended)
+### One-liner (recommended)
+
+**macOS / Linux:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/minitap-ai/minitest-cli/main/install.sh | bash
 ```
 
-This auto-detects and uses the fastest available method (`uv` > `brew`).
-If neither is installed, it bootstraps `uv` automatically.
+**Windows (PowerShell):**
 
-### uv
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/minitap-ai/minitest-cli/main/install.ps1 | iex"
+```
+
+Both scripts use `uv` if available, or install it automatically.
+
+### Other methods
+
+**uv** (all platforms):
 
 ```bash
 uv tool install minitest-cli
 ```
 
-### Homebrew
+**Homebrew** (macOS):
 
 ```bash
 brew install minitap-ai/tap/minitest-cli
 ```
 
-### uvx (zero-install)
-
-Run without installing:
+**uvx** (zero-install, all platforms):
 
 ```bash
 uvx --from minitest-cli minitest --help
 ```
 
-### From source
+**From source:**
 
 ```bash
 git clone https://github.com/minitap-ai/minitest-cli.git

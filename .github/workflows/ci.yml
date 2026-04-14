@@ -63,3 +63,18 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  install-script:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v5
+
+      - name: Run install.sh
+        run: bash install.sh
+
+      - name: Verify minitest is usable
+        run: minitest --help

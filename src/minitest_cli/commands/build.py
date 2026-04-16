@@ -35,7 +35,10 @@ def upload(
     file: Annotated[
         Path,
         typer.Argument(
-            help="Path to the build file (.apk or .ipa).",
+            help=(
+                "Path to the build file (.apk or .ipa). Must be a Simulator"
+                " build for iOS or an x86_64-compatible .apk for Android."
+            ),
             exists=True,
             readable=True,
         ),
@@ -45,7 +48,14 @@ def upload(
         typer.Option(help="Target platform. Auto-detected from file extension."),
     ] = None,
 ) -> None:
-    """Upload a build file (.apk for Android, .ipa for iOS)."""
+    """Upload a build file (.apk for Android, .ipa for iOS).
+
+    Builds must be compatible with virtual devices:
+
+    \b
+    - iOS: provide a Simulator build (.ipa built for the iOS Simulator, not a physical device).
+    - Android: provide an x86_64-compatible .apk (most emulator images are x86_64).
+    """
     settings, app_id, json_mode = resolve_app()
     resolved_platform = platform.value if platform else detect_platform(file)
 

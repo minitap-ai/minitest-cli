@@ -69,10 +69,8 @@ def _is_newer(latest: str, current: str) -> bool:
 
 
 def _upgrade_command() -> str:
-    """Return the appropriate upgrade command based on install method."""
-    if _is_brew_install():
-        return "brew upgrade minitest-cli"
-    return "pip install --upgrade minitest-cli"
+    """Return the CLI self-upgrade command."""
+    return "minitest upgrade"
 
 
 def check_for_updates(settings: Settings) -> None:

@@ -83,3 +83,31 @@ dmypy.json
 # Opencode (local agent config — keep skills tracked)
 .opencode/*
 !.opencode/skill/
+
+# Agent skill directories (created by `npx skills add/update`)
+.agents/
+.claude/
+.codebuddy/
+.commandcode/
+.continue/
+.crush/
+.factory/
+.goose/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+skills/
+skills-lock.json

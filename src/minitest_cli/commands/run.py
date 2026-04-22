@@ -1,4 +1,4 @@
-"""Test execution commands: start a run, check status, list runs, run all flows."""
+"""Test execution commands: start a run, check status, list runs, run all user stories."""
 
 from typing import Annotated
 
@@ -14,15 +14,15 @@ from minitest_cli.commands.run_helpers import (
     handle_response_error,
     poll_run_status,
     resolve_app,
-    resolve_flow_id,
+    resolve_user_story_id,
     run_api_call,
     RUN_TABLE_HEADERS,
 )
-from minitest_cli.models.flow_run import (
-    BatchFlowRunResponse,
-    CreateFlowRunRequest,
-    FlowRunListResponse,
-    FlowRunResponse,
+from minitest_cli.models.story_run import (
+    BatchStoryRunResponse,
+    CreateStoryRunRequest,
+    StoryRunListResponse,
+    StoryRunResponse,
 )
 from minitest_cli.utils.output import output, print_info, print_json, print_success, print_table
 
@@ -31,21 +31,21 @@ app = typer.Typer(name="run", help="Test execution.")
 
 @app.command()
 def start(
-    flow: Annotated[str, typer.Argument(help="Flow name or UUID to run.")],
+    user_story: Annotated[str, typer.Argument(help="User-story name or UUID to run.")],
     ios_build: Annotated[str, typer.Option("--ios-build", help="iOS build ID.")],
     android_build: Annotated[str, typer.Option("--android-build", help="Android build ID.")],
     watch: Annotated[
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
 ) -> None:
-    """Start a new test run for a flow."""
+    """Start a new test run for a user story."""
     settings, app_id, json_mode = resolve_app()
 
-    async def _start() -> FlowRunResponse:
+    async def _start() -> StoryRunResponse:
         async with ApiClient(settings) as client:
-            flow_id = await resolve_flow_id(client, app_id, flow)
-            body = CreateFlowRunRequest(
-                flow_template_id=flow_id,
+            user_story_id = await resolve_user_story_id(client, app_id, user_story)
+            body = CreateStoryRunRequest(
+                user_story_id=user_story_id,
                 ios_build_id=ios_build,
                 android_build_id=android_build,
             )
@@ -54,7 +54,7 @@ def start(
                 json=body.model_dump(by_alias=True, exclude_none=True),
             )
             handle_response_error(resp, resource="Run")
-            run = FlowRunResponse.model_validate(resp.json())
+            run = StoryRunResponse.model_validate(resp.json())
             if not watch:
                 return run
             return await poll_run_status(client, app_id, run.id, json_mode)
@@ -82,11 +82,11 @@ def status(
     """Check the status of a test run."""
     settings, app_id, json_mode = resolve_app()
 
-    async def _status() -> FlowRunResponse:
+    async def _status() -> StoryRunResponse:
         async with ApiClient(settings) as client:
             resp = await client.get(f"{base_path(app_id)}/{run_id}")
             handle_response_error(resp, resource="Run")
-            run = FlowRunResponse.model_validate(resp.json())
+            run = StoryRunResponse.model_validate(resp.json())
             if watch and run.status not in {"completed", "failed"}:
                 return await poll_run_status(client, app_id, run.id, json_mode)
             return run
@@ -97,7 +97,7 @@ def status(
 
 @app.command(name="list")
 def list_runs(
-    flow: Annotated[str, typer.Argument(help="Flow name or UUID to list runs for.")],
+    user_story: Annotated[str, typer.Argument(help="User-story name or UUID to list runs for.")],
     page: Annotated[int, typer.Option(help="Page number.")] = 1,
     page_size: Annotated[int, typer.Option(help="Items per page.")] = 20,
     status_filter: Annotated[
@@ -106,15 +106,15 @@ def list_runs(
     ] = None,
     all_pages: Annotated[bool, typer.Option("--all", help="Fetch all results.")] = False,
 ) -> None:
-    """List runs for a flow."""
+    """List runs for a user story."""
     settings, app_id, json_mode = resolve_app()
     if all_pages:
         page, page_size = 1, 100
 
-    async def _list() -> FlowRunListResponse:
+    async def _list() -> StoryRunListResponse:
         async with ApiClient(settings) as client:
-            flow_id = await resolve_flow_id(client, app_id, flow)
-            return await fetch_runs(client, app_id, flow_id, page, page_size, status_filter)
+            user_story_id = await resolve_user_story_id(client, app_id, user_story)
+            return await fetch_runs(client, app_id, user_story_id, page, page_size, status_filter)
 
     result = run_api_call(_list())
 
@@ -137,15 +137,15 @@ def run_all(
     ios_build: Annotated[str, typer.Option("--ios-build", help="iOS build ID.")],
     android_build: Annotated[str, typer.Option("--android-build", help="Android build ID.")],
 ) -> None:
-    """Start test runs for all flows (fire-and-forget)."""
+    """Start test runs for all user stories (fire-and-forget)."""
     settings, app_id, json_mode = resolve_app()
 
-    async def _run_all() -> BatchFlowRunResponse:
+    async def _run_all() -> BatchStoryRunResponse:
         async with ApiClient(settings) as client:
             body = {"iosBuildId": ios_build, "androidBuildId": android_build}
             resp = await client.post(f"{base_path(app_id)}/batch", json=body)
             handle_response_error(resp, resource="Batch run")
-            return BatchFlowRunResponse.model_validate(resp.json())
+            return BatchStoryRunResponse.model_validate(resp.json())
 
     batch = run_api_call(_run_all())
 
@@ -154,19 +154,20 @@ def run_all(
             [
                 {
                     "run_id": r.id,
-                    "flow": r.flow_template_name or r.flow_template_id,
+                    "user_story": r.user_story_name or r.user_story_id,
                     "status": r.status.value,
                 }
-                for r in batch.flows
+                for r in batch.story_runs
             ]
         )
         return
 
-    rows = [format_run_row(r) for r in batch.flows]
+    rows = [format_run_row(r) for r in batch.story_runs]
     print_table(RUN_TABLE_HEADERS, rows, title="Batch Runs Started")
     if batch.message:
         print_info(batch.message)
     else:
         print_info(
-            f"Started {len(batch.flows)} runs. Use `minitest run status <id>` to check progress."
+            f"Started {len(batch.story_runs)} runs. "
+            "Use `minitest run status <id>` to check progress."
         )

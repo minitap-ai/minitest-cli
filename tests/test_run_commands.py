@@ -18,7 +18,7 @@ from minitest_cli.commands.run_helpers import (
     is_uuid,
 )
 from minitest_cli.core.config import Settings
-from minitest_cli.models.flow_run import FlowRunResponse
+from minitest_cli.models.story_run import StoryRunResponse
 
 runner = CliRunner()
 
@@ -81,7 +81,7 @@ def _mock_client() -> AsyncMock:
 # Fixtures / sample data — matches the real API flat response shape
 # ---------------------------------------------------------------------------
 
-_FLOW_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+_USER_STORY_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 _RUN_UUID = "11111111-2222-3333-4444-555555555555"
 _IOS_BUILD_UUID = "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1"
 _ANDROID_BUILD_UUID = "b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2"
@@ -90,8 +90,8 @@ _CRITERIA_UUID_2 = "c2c2c2c2-c2c2-c2c2-c2c2-c2c2c2c2c2c2"
 
 _PENDING_RUN = {
     "id": _RUN_UUID,
-    "flowTemplateId": _FLOW_UUID,
-    "flowTemplateName": "Login Flow",
+    "userStoryId": _USER_STORY_UUID,
+    "userStoryName": "Login Story",
     "tenantId": "tenant-1",
     "status": "pending",
     "iosBuildId": _IOS_BUILD_UUID,
@@ -110,8 +110,8 @@ _PENDING_RUN = {
 
 _COMPLETED_RUN = {
     "id": _RUN_UUID,
-    "flowTemplateId": _FLOW_UUID,
-    "flowTemplateName": "Login Flow",
+    "userStoryId": _USER_STORY_UUID,
+    "userStoryName": "Login Story",
     "tenantId": "tenant-1",
     "status": "completed",
     "iosBuildId": _IOS_BUILD_UUID,
@@ -128,8 +128,8 @@ _COMPLETED_RUN = {
     "results": [
         {
             "id": "r1",
-            "flowId": _RUN_UUID,
-            "acceptanceCriteriaId": _CRITERIA_UUID_1,
+            "storyRunId": _RUN_UUID,
+            "criterionVersionId": _CRITERIA_UUID_1,
             "platform": "ios",
             "success": True,
             "failReason": None,
@@ -137,8 +137,8 @@ _COMPLETED_RUN = {
         },
         {
             "id": "r2",
-            "flowId": _RUN_UUID,
-            "acceptanceCriteriaId": _CRITERIA_UUID_1,
+            "storyRunId": _RUN_UUID,
+            "criterionVersionId": _CRITERIA_UUID_1,
             "platform": "android",
             "success": False,
             "failReason": "Button not found",
@@ -154,10 +154,14 @@ _FAILED_RUN = {
     "androidErrorMessage": None,
 }
 
-_FLOW_LIST = {
+_USER_STORY_LIST = {
     "items": [
-        {"id": _FLOW_UUID, "name": "Login Flow", "type": "standard"},
-        {"id": "ff000000-0000-0000-0000-000000000001", "name": "Checkout Flow", "type": "standard"},
+        {"id": _USER_STORY_UUID, "name": "Login Story", "type": "standard"},
+        {
+            "id": "ff000000-0000-0000-0000-000000000001",
+            "name": "Checkout Story",
+            "type": "standard",
+        },
     ],
     "total": 2,
     "page": 1,
@@ -174,16 +178,16 @@ _RUN_LIST_RESPONSE = {
 }
 
 _BATCH_RESPONSE = {
-    "flows": [
-        {**_PENDING_RUN, "flowTemplateName": "Login Flow"},
+    "storyRuns": [
+        {**_PENDING_RUN, "userStoryName": "Login Story"},
         {
             **_PENDING_RUN,
             "id": "22222222-3333-4444-5555-666666666666",
-            "flowTemplateName": "Checkout Flow",
-            "flowTemplateId": "ff000000-0000-0000-0000-000000000001",
+            "userStoryName": "Checkout Story",
+            "userStoryId": "ff000000-0000-0000-0000-000000000001",
         },
     ],
-    "message": "Created 2 flows. 2 queued for execution.",
+    "message": "Created 2 story runs. 2 queued for execution.",
 }
 
 
@@ -200,7 +204,7 @@ class TestIsUuid:
         assert is_uuid("AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE") is True
 
     def test_name_returns_false(self) -> None:
-        assert is_uuid("Login Flow") is False
+        assert is_uuid("Login Story") is False
 
     def test_partial_uuid_returns_false(self) -> None:
         assert is_uuid("aaaaaaaa-bbbb-cccc-dddd") is False
@@ -243,7 +247,7 @@ class TestHandleResponseError:
 
     def test_500_fk_violation_exits_4(self) -> None:
         """API leaks Postgres FK violations as 500; treat as not-found."""
-        fk_msg = 'insert or update on table "flows" violates foreign key constraint'
+        fk_msg = 'insert or update on table "story_runs" violates foreign key constraint'
         resp = _mock_response(
             500,
             {"error": "internal_error", "message": fk_msg},
@@ -259,23 +263,23 @@ class TestHandleResponseError:
 
 class TestFormatRunRow:
     def test_formats_complete_run(self) -> None:
-        run = FlowRunResponse.model_validate(_COMPLETED_RUN)
+        run = StoryRunResponse.model_validate(_COMPLETED_RUN)
         row = format_run_row(run)
         assert row[0] == _RUN_UUID
-        assert row[1] == "Login Flow"
+        assert row[1] == "Login Story"
         assert row[2] == "completed"
         assert "2025-06-01" in row[3]
 
-    def test_falls_back_to_flow_template_id(self) -> None:
-        data = {**_PENDING_RUN, "flowTemplateName": None}
-        run = FlowRunResponse.model_validate(data)
+    def test_falls_back_to_user_story_id(self) -> None:
+        data = {**_PENDING_RUN, "userStoryName": None}
+        run = StoryRunResponse.model_validate(data)
         row = format_run_row(run)
-        assert row[1] == _FLOW_UUID
+        assert row[1] == _USER_STORY_UUID
 
 
 class TestDisplayRunResult:
     def test_json_mode_outputs_json(self, capsys) -> None:
-        run = FlowRunResponse.model_validate(_COMPLETED_RUN)
+        run = StoryRunResponse.model_validate(_COMPLETED_RUN)
         display_run_result(run, json_mode=True)
         output = capsys.readouterr().out
         data = json.loads(output)
@@ -287,7 +291,7 @@ class TestDisplayRunResult:
         assert data["results"][1]["fail_reason"] == "Button not found"
 
     def test_human_mode_shows_criteria_table(self, capsys) -> None:
-        run = FlowRunResponse.model_validate(_COMPLETED_RUN)
+        run = StoryRunResponse.model_validate(_COMPLETED_RUN)
         display_run_result(run, json_mode=False)
         captured = capsys.readouterr()
         # print_table goes to stdout, per-platform info to stderr
@@ -303,14 +307,14 @@ class TestDisplayRunResult:
 
 class TestStartCommand:
     def test_start_with_uuid_no_watch_json(self, tmp_path) -> None:
-        """Start a run using a flow UUID, no-watch mode, JSON output."""
+        """Start a run using a user-story UUID, no-watch mode, JSON output."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", _FLOW_UUID, "--no-watch", *_BUILD_FLAGS],
+                ["start", _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS],
                 settings,
                 json_mode=True,
             )
@@ -320,16 +324,16 @@ class TestStartCommand:
         assert data["run_id"] == _RUN_UUID
         assert data["status"] == "pending"
 
-    def test_start_with_name_resolves_flow(self, tmp_path) -> None:
-        """Start a run using a flow name; verifies flow list fetch + name resolution."""
+    def test_start_with_name_resolves_user_story(self, tmp_path) -> None:
+        """Start a run using a user-story name; verifies list fetch + name resolution."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        client.get = AsyncMock(return_value=_mock_response(200, _FLOW_LIST))
+        client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
         client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", "Login Flow", "--no-watch", *_BUILD_FLAGS],
+                ["start", "Login Story", "--no-watch", *_BUILD_FLAGS],
                 settings,
                 json_mode=True,
             )
@@ -338,18 +342,18 @@ class TestStartCommand:
         data = json.loads(result.output)
         assert data["run_id"] == _RUN_UUID
         first_get = client.get.call_args_list[0]
-        assert "/flow-templates" in first_get[0][0]
+        assert "/user-stories" in first_get[0][0]
 
     def test_start_with_name_case_insensitive(self, tmp_path) -> None:
-        """Flow name resolution is case-insensitive."""
+        """User-story name resolution is case-insensitive."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        client.get = AsyncMock(return_value=_mock_response(200, _FLOW_LIST))
+        client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
         client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", "login flow", "--no-watch", *_BUILD_FLAGS],
+                ["start", "login story", "--no-watch", *_BUILD_FLAGS],
                 settings,
                 json_mode=True,
             )
@@ -364,7 +368,7 @@ class TestStartCommand:
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", _FLOW_UUID, "--no-watch", *_BUILD_FLAGS],
+                ["start", _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS],
                 settings,
                 json_mode=True,
             )
@@ -383,7 +387,7 @@ class TestStartCommand:
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", _FLOW_UUID, "--no-watch", *_BUILD_FLAGS],
+                ["start", _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS],
                 settings,
                 json_mode=False,
             )
@@ -392,29 +396,29 @@ class TestStartCommand:
         assert _RUN_UUID in result.output
         assert "minitest run status" in result.output
 
-    def test_start_flow_not_found_exits_4(self, tmp_path) -> None:
-        """When flow name doesn't match any known flow, exit code 4."""
+    def test_start_user_story_not_found_exits_4(self, tmp_path) -> None:
+        """When user-story name doesn't match any known user story, exit code 4."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        client.get = AsyncMock(return_value=_mock_response(200, _FLOW_LIST))
+        client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", "Nonexistent Flow", "--no-watch", *_BUILD_FLAGS],
+                ["start", "Nonexistent Story", "--no-watch", *_BUILD_FLAGS],
                 settings,
             )
 
         assert result.exit_code == 4
 
     def test_start_api_error_exits_3(self, tmp_path) -> None:
-        """HTTP 500 from POST /flows exits with code 3."""
+        """HTTP 500 from POST /story-runs exits with code 3."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(500, {"detail": "server error"}))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", _FLOW_UUID, "--no-watch", *_BUILD_FLAGS],
+                ["start", _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS],
                 settings,
             )
 
@@ -428,7 +432,7 @@ class TestStartCommand:
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["start", _FLOW_UUID, "--no-watch", *_BUILD_FLAGS],
+                ["start", _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS],
                 settings,
             )
 
@@ -442,7 +446,9 @@ class TestStartCommand:
             "minitest_cli.core.auth.require_auth",
             side_effect=typer.Exit(code=2),
         ):
-            result = _run_with_context(["start", _FLOW_UUID, "--no-watch", *_BUILD_FLAGS], settings)
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS], settings
+            )
 
         assert result.exit_code == 2
 
@@ -464,7 +470,7 @@ class TestStartCommand:
             patch("minitest_cli.commands.run_helpers.err_console"),
         ):
             result = _run_with_context(
-                ["start", _FLOW_UUID, *_BUILD_FLAGS],
+                ["start", _USER_STORY_UUID, *_BUILD_FLAGS],
                 settings,
                 json_mode=True,
             )
@@ -479,7 +485,7 @@ class TestStartCommand:
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=_mock_client()):
             result = _run_with_context(
-                ["start", _FLOW_UUID, "--no-watch"],
+                ["start", _USER_STORY_UUID, "--no-watch"],
                 settings,
             )
 
@@ -513,7 +519,7 @@ class TestStatusCommand:
         assert data["results"][0]["success"] is True
         assert data["results"][1]["fail_reason"] == "Button not found"
         # Verify correct endpoint was called
-        assert client.get.call_args[0][0] == f"/api/v1/apps/app-123/flows/{_RUN_UUID}"
+        assert client.get.call_args[0][0] == f"/api/v1/apps/app-123/story-runs/{_RUN_UUID}"
 
     def test_status_human_mode_shows_results(self, tmp_path) -> None:
         """Human mode displays criteria and recording URLs."""
@@ -626,7 +632,7 @@ class TestStatusCommand:
             )
 
         assert result.exit_code == 0
-        assert client.get.call_args[0][0] == f"/api/v1/apps/flag-app-789/flows/{_RUN_UUID}"
+        assert client.get.call_args[0][0] == f"/api/v1/apps/flag-app-789/story-runs/{_RUN_UUID}"
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +642,7 @@ class TestStatusCommand:
 
 class TestRunAllCommand:
     def test_all_fires_batch_and_returns_json(self, tmp_path) -> None:
-        """run all POST /flows/batch, returns JSON list."""
+        """run all POST /story-runs/batch, returns JSON list."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
@@ -652,8 +658,8 @@ class TestRunAllCommand:
         data = json.loads(result.output)
         assert len(data) == 2
         assert data[0]["run_id"] == _RUN_UUID
-        assert data[0]["flow"] == "Login Flow"
-        assert client.post.call_args[0][0] == "/api/v1/apps/app-123/flows/batch"
+        assert data[0]["user_story"] == "Login Story"
+        assert client.post.call_args[0][0] == "/api/v1/apps/app-123/story-runs/batch"
 
     def test_all_human_mode_shows_table(self, tmp_path) -> None:
         """Human mode displays a table of started runs."""
@@ -670,7 +676,7 @@ class TestRunAllCommand:
 
         assert result.exit_code == 0
         assert "Batch Runs" in result.output
-        assert "Login Flow" in result.output
+        assert "Login Story" in result.output
 
     def test_all_posts_correct_build_ids(self, tmp_path) -> None:
         """Build IDs from flags are sent in the batch POST body."""
@@ -738,7 +744,7 @@ class TestListRunsCommand:
         client.get.return_value = _mock_response(200, _RUN_LIST_RESPONSE)
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
-            result = _run_with_context(["list", _FLOW_UUID], settings, json_mode=True)
+            result = _run_with_context(["list", _USER_STORY_UUID], settings, json_mode=True)
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -750,10 +756,10 @@ class TestListRunsCommand:
         client.get.return_value = _mock_response(200, _RUN_LIST_RESPONSE)
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
-            result = _run_with_context(["list", _FLOW_UUID], settings)
+            result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 0
-        assert "Login Flow" in result.output
+        assert "Login Story" in result.output
 
     def test_list_empty(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
@@ -762,7 +768,7 @@ class TestListRunsCommand:
         client.get.return_value = _mock_response(200, empty)
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
-            result = _run_with_context(["list", _FLOW_UUID], settings)
+            result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 0
 
@@ -773,7 +779,7 @@ class TestListRunsCommand:
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
-                ["list", _FLOW_UUID, "--status", "completed"], settings, json_mode=True
+                ["list", _USER_STORY_UUID, "--status", "completed"], settings, json_mode=True
             )
 
         assert result.exit_code == 0
@@ -784,16 +790,16 @@ class TestListRunsCommand:
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.get.side_effect = [
-            _mock_response(200, _FLOW_LIST),
+            _mock_response(200, _USER_STORY_LIST),
             _mock_response(200, _RUN_LIST_RESPONSE),
         ]
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
-            result = _run_with_context(["list", "Login Flow"], settings, json_mode=True)
+            result = _run_with_context(["list", "Login Story"], settings, json_mode=True)
 
         assert result.exit_code == 0
         path = client.get.call_args_list[1][0][0]
-        assert _FLOW_UUID in path
+        assert _USER_STORY_UUID in path
 
     def test_list_api_error(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
@@ -801,7 +807,7 @@ class TestListRunsCommand:
         client.get.return_value = _mock_response(500, {"detail": "Server error"})
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
-            result = _run_with_context(["list", _FLOW_UUID], settings)
+            result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 3
 
@@ -811,7 +817,7 @@ class TestListRunsCommand:
         client.get.side_effect = httpx.ConnectError("Connection refused")
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
-            result = _run_with_context(["list", _FLOW_UUID], settings)
+            result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 3
 
@@ -822,6 +828,6 @@ class TestListRunsCommand:
             "minitest_cli.core.auth.require_auth",
             side_effect=typer.Exit(code=2),
         ):
-            result = _run_with_context(["list", _FLOW_UUID], settings)
+            result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 2

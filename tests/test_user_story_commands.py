@@ -1,4 +1,7 @@
-"""Essential tests for flow commands - validates business logic, error handling, and CLI parsing."""
+"""Essential tests for user-story commands.
+
+Validates business logic, error handling, and CLI parsing.
+"""
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -8,12 +11,12 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
-from minitest_cli.commands.flow import app as flow_app
+from minitest_cli.commands.user_story import app as user_story_app
 from minitest_cli.core.config import Settings
 
 runner = CliRunner()
 
-VALID_FLOW_TYPES = ["login", "registration", "checkout", "onboarding", "other"]
+VALID_USER_STORY_TYPES = ["login", "registration", "checkout", "onboarding", "other"]
 
 
 def _make_settings(tmp_path, **overrides):
@@ -41,7 +44,7 @@ def _run_with_context(args, settings, json_mode=False, app_flag=None):
     for p in patches:
         p.start()
     try:
-        result = runner.invoke(flow_app, args)
+        result = runner.invoke(user_story_app, args)
     finally:
         for p in patches:
             p.stop()
@@ -55,9 +58,9 @@ def _mock_response(status_code=200, json_data=None):
     return resp
 
 
-SAMPLE_FLOW = {
-    "id": "flow-1",
-    "name": "Login Flow",
+SAMPLE_USER_STORY = {
+    "id": "story-1",
+    "name": "Login Story",
     "type": "login",
     "acceptanceCriteria": [
         {"id": "ac-1", "content": "User can log in"},
@@ -66,15 +69,15 @@ SAMPLE_FLOW = {
 }
 
 
-class TestCreateFlow:
+class TestCreateUserStory:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
         with patch(
-            "minitest_cli.commands.flow_helpers.fetch_flow_types",
-            return_value=VALID_FLOW_TYPES,
+            "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+            return_value=VALID_USER_STORY_TYPES,
         ):
             result = _run_with_context(
-                ["create", "--name", "Bad Flow", "--type", "invalid_type"],
+                ["create", "--name", "Bad Story", "--type", "invalid_type"],
                 settings,
             )
         assert result.exit_code != 0
@@ -84,17 +87,17 @@ class TestCreateFlow:
         settings = _make_settings(tmp_path)
         with (
             patch(
-                "minitest_cli.commands.flow_helpers.fetch_flow_types",
-                return_value=VALID_FLOW_TYPES,
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.flow.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.side_effect = httpx.ConnectError("Connection refused")
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "Flow", "--type", "login"],
+                ["create", "--name", "Story", "--type", "login"],
                 settings,
             )
         assert result.exit_code == 3
@@ -102,31 +105,31 @@ class TestCreateFlow:
 
     def test_valid_type_accepted(self, tmp_path):
         settings = _make_settings(tmp_path)
-        mock_resp = _mock_response(201, {"id": "new-flow", "name": "Flow", "type": "login"})
+        mock_resp = _mock_response(201, {"id": "new-story", "name": "Story", "type": "login"})
         with (
             patch(
-                "minitest_cli.commands.flow_helpers.fetch_flow_types",
-                return_value=VALID_FLOW_TYPES,
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.flow.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "Flow", "--type", "login"],
+                ["create", "--name", "Story", "--type", "login"],
                 settings,
             )
         assert result.exit_code == 0
 
 
-class TestListFlows:
+class TestListUserStories:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
         with patch(
-            "minitest_cli.commands.flow_helpers.fetch_flow_types",
-            return_value=VALID_FLOW_TYPES,
+            "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+            return_value=VALID_USER_STORY_TYPES,
         ):
             result = _run_with_context(["list", "--type", "bad_type"], settings)
         assert result.exit_code != 0
@@ -135,12 +138,12 @@ class TestListFlows:
     def test_all_flag_fetches_multiple_pages(self, tmp_path):
         settings = _make_settings(tmp_path)
         page1_resp = _mock_response(
-            200, {"items": [SAMPLE_FLOW], "total": 2, "page": 1, "pageSize": 100}
+            200, {"items": [SAMPLE_USER_STORY], "total": 2, "page": 1, "pageSize": 100}
         )
         page2_resp = _mock_response(
-            200, {"items": [SAMPLE_FLOW], "total": 2, "page": 2, "pageSize": 100}
+            200, {"items": [SAMPLE_USER_STORY], "total": 2, "page": 2, "pageSize": 100}
         )
-        with patch("minitest_cli.commands.flow.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.side_effect = [page1_resp, page2_resp]
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -152,33 +155,33 @@ class TestListFlows:
         assert len(data) == 2
 
 
-class TestGetFlow:
+class TestGetUserStory:
     def test_not_found_exits_4(self, tmp_path):
         settings = _make_settings(tmp_path)
-        mock_resp = _mock_response(404, {"detail": "Flow not found"})
-        with patch("minitest_cli.commands.flow.ApiClient") as MockClient:
+        mock_resp = _mock_response(404, {"detail": "User story not found"})
+        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-            result = _run_with_context(["get", "flow-1"], settings)
+            result = _run_with_context(["get", "story-1"], settings)
         assert result.exit_code == 4
         assert "not found" in result.output.lower()
 
 
-class TestUpdateFlow:
+class TestUpdateUserStory:
     def test_add_criteria_fetches_and_appends(self, tmp_path):
         settings = _make_settings(tmp_path)
-        get_resp = _mock_response(200, SAMPLE_FLOW)
-        patch_resp = _mock_response(200, SAMPLE_FLOW)
-        with patch("minitest_cli.commands.flow_modify.ApiClient") as MockClient:
+        get_resp = _mock_response(200, SAMPLE_USER_STORY)
+        patch_resp = _mock_response(200, SAMPLE_USER_STORY)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = get_resp
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["update", "flow-1", "--add-criteria", "New criterion"],
+                ["update", "story-1", "--add-criteria", "New criterion"],
                 settings,
                 json_mode=True,
             )
@@ -193,14 +196,14 @@ class TestUpdateFlow:
 
     def test_empty_payload_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
-        result = _run_with_context(["update", "flow-1"], settings)
+        result = _run_with_context(["update", "story-1"], settings)
         assert result.exit_code == 1
         assert "Provide at least one field to update" in result.output
 
     def test_conflicting_criteria_flags_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
         result = _run_with_context(
-            ["update", "flow-1", "--criteria", "A", "--add-criteria", "B"],
+            ["update", "story-1", "--criteria", "A", "--add-criteria", "B"],
             settings,
         )
         assert result.exit_code == 1
@@ -209,79 +212,79 @@ class TestUpdateFlow:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
         with patch(
-            "minitest_cli.commands.flow_helpers.fetch_flow_types",
-            return_value=VALID_FLOW_TYPES,
+            "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+            return_value=VALID_USER_STORY_TYPES,
         ):
             result = _run_with_context(
-                ["update", "flow-1", "--type", "nonsense"],
+                ["update", "story-1", "--type", "nonsense"],
                 settings,
             )
         assert result.exit_code != 0
         assert "invalid" in result.output.lower() or "nonsense" in result.output.lower()
 
 
-class TestDeleteFlow:
+class TestDeleteUserStory:
     def test_requires_force_flag(self, tmp_path):
         settings = _make_settings(tmp_path)
-        result = _run_with_context(["delete", "flow-1"], settings)
+        result = _run_with_context(["delete", "story-1"], settings)
         assert result.exit_code == 1
         assert "--force" in result.output
 
     def test_not_found_exits_4(self, tmp_path):
         settings = _make_settings(tmp_path)
-        mock_resp = _mock_response(404, {"detail": "Flow not found"})
-        with patch("minitest_cli.commands.flow_modify.ApiClient") as MockClient:
+        mock_resp = _mock_response(404, {"detail": "User story not found"})
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.delete.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-            result = _run_with_context(["delete", "flow-1", "--force"], settings)
+            result = _run_with_context(["delete", "story-1", "--force"], settings)
         assert result.exit_code == 4
         assert "not found" in result.output.lower()
 
 
-class TestFetchFlowTypes:
-    """Tests for the fetch_flow_types helper."""
+class TestFetchUserStoryTypes:
+    """Tests for the fetch_user_story_types helper."""
 
     def test_returns_api_types_on_success(self, tmp_path):
-        from minitest_cli.commands.flow_helpers import fetch_flow_types
+        from minitest_cli.commands.user_story_helpers import fetch_user_story_types
 
         settings = _make_settings(tmp_path)
         api_types = ["login", "registration", "checkout", "new_type"]
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 200
         mock_resp.json.return_value = api_types
-        with patch("minitest_cli.commands.flow_helpers.httpx.get", return_value=mock_resp):
-            result = fetch_flow_types(settings)
+        with patch("minitest_cli.commands.user_story_helpers.httpx.get", return_value=mock_resp):
+            result = fetch_user_story_types(settings)
         assert result == api_types
 
     def test_network_error_exits_3(self, tmp_path):
         from click.exceptions import Exit
 
-        from minitest_cli.commands.flow_helpers import fetch_flow_types
+        from minitest_cli.commands.user_story_helpers import fetch_user_story_types
 
         settings = _make_settings(tmp_path)
         with (
             patch(
-                "minitest_cli.commands.flow_helpers.httpx.get",
+                "minitest_cli.commands.user_story_helpers.httpx.get",
                 side_effect=httpx.ConnectError("fail"),
             ),
             pytest.raises(Exit) as exc_info,
         ):
-            fetch_flow_types(settings)
+            fetch_user_story_types(settings)
         assert exc_info.value.exit_code == 3
 
     def test_non_200_exits_3(self, tmp_path):
         from click.exceptions import Exit
 
-        from minitest_cli.commands.flow_helpers import fetch_flow_types
+        from minitest_cli.commands.user_story_helpers import fetch_user_story_types
 
         settings = _make_settings(tmp_path)
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 500
         with (
-            patch("minitest_cli.commands.flow_helpers.httpx.get", return_value=mock_resp),
+            patch("minitest_cli.commands.user_story_helpers.httpx.get", return_value=mock_resp),
             pytest.raises(Exit) as exc_info,
         ):
-            fetch_flow_types(settings)
+            fetch_user_story_types(settings)
         assert exc_info.value.exit_code == 3

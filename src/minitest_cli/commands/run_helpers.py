@@ -11,7 +11,7 @@ import typer
 from minitest_cli.api.client import ApiClient
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.config import Settings
-from minitest_cli.models.flow_run import FlowRunListResponse, FlowRunResponse, RunStatus
+from minitest_cli.models.story_run import RunStatus, StoryRunListResponse, StoryRunResponse
 from minitest_cli.utils.output import err_console, print_error
 
 from minitest_cli.commands.run_display import (  # noqa: F401
@@ -58,8 +58,8 @@ def resolve_app() -> tuple[Settings, str, bool]:
 
 
 def base_path(app_id: str) -> str:
-    """Return the base API path for flow runs."""
-    return f"/api/v1/apps/{app_id}/flows"
+    """Return the base API path for story runs."""
+    return f"/api/v1/apps/{app_id}/story-runs"
 
 
 def extract_detail(resp: httpx.Response) -> str | None:
@@ -83,7 +83,7 @@ def handle_response_error(resp: httpx.Response, *, resource: str = "Run") -> Non
         detail = extract_detail(resp) or ""
         if "violates foreign key constraint" in detail:
             msg = f"{resource} references a resource that does not exist."
-            print_error(f"{msg} Check the flow and build IDs.")
+            print_error(f"{msg} Check the user-story and build IDs.")
             raise typer.Exit(code=EXIT_NOT_FOUND)
     if resp.status_code >= 400:
         detail = extract_detail(resp)
@@ -105,53 +105,53 @@ def is_uuid(value: str) -> bool:
     return bool(UUID_PATTERN.match(value))
 
 
-async def resolve_flow_id(
+async def resolve_user_story_id(
     client: ApiClient,
     app_id: str,
-    flow_ref: str,
+    user_story_ref: str,
 ) -> str:
-    """Resolve a flow name or UUID to a flow template ID.
+    """Resolve a user-story name or UUID to a user-story ID.
 
-    If flow_ref is a UUID, returns it directly.
-    Otherwise fetches flow list and does case-insensitive name match.
+    If user_story_ref is a UUID, returns it directly.
+    Otherwise fetches the user-story list and does case-insensitive name match.
     """
-    if is_uuid(flow_ref):
-        return flow_ref
+    if is_uuid(user_story_ref):
+        return user_story_ref
 
     resp = await client.get(
-        f"/api/v1/apps/{app_id}/flow-templates",
+        f"/api/v1/apps/{app_id}/user-stories",
         params={"page_size": 100},
     )
-    handle_response_error(resp, resource="Flow")
+    handle_response_error(resp, resource="User story")
 
     items = resp.json().get("items", [])
-    for flow in items:
-        if flow.get("name", "").lower() == flow_ref.lower():
-            return flow["id"]
+    for story in items:
+        if story.get("name", "").lower() == user_story_ref.lower():
+            return story["id"]
 
-    print_error(f"Flow not found: '{flow_ref}'. Use a valid flow name or UUID.")
+    print_error(f"User story not found: '{user_story_ref}'. Use a valid user-story name or UUID.")
     raise typer.Exit(code=EXIT_NOT_FOUND)
 
 
 async def fetch_runs(
     client: ApiClient,
     app_id: str,
-    flow_id: str,
+    user_story_id: str,
     page: int,
     page_size: int,
     status_filter: str | None,
-) -> FlowRunListResponse:
-    """Fetch paginated runs for a flow template."""
+) -> StoryRunListResponse:
+    """Fetch paginated runs for a user story."""
     params: dict[str, str | int] = {"page": page, "page_size": page_size}
     if status_filter is not None:
         params["status"] = status_filter
 
     resp = await client.get(
-        f"/api/v1/apps/{app_id}/flow-templates/{flow_id}/flows",
+        f"/api/v1/apps/{app_id}/user-stories/{user_story_id}/story-runs",
         params=params,
     )
     handle_response_error(resp, resource="Runs")
-    return FlowRunListResponse.model_validate(resp.json())
+    return StoryRunListResponse.model_validate(resp.json())
 
 
 async def poll_run_status(
@@ -159,7 +159,7 @@ async def poll_run_status(
     app_id: str,
     run_id: str,
     json_mode: bool,
-) -> FlowRunResponse:
+) -> StoryRunResponse:
     """Poll a run until it reaches a terminal status. Returns final state."""
     path = f"{base_path(app_id)}/{run_id}"
 
@@ -168,7 +168,7 @@ async def poll_run_status(
             resp = await client.get(path)
             handle_response_error(resp, resource="Run")
 
-            run = FlowRunResponse.model_validate(resp.json())
+            run = StoryRunResponse.model_validate(resp.json())
 
             spinner.update(f"[bold blue]Running… status: {run.status.value}")
 

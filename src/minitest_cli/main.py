@@ -5,7 +5,16 @@ from typing import Annotated
 import typer
 
 from minitest_cli import __version__
-from minitest_cli.commands import apps, auth, build, flow, maintenance_check, run, skill, upgrade
+from minitest_cli.commands import (
+    apps,
+    auth,
+    build,
+    maintenance_check,
+    run,
+    skill,
+    upgrade,
+    user_story,
+)
 from minitest_cli.core.config import get_settings
 from minitest_cli.utils.update_check import check_for_updates
 
@@ -19,7 +28,7 @@ app = typer.Typer(
 # Register command groups
 app.add_typer(auth.app)
 app.add_typer(apps.app)
-app.add_typer(flow.app)
+app.add_typer(user_story.app)
 app.add_typer(build.app)
 app.add_typer(maintenance_check.app)
 app.add_typer(run.app)

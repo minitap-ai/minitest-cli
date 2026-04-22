@@ -1,4 +1,4 @@
-"""Pydantic models for the flow-run API (test execution)."""
+"""Pydantic models for the story-run API (test execution)."""
 
 from datetime import datetime
 from enum import StrEnum
@@ -13,24 +13,24 @@ class RunStatus(StrEnum):
     failed = "failed"
 
 
-class AcceptanceCriteriaResult(CamelModel):
+class CriterionResult(CamelModel):
     """A single acceptance-criteria evaluation result."""
 
     id: str
-    flow_id: str
-    acceptance_criteria_id: str
+    story_run_id: str
+    criterion_version_id: str
     platform: str
     success: bool
     fail_reason: str | None = None
     created_at: datetime
 
 
-class FlowRunResponse(CamelModel):
-    """Response from POST /flows or GET /flows/{id}."""
+class StoryRunResponse(CamelModel):
+    """Response from POST /story-runs or GET /story-runs/{id}."""
 
     id: str
-    flow_template_id: str
-    flow_template_name: str | None = None
+    user_story_id: str
+    user_story_name: str | None = None
     tenant_id: str | None = None
     status: RunStatus
     ios_build_id: str | None = None
@@ -44,35 +44,36 @@ class FlowRunResponse(CamelModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_at: datetime
-    results: list[AcceptanceCriteriaResult] = []
+    results: list[CriterionResult] = []
 
 
-class CreateFlowRunRequest(CamelModel):
-    """Request body for POST /flows."""
+class CreateStoryRunRequest(CamelModel):
+    """Request body for POST /story-runs."""
 
-    flow_template_id: str
+    user_story_id: str
     ios_build_id: str | None = None
     android_build_id: str | None = None
 
 
-class FlowRunListResponse(CamelModel):
-    """Paginated response from GET /flow-templates/{id}/flows."""
+class StoryRunListResponse(CamelModel):
+    """Paginated response from GET /user-stories/{id}/story-runs."""
 
-    items: list[FlowRunResponse]
+    items: list[StoryRunResponse]
     total: int
     page: int
     page_size: int
 
 
-class BatchFlowRunRequest(CamelModel):
-    """Request body for POST /flows/batch."""
+class BatchStoryRunRequest(CamelModel):
+    """Request body for POST /story-runs/batch."""
 
     ios_build_id: str | None = None
     android_build_id: str | None = None
+    user_story_ids: list[str] | None = None
 
 
-class BatchFlowRunResponse(CamelModel):
-    """Response from POST /flows/batch."""
+class BatchStoryRunResponse(CamelModel):
+    """Response from POST /story-runs/batch."""
 
-    flows: list[FlowRunResponse]
+    story_runs: list[StoryRunResponse]
     message: str | None = None

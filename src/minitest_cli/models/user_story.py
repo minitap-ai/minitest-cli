@@ -1,4 +1,4 @@
-"""Pydantic models for the flow-template API, mirroring testing-service schemas."""
+"""Pydantic models for the user-story API, mirroring testing-service schemas."""
 
 from datetime import datetime
 from typing import Any
@@ -8,12 +8,12 @@ from minitest_cli.models.base import CamelModel
 
 class AcceptanceCriteriaResponse(CamelModel):
     id: str
-    flow_template_id: str
+    user_story_id: str
     content: str
     created_at: datetime
 
 
-class FlowTemplateResponse(CamelModel):
+class UserStoryResponse(CamelModel):
     id: str
     app_id: str
     name: str
@@ -22,25 +22,25 @@ class FlowTemplateResponse(CamelModel):
     created_at: datetime
 
 
-class FlowTemplateDetailResponse(FlowTemplateResponse):
+class UserStoryDetailResponse(UserStoryResponse):
     acceptance_criteria: list[AcceptanceCriteriaResponse] = []
 
 
-class FlowTemplateListResponse(CamelModel):
-    items: list[FlowTemplateResponse]
+class UserStoryListResponse(CamelModel):
+    items: list[UserStoryResponse]
     total: int
     page: int
     page_size: int
 
 
-class CreateFlowTemplateRequest(CamelModel):
+class CreateUserStoryRequest(CamelModel):
     name: str
     description: str | None = None
     type: str = "other"
     acceptance_criteria: list[str] = []
 
 
-class UpdateFlowTemplateRequest(CamelModel):
+class UpdateUserStoryRequest(CamelModel):
     name: str | None = None
     description: str | None = None
     type: str | None = None

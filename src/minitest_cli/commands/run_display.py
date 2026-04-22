@@ -2,7 +2,7 @@
 
 import math
 
-from minitest_cli.models.flow_run import FlowRunListResponse, FlowRunResponse, RunStatus
+from minitest_cli.models.story_run import RunStatus, StoryRunListResponse, StoryRunResponse
 from minitest_cli.utils.output import (
     err_console,
     print_error,
@@ -12,22 +12,22 @@ from minitest_cli.utils.output import (
     print_table,
 )
 
-RUN_TABLE_HEADERS = ["ID", "Flow", "Status", "Created"]
+RUN_TABLE_HEADERS = ["ID", "User Story", "Status", "Created"]
 
 RESULTS_TABLE_HEADERS = ["Criterion ID", "Platform", "Result", "Fail Reason"]
 
 
-def format_run_row(run: FlowRunResponse) -> list[str]:
-    """Format a single FlowRunResponse as a table row."""
+def format_run_row(run: StoryRunResponse) -> list[str]:
+    """Format a single StoryRunResponse as a table row."""
     return [
         run.id,
-        run.flow_template_name or run.flow_template_id,
+        run.user_story_name or run.user_story_id,
         run.status.value,
         run.created_at.strftime("%Y-%m-%d %H:%M"),
     ]
 
 
-def _platform_status_line(platform: str, run: FlowRunResponse) -> tuple[str, str | None] | None:
+def _platform_status_line(platform: str, run: StoryRunResponse) -> tuple[str, str | None] | None:
     """Build a status line for a platform from the flat run fields."""
     if platform == "ios" and not run.ios_build_id:
         return None
@@ -48,7 +48,7 @@ def _platform_status_line(platform: str, run: FlowRunResponse) -> tuple[str, str
     return "".join(parts), recording
 
 
-def display_run_result(run: FlowRunResponse, json_mode: bool) -> None:
+def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
     """Display the full results of a completed run."""
     if json_mode:
         print_json(run.model_dump(mode="json"))
@@ -74,7 +74,7 @@ def display_run_result(run: FlowRunResponse, json_mode: bool) -> None:
     rows: list[list[str]] = []
     for cr in run.results:
         result_str = "[green]✓ pass[/green]" if cr.success else "[red]✗ fail[/red]"
-        rows.append([cr.acceptance_criteria_id, cr.platform, result_str, cr.fail_reason or ""])
+        rows.append([cr.criterion_version_id, cr.platform, result_str, cr.fail_reason or ""])
 
     if rows:
         print_table(RESULTS_TABLE_HEADERS, rows, title="Acceptance Criteria Results")
@@ -97,7 +97,7 @@ def display_run_result(run: FlowRunResponse, json_mode: bool) -> None:
             print_error("Run failed.")
 
 
-def format_run_pagination_info(data: FlowRunListResponse) -> tuple[str, str]:
+def format_run_pagination_info(data: StoryRunListResponse) -> tuple[str, str]:
     """Return (title, tip) for paginated run table display."""
     total_pages = math.ceil(data.total / data.page_size) if data.total else 1
     start = (data.page - 1) * data.page_size + 1

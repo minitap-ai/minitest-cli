@@ -1,4 +1,4 @@
-"""Shared helpers for flow commands: API paths, response handling, formatting."""
+"""Shared helpers for user-story commands: API paths, response handling, formatting."""
 
 import asyncio
 from collections.abc import Coroutine
@@ -8,43 +8,43 @@ import httpx
 import typer
 
 from minitest_cli.core.config import Settings
-from minitest_cli.models.flow_template import (
-    FlowTemplateDetailResponse,
-    FlowTemplateListResponse,
+from minitest_cli.models.user_story import (
+    UserStoryDetailResponse,
+    UserStoryListResponse,
 )
 from minitest_cli.utils.output import print_error
 
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
 
-FLOW_TABLE_HEADERS = ["ID", "Name", "Type", "Description", "Acceptance Criteria"]
+USER_STORY_TABLE_HEADERS = ["ID", "Name", "Type", "Description", "Acceptance Criteria"]
 
 
-def fetch_flow_types(settings: Settings) -> list[str]:
-    """Fetch valid flow types from the API."""
+def fetch_user_story_types(settings: Settings) -> list[str]:
+    """Fetch valid user-story types from the API."""
     try:
         resp = httpx.get(
-            f"{settings.api_url}/api/v1/flow-types",
+            f"{settings.api_url}/api/v1/user-story-types",
             timeout=10,
         )
     except httpx.HTTPError as exc:
-        print_error(f"Failed to fetch flow types: {exc}")
+        print_error(f"Failed to fetch user-story types: {exc}")
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
     if resp.status_code != 200:
-        print_error(f"Failed to fetch flow types: HTTP {resp.status_code}")
+        print_error(f"Failed to fetch user-story types: HTTP {resp.status_code}")
         raise typer.Exit(code=EXIT_NETWORK_ERROR)
     data = resp.json()
     if not isinstance(data, list) or not data:
-        print_error("Invalid response from flow types endpoint.")
+        print_error("Invalid response from user-story types endpoint.")
         raise typer.Exit(code=EXIT_NETWORK_ERROR)
     return data
 
 
-def validate_flow_type(value: str, settings: Settings) -> str:
-    """Validate a flow type value against types from the API."""
-    valid = fetch_flow_types(settings)
+def validate_user_story_type(value: str, settings: Settings) -> str:
+    """Validate a user-story type value against types from the API."""
+    valid = fetch_user_story_types(settings)
     if value not in valid:
-        print_error(f"Invalid flow type '{value}'. Valid types: {', '.join(valid)}")
+        print_error(f"Invalid user-story type '{value}'. Valid types: {', '.join(valid)}")
         raise typer.Exit(code=1)
     return value
 
@@ -62,7 +62,7 @@ def get_app_flag() -> str | None:
 
 
 def base_path(app_id: str) -> str:
-    return f"/api/v1/apps/{app_id}/flow-templates"
+    return f"/api/v1/apps/{app_id}/user-stories"
 
 
 def extract_detail(resp: httpx.Response) -> str | None:
@@ -75,7 +75,7 @@ def extract_detail(resp: httpx.Response) -> str | None:
     return None
 
 
-def handle_response_error(resp: httpx.Response, *, resource: str = "Flow") -> None:
+def handle_response_error(resp: httpx.Response, *, resource: str = "User story") -> None:
     if resp.status_code == 404:
         detail = extract_detail(resp)
         print_error(detail or f"{resource} not found.")
@@ -94,25 +94,25 @@ def run_api_call[T](coro: Coroutine[Any, Any, T]) -> T:
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
 
-def format_flow_row(flow: dict[str, Any]) -> list[str]:
+def format_user_story_row(story: dict[str, Any]) -> list[str]:
     criteria_str = ""
     try:
-        parsed = FlowTemplateDetailResponse.model_validate(flow)
+        parsed = UserStoryDetailResponse.model_validate(story)
         criteria_str = "; ".join(c.content for c in parsed.acceptance_criteria)
     except Exception:  # noqa: BLE001
         pass
     return [
-        str(flow.get("id", "")),
-        flow.get("name", ""),
-        flow.get("type", ""),
-        flow.get("description", "") or "",
+        str(story.get("id", "")),
+        story.get("name", ""),
+        story.get("type", ""),
+        story.get("description", "") or "",
         criteria_str,
     ]
 
 
-def extract_criteria_strings(flow_data: dict[str, Any]) -> list[str]:
-    """Extract plain-text criteria from a flow response, handling all formats."""
-    raw = flow_data.get("acceptanceCriteria") or flow_data.get("acceptance_criteria") or []
+def extract_criteria_strings(story_data: dict[str, Any]) -> list[str]:
+    """Extract plain-text criteria from a user-story response, handling all formats."""
+    raw = story_data.get("acceptanceCriteria") or story_data.get("acceptance_criteria") or []
     return [
         item.get("content", "") if isinstance(item, dict) else str(item)
         for item in raw
@@ -126,7 +126,7 @@ def format_pagination_info(
     page_size: int,
 ) -> tuple[str, str | None]:
     try:
-        parsed = FlowTemplateListResponse.model_validate(data)
+        parsed = UserStoryListResponse.model_validate(data)
         total, current_page, current_page_size = parsed.total, parsed.page, parsed.page_size
         item_count = len(parsed.items)
     except Exception:  # noqa: BLE001
@@ -145,13 +145,16 @@ def format_pagination_info(
         start = (current_page - 1) * current_page_size + 1
         end = min(start + item_count - 1, total)
 
-    title = f"Flows (Page {current_page} of {total_pages}, showing {start}-{end} of {total})"
+    title = f"User stories (Page {current_page} of {total_pages}, showing {start}-{end} of {total})"
 
     tip = None
     if current_page < total_pages:
         next_page = current_page + 1
-        tip = f"\n💡 Tip: Use --page {next_page} to see more, or --all to fetch all {total} flows"
+        tip = (
+            f"\n💡 Tip: Use --page {next_page} to see more, "
+            f"or --all to fetch all {total} user stories"
+        )
     elif total > current_page_size and current_page_size < 100:
-        tip = f"\n💡 Tip: Use --all to fetch all {total} flows in one request"
+        tip = f"\n💡 Tip: Use --all to fetch all {total} user stories in one request"
 
     return title, tip

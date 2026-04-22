@@ -85,7 +85,7 @@ minitest run --app <app-id>
 | ---------------- | ------------------------- |
 | `minitest auth`  | Authentication management |
 | `minitest apps`  | App management            |
-| `minitest flow`  | Testing flow operations   |
+| `minitest user-story` | User-story operations |
 | `minitest build` | Build management          |
 | `minitest run`   | Test execution            |
 

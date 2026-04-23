@@ -177,7 +177,17 @@ _RUN_LIST_RESPONSE = {
     "pageSize": 20,
 }
 
+_BATCH_UUID = "99999999-8888-7777-6666-555555555555"
+
 _BATCH_RESPONSE = {
+    "id": _BATCH_UUID,
+    "appId": "app-123",
+    "tenantId": "tenant-1",
+    "source": "api",
+    "status": "pending",
+    "createdAt": "2025-06-01T10:00:00Z",
+    "iosBuildId": _IOS_BUILD_UUID,
+    "androidBuildId": _ANDROID_BUILD_UUID,
     "storyRuns": [
         {**_PENDING_RUN, "userStoryName": "Login Story"},
         {
@@ -187,7 +197,11 @@ _BATCH_RESPONSE = {
             "userStoryId": "ff000000-0000-0000-0000-000000000001",
         },
     ],
-    "message": "Created 2 story runs. 2 queued for execution.",
+}
+
+_SINGLE_BATCH_RESPONSE = {
+    **_BATCH_RESPONSE,
+    "storyRuns": [{**_PENDING_RUN, "userStoryName": "Login Story"}],
 }
 
 
@@ -310,7 +324,7 @@ class TestStartCommand:
         """Start a run using a user-story UUID, no-watch mode, JSON output."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
@@ -329,7 +343,7 @@ class TestStartCommand:
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
-        client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
@@ -349,7 +363,7 @@ class TestStartCommand:
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
-        client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
@@ -364,7 +378,7 @@ class TestStartCommand:
         """Build IDs from flags are sent in the POST body."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
@@ -383,7 +397,7 @@ class TestStartCommand:
         """No-watch mode without --json shows human-friendly message."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(
@@ -462,7 +476,7 @@ class TestStartCommand:
                 _mock_response(200, _COMPLETED_RUN),
             ]
         )
-        client.post = AsyncMock(return_value=_mock_response(200, _PENDING_RUN))
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
 
         with (
             patch("minitest_cli.commands.run.ApiClient", return_value=client),
@@ -545,7 +559,10 @@ class TestStatusCommand:
         client.get = AsyncMock(return_value=_mock_response(404, {"detail": "Run not found"}))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
-            result = _run_with_context(["status", "nonexistent-id"], settings)
+            result = _run_with_context(
+                ["status", "deadbeef-dead-beef-dead-beefdeadbeef"],
+                settings,
+            )
 
         assert result.exit_code == 4
 
@@ -642,7 +659,7 @@ class TestStatusCommand:
 
 class TestRunAllCommand:
     def test_all_fires_batch_and_returns_json(self, tmp_path) -> None:
-        """run all POST /story-runs/batch, returns JSON list."""
+        """run all POST /batches, returns JSON summary with batch_id + story_runs."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
@@ -656,10 +673,12 @@ class TestRunAllCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert len(data) == 2
-        assert data[0]["run_id"] == _RUN_UUID
-        assert data[0]["user_story"] == "Login Story"
-        assert client.post.call_args[0][0] == "/api/v1/apps/app-123/story-runs/batch"
+        assert data["batch_id"] == _BATCH_UUID
+        assert data["status"] == "pending"
+        assert len(data["story_runs"]) == 2
+        assert data["story_runs"][0]["run_id"] == _RUN_UUID
+        assert data["story_runs"][0]["user_story"] == "Login Story"
+        assert client.post.call_args[0][0] == "/api/v1/apps/app-123/batches"
 
     def test_all_human_mode_shows_table(self, tmp_path) -> None:
         """Human mode displays a table of started runs."""
@@ -675,7 +694,7 @@ class TestRunAllCommand:
             )
 
         assert result.exit_code == 0
-        assert "Batch Runs" in result.output
+        assert _BATCH_UUID in result.output
         assert "Login Story" in result.output
 
     def test_all_posts_correct_build_ids(self, tmp_path) -> None:
@@ -829,5 +848,69 @@ class TestListRunsCommand:
             side_effect=typer.Exit(code=2),
         ):
             result = _run_with_context(["list", _USER_STORY_UUID], settings)
+
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# cancel command
+# ---------------------------------------------------------------------------
+
+
+_CANCELLED_RUN = {**_PENDING_RUN, "status": "cancelled"}
+
+
+class TestCancelRunCommand:
+    def test_cancel_posts_to_cancel_endpoint(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(200, _CANCELLED_RUN))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(["cancel", _RUN_UUID], settings)
+
+        assert result.exit_code == 0
+        assert client.post.call_args[0][0] == f"/api/v1/apps/app-123/story-runs/{_RUN_UUID}/cancel"
+        assert _RUN_UUID in result.output
+
+    def test_cancel_json_output(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(200, _CANCELLED_RUN))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(["cancel", _RUN_UUID], settings, json_mode=True)
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["status"] == "cancelled"
+        assert data["id"] == _RUN_UUID
+
+    def test_cancel_rejects_invalid_uuid(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path)
+        result = _run_with_context(["cancel", "not-a-uuid"], settings)
+        assert result.exit_code == 1
+
+    def test_cancel_not_found_exits_4(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(404, {"detail": "Run not found"}))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["cancel", "deadbeef-dead-beef-dead-beefdeadbeef"],
+                settings,
+            )
+
+        assert result.exit_code == 4
+
+    def test_cancel_requires_auth(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path, token=None)
+
+        with patch(
+            "minitest_cli.core.auth.require_auth",
+            side_effect=typer.Exit(code=2),
+        ):
+            result = _run_with_context(["cancel", _RUN_UUID], settings)
 
         assert result.exit_code == 2

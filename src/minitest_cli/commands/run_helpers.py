@@ -11,7 +11,11 @@ import typer
 from minitest_cli.api.client import ApiClient
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.config import Settings
-from minitest_cli.models.story_run import RunStatus, StoryRunListResponse, StoryRunResponse
+from minitest_cli.models.story_run import (
+    RunStatus,
+    StoryRunListResponse,
+    StoryRunResponse,
+)
 from minitest_cli.utils.output import err_console, print_error
 
 from minitest_cli.commands.run_display import (  # noqa: F401
@@ -31,7 +35,7 @@ UUID_PATTERN = re.compile(
 
 POLL_INTERVAL_SECONDS = 2
 
-TERMINAL_STATUSES = {RunStatus.completed, RunStatus.failed}
+TERMINAL_STATUSES = {RunStatus.completed, RunStatus.failed, RunStatus.cancelled}
 
 
 def get_settings() -> Settings:
@@ -60,6 +64,14 @@ def resolve_app() -> tuple[Settings, str, bool]:
 def base_path(app_id: str) -> str:
     """Return the base API path for story runs."""
     return f"/api/v1/apps/{app_id}/story-runs"
+
+
+def ensure_uuid(value: str, *, kind: str) -> str:
+    """Validate a CLI-supplied identifier is a UUID; exit 1 with a clear error otherwise."""
+    if not is_uuid(value):
+        print_error(f"Invalid {kind}: '{value}' is not a valid UUID.")
+        raise typer.Exit(code=1)
+    return value
 
 
 def extract_detail(resp: httpx.Response) -> str | None:

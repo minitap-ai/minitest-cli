@@ -17,8 +17,42 @@ from minitest_cli.commands.user_story_helpers import (
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
-from minitest_cli.models.user_story import CriterionUpsertItem, UpdateUserStoryRequest
+from minitest_cli.models.user_story import UpdateUserStoryRequest
 from minitest_cli.utils.output import output, print_error, print_success
+
+
+def _build_criteria_payload(
+    existing_items: list[dict[str, str]],
+    *,
+    replace: list[str] | None,
+    add: list[str] | None,
+) -> list[dict[str, str]]:
+    """Build the acceptanceCriteria payload preserving stable criterion ids.
+
+    - ``replace`` (``--criteria``): full replacement. Any entry whose content
+      matches an existing criterion keeps its stable ``id`` so the backend does
+      not churn identity. New contents are sent without ``id``.
+    - ``add`` (``--add-criteria``): append. Existing items are passed through
+      untouched (ids preserved); new contents appended without ``id``.
+    """
+    by_content: dict[str, dict[str, str]] = {}
+    for item in existing_items:
+        content = item.get("content")
+        if content:
+            by_content[content] = item
+
+    if replace is not None:
+        out: list[dict[str, str]] = []
+        for content in replace:
+            match = by_content.get(content)
+            if match and match.get("id"):
+                out.append({"id": match["id"], "content": content})
+            else:
+                out.append({"content": content})
+        return out
+
+    appended = [{"content": c} for c in (add or [])]
+    return existing_items + appended
 
 
 def update_user_story(
@@ -52,16 +86,18 @@ def update_user_story(
     if user_story_type is not None:
         validate_user_story_type(user_story_type, settings)
 
-    criteria_items: list[CriterionUpsertItem] | None = (
-        [CriterionUpsertItem(content=c) for c in criteria] if criteria is not None else None
-    )
+    # When --criteria (full replace) or --add-criteria (append) is used we need
+    # the current story to preserve stable criterion identity. We defer building
+    # the final payload until we have fetched the existing criteria.
+    needs_current_story = criteria is not None or bool(add_criteria)
+
     req = UpdateUserStoryRequest(
         name=name,
         type=user_story_type,
         description=description,
-        acceptance_criteria=criteria_items,
+        acceptance_criteria=None,
     )
-    if not req.has_changes() and not add_criteria:
+    if not req.has_changes() and not needs_current_story:
         print_error("Provide at least one field to update.")
         raise typer.Exit(code=1)
 
@@ -70,12 +106,15 @@ def update_user_story(
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
             path = f"{base_path(app_id)}/{user_story_id}"
-            if add_criteria:
+            if needs_current_story:
                 get_resp = await client.get(path)
                 handle_response_error(get_resp)
                 existing_items = extract_criteria_items(get_resp.json())
-                new_items = [{"content": c} for c in add_criteria]
-                payload["acceptanceCriteria"] = existing_items + new_items
+                payload["acceptanceCriteria"] = _build_criteria_payload(
+                    existing_items,
+                    replace=list(criteria) if criteria is not None else None,
+                    add=list(add_criteria) if add_criteria else None,
+                )
             resp = await client.patch(path, json=payload)
             handle_response_error(resp)
             return resp.json()

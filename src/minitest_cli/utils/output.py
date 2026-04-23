@@ -9,16 +9,29 @@ import json
 import sys
 from typing import Any
 
+from pydantic import BaseModel
 from rich.console import Console
 from rich.table import Table
+
+
+def _to_jsonable(data: Any) -> Any:
+    """Recursively convert Pydantic models to camelCase-aliased dicts."""
+    if isinstance(data, BaseModel):
+        return data.model_dump(mode="json", by_alias=True)
+    if isinstance(data, dict):
+        return {k: _to_jsonable(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_to_jsonable(v) for v in data]
+    return data
+
 
 # stderr console for diagnostics – never captured by pipes
 err_console = Console(stderr=True)
 
 
 def print_json(data: Any) -> None:
-    """Print a JSON-serialisable object to stdout."""
-    print(json.dumps(data, indent=2, default=str))  # noqa: T201
+    """Print a JSON-serialisable object to stdout (camelCase for Pydantic models)."""
+    print(json.dumps(_to_jsonable(data), indent=2, default=str))  # noqa: T201
 
 
 def print_error(message: str) -> None:

@@ -43,9 +43,9 @@ def maintenance_check(
         print_json(
             {
                 "id": result.id,
-                "app_id": result.app_id,
-                "commit_sha": result.commit_sha,
-                "created_at": result.created_at,
+                "appId": result.app_id,
+                "commitSha": result.commit_sha,
+                "createdAt": result.created_at,
             }
         )
     else:

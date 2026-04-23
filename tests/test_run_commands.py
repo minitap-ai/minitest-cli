@@ -299,10 +299,10 @@ class TestDisplayRunResult:
         data = json.loads(output)
         assert data["id"] == _RUN_UUID
         assert data["status"] == "completed"
-        # model_dump(mode="json") uses Python field names (snake_case)
+        # --json output uses camelCase to match the backend API contract
         assert len(data["results"]) == 2
         assert data["results"][0]["success"] is True
-        assert data["results"][1]["fail_reason"] == "Button not found"
+        assert data["results"][1]["failReason"] == "Button not found"
 
     def test_human_mode_shows_criteria_table(self, capsys) -> None:
         run = StoryRunResponse.model_validate(_COMPLETED_RUN)
@@ -335,7 +335,7 @@ class TestStartCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["run_id"] == _RUN_UUID
+        assert data["runId"] == _RUN_UUID
         assert data["status"] == "pending"
 
     def test_start_with_name_resolves_user_story(self, tmp_path) -> None:
@@ -354,7 +354,7 @@ class TestStartCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["run_id"] == _RUN_UUID
+        assert data["runId"] == _RUN_UUID
         first_get = client.get.call_args_list[0]
         assert "/user-stories" in first_get[0][0]
 
@@ -531,7 +531,7 @@ class TestStatusCommand:
         # model_dump(mode="json") uses Python field names (snake_case)
         assert len(data["results"]) == 2
         assert data["results"][0]["success"] is True
-        assert data["results"][1]["fail_reason"] == "Button not found"
+        assert data["results"][1]["failReason"] == "Button not found"
         # Verify correct endpoint was called
         assert client.get.call_args[0][0] == f"/api/v1/apps/app-123/story-runs/{_RUN_UUID}"
 
@@ -659,7 +659,7 @@ class TestStatusCommand:
 
 class TestRunAllCommand:
     def test_all_fires_batch_and_returns_json(self, tmp_path) -> None:
-        """run all POST /batches, returns JSON summary with batch_id + story_runs."""
+        """run all POST /batches, returns JSON summary with batchId + storyRuns."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
@@ -673,11 +673,11 @@ class TestRunAllCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["batch_id"] == _BATCH_UUID
+        assert data["batchId"] == _BATCH_UUID
         assert data["status"] == "pending"
-        assert len(data["story_runs"]) == 2
-        assert data["story_runs"][0]["run_id"] == _RUN_UUID
-        assert data["story_runs"][0]["user_story"] == "Login Story"
+        assert len(data["storyRuns"]) == 2
+        assert data["storyRuns"][0]["runId"] == _RUN_UUID
+        assert data["storyRuns"][0]["userStory"] == "Login Story"
         assert client.post.call_args[0][0] == "/api/v1/apps/app-123/batches"
 
     def test_all_human_mode_shows_table(self, tmp_path) -> None:

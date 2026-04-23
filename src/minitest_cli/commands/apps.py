@@ -61,7 +61,7 @@ def list_apps() -> None:
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
     if json_mode:
-        print_json([a.model_dump(mode="json") for a in data.apps])
+        print_json([a.model_dump(mode="json", by_alias=True) for a in data.apps])
         return
 
     rows = [[a.id, a.name] for a in data.apps]

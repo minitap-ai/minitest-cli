@@ -23,14 +23,14 @@ async def post_batch(client: ApiClient, app_id: str, body: CreateBatchRequest) -
 
 
 def batch_summary_payload(batch: BatchResponse) -> dict[str, Any]:
-    """Serialise a batch to a compact JSON payload for --json output."""
+    """Serialise a batch to a compact JSON payload for --json output (camelCase)."""
     return {
-        "batch_id": batch.id,
+        "batchId": batch.id,
         "status": batch.status.value,
-        "story_runs": [
+        "storyRuns": [
             {
-                "run_id": r.id,
-                "user_story": r.user_story_name or r.user_story_id,
+                "runId": r.id,
+                "userStory": r.user_story_name or r.user_story_id,
                 "status": r.status.value,
             }
             for r in batch.story_runs

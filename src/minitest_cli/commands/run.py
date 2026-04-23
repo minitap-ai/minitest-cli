@@ -38,18 +38,32 @@ from minitest_cli.utils.output import (
 
 app = typer.Typer(name="run", help="Test execution.")
 
+IosBuildOpt = Annotated[
+    str | None, typer.Option("--ios-build", help="iOS build ID (omit for Android-only apps).")
+]
+AndroidBuildOpt = Annotated[
+    str | None, typer.Option("--android-build", help="Android build ID (omit for iOS-only apps).")
+]
+
+
+def _require_build(ios_build: str | None, android_build: str | None) -> None:
+    if not ios_build and not android_build:
+        print_error("Provide at least one of --ios-build or --android-build.")
+        raise typer.Exit(code=1)
+
 
 @app.command()
 def start(
     user_story: Annotated[str, typer.Argument(help="User-story name or UUID to run.")],
-    ios_build: Annotated[str, typer.Option("--ios-build", help="iOS build ID.")],
-    android_build: Annotated[str, typer.Option("--android-build", help="Android build ID.")],
+    ios_build: IosBuildOpt = None,
+    android_build: AndroidBuildOpt = None,
     watch: Annotated[
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
 ) -> None:
     """Start a new test run for a user story (via the batches endpoint)."""
     settings, app_id, json_mode = resolve_app()
+    _require_build(ios_build, android_build)
 
     async def _start() -> StoryRunResponse:
         async with ApiClient(settings) as client:
@@ -161,11 +175,12 @@ def cancel(run_id: Annotated[str, typer.Argument(help="Run ID to cancel.")]) -> 
 
 @app.command(name="all")
 def run_all(
-    ios_build: Annotated[str, typer.Option("--ios-build", help="iOS build ID.")],
-    android_build: Annotated[str, typer.Option("--android-build", help="Android build ID.")],
+    ios_build: IosBuildOpt = None,
+    android_build: AndroidBuildOpt = None,
 ) -> None:
     """Start a batch covering every user story for the app."""
     settings, app_id, json_mode = resolve_app()
+    _require_build(ios_build, android_build)
 
     async def _run_all() -> BatchResponse:
         async with ApiClient(settings) as client:

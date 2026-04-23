@@ -493,8 +493,8 @@ class TestStartCommand:
         data = json.loads(result.output)
         assert data["status"] == "completed"
 
-    def test_start_requires_both_build_flags(self, tmp_path) -> None:
-        """Missing --ios-build or --android-build shows usage error."""
+    def test_start_requires_at_least_one_build_flag(self, tmp_path) -> None:
+        """Missing both --ios-build and --android-build exits with code 1."""
         settings = _make_settings(tmp_path)
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=_mock_client()):
@@ -503,7 +503,33 @@ class TestStartCommand:
                 settings,
             )
 
-        assert result.exit_code != 0
+        assert result.exit_code == 1
+        assert "at least one of --ios-build or --android-build" in result.output
+
+    def test_start_accepts_android_only(self, tmp_path) -> None:
+        """Android-only apps can omit --ios-build."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(
+                [
+                    "start",
+                    _USER_STORY_UUID,
+                    "--no-watch",
+                    "--android-build",
+                    _ANDROID_BUILD_UUID,
+                ],
+                settings,
+                json_mode=True,
+            )
+
+        assert result.exit_code == 0
+        body = client.post.call_args[1]["json"]
+        assert "iosBuildId" not in body
+        assert body["androidBuildId"] == _ANDROID_BUILD_UUID
 
 
 # ---------------------------------------------------------------------------

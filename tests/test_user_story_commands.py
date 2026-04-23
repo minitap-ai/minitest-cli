@@ -267,6 +267,49 @@ class TestUpdateUserStory:
         payload = instance.patch.call_args.kwargs["json"]
         assert payload["acceptanceCriteria"] == [{"content": "totally new"}]
 
+    def test_replace_criteria_duplicate_content_does_not_reuse_id(self, tmp_path):
+        """If the user passes the same content twice via --criteria, each
+        occurrence must consume at most one existing id. Reusing the same id
+        twice would trip the backend's duplicate-id guard."""
+        settings = _make_settings(tmp_path)
+        story = {
+            "id": "story-1",
+            "name": "Login",
+            "type": "login",
+            "acceptanceCriteria": [
+                {"id": "v-1", "criterionId": "crit-alpha", "content": "alpha"},
+            ],
+        }
+        get_resp = _mock_response(200, story)
+        patch_resp = _mock_response(200, story)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.get.return_value = get_resp
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                [
+                    "update",
+                    "story-1",
+                    "--criteria",
+                    "alpha",
+                    "--criteria",
+                    "alpha",
+                ],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        sent = instance.patch.call_args.kwargs["json"]["acceptanceCriteria"]
+        ids = [c.get("id") for c in sent]
+        assert ids.count("crit-alpha") <= 1
+        # First occurrence consumes the existing id; second is sent as brand-new.
+        assert sent == [
+            {"id": "crit-alpha", "content": "alpha"},
+            {"content": "alpha"},
+        ]
+
     def test_empty_payload_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
         result = _run_with_context(["update", "story-1"], settings)

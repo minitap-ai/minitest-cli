@@ -6,11 +6,29 @@ from typing import Any
 from minitest_cli.models.base import CamelModel
 
 
-class AcceptanceCriteriaResponse(CamelModel):
+class CriterionVersionResponse(CamelModel):
+    """Latest version of an acceptance criterion returned by the API."""
+
     id: str
-    user_story_id: str
+    criterion_id: str
     content: str
     created_at: datetime
+
+
+# Alias kept for callers that still import the old name.
+AcceptanceCriteriaResponse = CriterionVersionResponse
+
+
+class CriterionUpsertItem(CamelModel):
+    """Upsert payload for an acceptance criterion.
+
+    - ``id`` omitted: create a new criterion.
+    - ``id`` present: existing criterion id (stable ``criterionId`` from GET).
+    - ``content``: required, non-empty.
+    """
+
+    id: str | None = None
+    content: str
 
 
 class UserStoryResponse(CamelModel):
@@ -23,7 +41,7 @@ class UserStoryResponse(CamelModel):
 
 
 class UserStoryDetailResponse(UserStoryResponse):
-    acceptance_criteria: list[AcceptanceCriteriaResponse] = []
+    acceptance_criteria: list[CriterionVersionResponse] = []
 
 
 class UserStoryListResponse(CamelModel):
@@ -44,7 +62,7 @@ class UpdateUserStoryRequest(CamelModel):
     name: str | None = None
     description: str | None = None
     type: str | None = None
-    acceptance_criteria: list[str] | None = None
+    acceptance_criteria: list[CriterionUpsertItem] | None = None
 
     def has_changes(self) -> bool:
         return any(v is not None for v in self.model_dump(exclude_none=False).values())

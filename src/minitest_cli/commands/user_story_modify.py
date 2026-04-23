@@ -7,7 +7,7 @@ import typer
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.user_story_helpers import (
     base_path,
-    extract_criteria_strings,
+    extract_criteria_items,
     get_app_flag,
     get_settings,
     handle_response_error,
@@ -17,7 +17,7 @@ from minitest_cli.commands.user_story_helpers import (
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
-from minitest_cli.models.user_story import UpdateUserStoryRequest
+from minitest_cli.models.user_story import CriterionUpsertItem, UpdateUserStoryRequest
 from minitest_cli.utils.output import output, print_error, print_success
 
 
@@ -52,11 +52,14 @@ def update_user_story(
     if user_story_type is not None:
         validate_user_story_type(user_story_type, settings)
 
+    criteria_items: list[CriterionUpsertItem] | None = (
+        [CriterionUpsertItem(content=c) for c in criteria] if criteria is not None else None
+    )
     req = UpdateUserStoryRequest(
         name=name,
         type=user_story_type,
         description=description,
-        acceptance_criteria=list(criteria) if criteria is not None else None,
+        acceptance_criteria=criteria_items,
     )
     if not req.has_changes() and not add_criteria:
         print_error("Provide at least one field to update.")
@@ -70,8 +73,9 @@ def update_user_story(
             if add_criteria:
                 get_resp = await client.get(path)
                 handle_response_error(get_resp)
-                existing = extract_criteria_strings(get_resp.json())
-                payload["acceptanceCriteria"] = existing + list(add_criteria)
+                existing_items = extract_criteria_items(get_resp.json())
+                new_items = [{"content": c} for c in add_criteria]
+                payload["acceptanceCriteria"] = existing_items + new_items
             resp = await client.patch(path, json=payload)
             handle_response_error(resp)
             return resp.json()

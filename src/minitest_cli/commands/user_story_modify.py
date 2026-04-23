@@ -35,16 +35,17 @@ def _build_criteria_payload(
     - ``add`` (``--add-criteria``): append. Existing items are passed through
       untouched (ids preserved); new contents appended without ``id``.
     """
-    by_content: dict[str, dict[str, str]] = {}
+    by_content: dict[str, list[dict[str, str]]] = {}
     for item in existing_items:
         content = item.get("content")
         if content:
-            by_content[content] = item
+            by_content.setdefault(content, []).append(item)
 
     if replace is not None:
         out: list[dict[str, str]] = []
         for content in replace:
-            match = by_content.get(content)
+            matches = by_content.get(content)
+            match = matches.pop(0) if matches else None
             if match and match.get("id"):
                 out.append({"id": match["id"], "content": content})
             else:

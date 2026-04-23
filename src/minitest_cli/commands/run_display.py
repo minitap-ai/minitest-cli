@@ -51,7 +51,7 @@ def _platform_status_line(platform: str, run: StoryRunResponse) -> tuple[str, st
 def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
     """Display the full results of a completed run."""
     if json_mode:
-        print_json(run.model_dump(mode="json"))
+        print_json(run.model_dump(mode="json", by_alias=True))
         return
 
     status_icon = {

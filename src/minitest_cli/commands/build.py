@@ -74,7 +74,7 @@ def upload(
         return BuildResponse.model_validate(resp.json())
 
     result = run_api_call(_run())
-    result_dict = result.model_dump(mode="json")
+    result_dict = result.model_dump(mode="json", by_alias=True)
 
     if json_mode:
         output(result_dict, json_mode=True)
@@ -113,7 +113,7 @@ def list_builds(
     result = run_api_call(_run())
 
     if json_mode:
-        output(result.model_dump(mode="json"), json_mode=True)
+        output(result.model_dump(mode="json", by_alias=True), json_mode=True)
         return
 
     if not result.items:

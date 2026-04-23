@@ -85,7 +85,7 @@ def list_batches(
     result = run_api_call(_list())
 
     if json_mode:
-        output(result.model_dump(mode="json"), json_mode=True)
+        output(result.model_dump(mode="json", by_alias=True), json_mode=True)
         return
 
     if not result.items:
@@ -121,7 +121,7 @@ def get_batch(
     batch = run_api_call(_get())
 
     if json_mode:
-        output(batch.model_dump(mode="json"), json_mode=True)
+        output(batch.model_dump(mode="json", by_alias=True), json_mode=True)
         return
 
     print_info(f"Batch {batch.id} — {batch.status.value} ({batch.source})")
@@ -164,6 +164,6 @@ def cancel(
 
     batch = run_api_call(_cancel())
     if json_mode:
-        output(batch.model_dump(mode="json"), json_mode=True)
+        output(batch.model_dump(mode="json", by_alias=True), json_mode=True)
     else:
         print_success(f"Batch cancelled: {batch.id} (status: {batch.status.value})")

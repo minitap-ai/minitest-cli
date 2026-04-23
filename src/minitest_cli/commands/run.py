@@ -71,7 +71,7 @@ def start(
     run = run_api_call(_start())
     if not watch:
         if json_mode:
-            print_json({"run_id": run.id, "status": run.status.value})
+            print_json({"runId": run.id, "status": run.status.value})
         else:
             print_success(f"Run started: {run.id}")
             print_info(f"Use `minitest run status {run.id}` to check progress.")
@@ -128,7 +128,7 @@ def list_runs(
 
     result = run_api_call(_list())
     if json_mode:
-        output(result.model_dump(mode="json"), json_mode=True)
+        output(result.model_dump(mode="json", by_alias=True), json_mode=True)
         return
     if not result.items:
         print_info("No runs found.")
@@ -154,7 +154,7 @@ def cancel(run_id: Annotated[str, typer.Argument(help="Run ID to cancel.")]) -> 
 
     run = run_api_call(_cancel())
     if json_mode:
-        output(run.model_dump(mode="json"), json_mode=True)
+        output(run.model_dump(mode="json", by_alias=True), json_mode=True)
     else:
         print_success(f"Run cancelled: {run.id} (status: {run.status.value})")
 

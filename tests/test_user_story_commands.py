@@ -195,6 +195,78 @@ class TestUpdateUserStory:
         assert "Error shown on bad password" in contents
         assert "New criterion" in contents
 
+    def test_replace_criteria_preserves_ids_for_unchanged_content(self, tmp_path):
+        """--criteria replace must reuse the stable criterionId for any entry
+        whose content already exists on the story; only brand-new contents are
+        sent without an id. Previously the CLI sent everything as new which
+        destroyed criterion identity on every replace."""
+        settings = _make_settings(tmp_path)
+        story = {
+            "id": "story-1",
+            "name": "Login",
+            "type": "login",
+            "acceptanceCriteria": [
+                {"id": "v-1", "criterionId": "crit-alpha", "content": "alpha"},
+                {"id": "v-2", "criterionId": "crit-beta", "content": "beta"},
+            ],
+        }
+        get_resp = _mock_response(200, story)
+        patch_resp = _mock_response(200, story)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.get.return_value = get_resp
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                [
+                    "update",
+                    "story-1",
+                    "--criteria",
+                    "alpha",
+                    "--criteria",
+                    "gamma",
+                ],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        sent = payload["acceptanceCriteria"]
+        assert {"id": "crit-alpha", "content": "alpha"} in sent
+        # gamma is new → no id so backend creates a new criterion
+        assert {"content": "gamma"} in sent
+        assert len(sent) == 2
+
+    def test_replace_criteria_without_match_sends_no_id(self, tmp_path):
+        """If no existing criterion has the same content, the entry must be
+        sent with ``content`` only so the backend creates a fresh criterion."""
+        settings = _make_settings(tmp_path)
+        story = {
+            "id": "story-1",
+            "name": "Login",
+            "type": "login",
+            "acceptanceCriteria": [
+                {"id": "v-1", "criterionId": "crit-alpha", "content": "alpha"},
+            ],
+        }
+        get_resp = _mock_response(200, story)
+        patch_resp = _mock_response(200, story)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.get.return_value = get_resp
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--criteria", "totally new"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["acceptanceCriteria"] == [{"content": "totally new"}]
+
     def test_empty_payload_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
         result = _run_with_context(["update", "story-1"], settings)

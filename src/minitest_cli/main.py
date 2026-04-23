@@ -8,6 +8,7 @@ from minitest_cli import __version__
 from minitest_cli.commands import (
     apps,
     auth,
+    batch,
     build,
     maintenance_check,
     run,
@@ -32,6 +33,7 @@ app.add_typer(user_story.app)
 app.add_typer(build.app)
 app.add_typer(maintenance_check.app)
 app.add_typer(run.app)
+app.add_typer(batch.app)
 app.add_typer(skill.app)
 app.add_typer(upgrade.app)
 

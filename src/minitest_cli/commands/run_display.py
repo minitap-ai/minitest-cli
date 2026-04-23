@@ -59,6 +59,7 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
         RunStatus.failed: "✗",
         RunStatus.pending: "…",
         RunStatus.running: "…",
+        RunStatus.cancelled: "⊘",
     }[run.status]
     print_info(f"Run {run.id} — {status_icon} {run.status.value}")
 
@@ -95,6 +96,8 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
             print_error(f"Run failed — {'; '.join(errors)}")
         else:
             print_error("Run failed.")
+    elif run.status == RunStatus.cancelled:
+        print_info("Run cancelled.")
 
 
 def format_run_pagination_info(data: StoryRunListResponse) -> tuple[str, str]:

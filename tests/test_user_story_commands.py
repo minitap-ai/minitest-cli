@@ -190,9 +190,10 @@ class TestUpdateUserStory:
         call_kwargs = instance.patch.call_args
         payload = call_kwargs.kwargs["json"]
         criteria = payload.get("acceptanceCriteria") or payload.get("acceptance_criteria")
-        assert "User can log in" in criteria
-        assert "Error shown on bad password" in criteria
-        assert "New criterion" in criteria
+        contents = [c.get("content") for c in criteria]
+        assert "User can log in" in contents
+        assert "Error shown on bad password" in contents
+        assert "New criterion" in contents
 
     def test_empty_payload_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)

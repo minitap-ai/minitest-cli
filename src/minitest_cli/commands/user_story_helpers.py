@@ -120,6 +120,29 @@ def extract_criteria_strings(story_data: dict[str, Any]) -> list[str]:
     ]
 
 
+def extract_criteria_items(story_data: dict[str, Any]) -> list[dict[str, str]]:
+    """Extract existing criteria as upsert items ``{id, content}``.
+
+    The ``id`` uses the stable criterion identifier (``criterionId`` in the API
+    response) so the backend preserves identity across updates.
+    """
+    raw = story_data.get("acceptanceCriteria") or story_data.get("acceptance_criteria") or []
+    items: list[dict[str, str]] = []
+    for entry in raw:
+        if isinstance(entry, dict):
+            content = entry.get("content")
+            if not content:
+                continue
+            stable_id = entry.get("criterionId") or entry.get("criterion_id")
+            item: dict[str, str] = {"content": content}
+            if stable_id:
+                item["id"] = stable_id
+            items.append(item)
+        elif entry:
+            items.append({"content": str(entry)})
+    return items
+
+
 def format_pagination_info(
     data: dict[str, Any],
     page: int,

@@ -20,7 +20,13 @@ from minitest_cli.commands.user_story_helpers import (
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
-from minitest_cli.utils.output import output, print_info, print_success, print_table
+from minitest_cli.utils.output import (
+    output,
+    print_error,
+    print_info,
+    print_success,
+    print_table,
+)
 
 app = typer.Typer(name="user-story", help="User-story operations.")
 
@@ -38,8 +44,24 @@ def create_user_story(
     criteria: Annotated[
         list[str] | None, typer.Option("--criteria", help="Acceptance criteria (repeatable).")
     ] = None,
+    depends_on: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--depends-on",
+            help=(
+                "Parent user-story IDs this story depends on (repeatable). "
+                "Validated server-side after creation: same-app, no cycles, "
+                "references must exist."
+            ),
+        ),
+    ] = None,
 ) -> None:
-    """Create a new user story."""
+    """Create a new user story.
+
+    When you already know which flows gate this one, set ``--depends-on``
+    here rather than calling ``suggest-deps`` afterwards — it's
+    deterministic, free, and one fewer round trip.
+    """
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -55,7 +77,24 @@ def create_user_story(
         async with ApiClient(settings) as client:
             resp = await client.post(base_path(app_id), json=payload)
             handle_response_error(resp)
-            return resp.json()
+            created = resp.json()
+            # The create endpoint doesn't accept ``depends_on`` so we follow
+            # up with a PATCH. There's a small window where the story exists
+            # without deps; the validation still runs on the PATCH so a bad
+            # dep list won't leave a half-applied state — only an unintended
+            # ``depends_on=[]`` story that the user can re-update or delete.
+            if depends_on:
+                story_id = created.get("id")
+                if not story_id:
+                    print_error("Server did not return an id for the new user story.")
+                    raise typer.Exit(code=1)
+                patch_resp = await client.patch(
+                    f"{base_path(app_id)}/{story_id}",
+                    json={"dependsOn": list(depends_on)},
+                )
+                handle_response_error(patch_resp)
+                return patch_resp.json()
+            return created
 
     data = run_api_call(_run())
     if not json_mode:

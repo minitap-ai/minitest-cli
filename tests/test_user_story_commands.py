@@ -359,6 +359,434 @@ class TestDeleteUserStory:
         assert "not found" in result.output.lower()
 
 
+SAMPLE_STORY_WITH_DEPS = {
+    "id": "story-1",
+    "name": "Checkout",
+    "type": "checkout",
+    "appId": "app-123",
+    "createdAt": "2026-04-28T00:00:00Z",
+    "dependsOn": ["story-login", "story-onboarding"],
+    "acceptanceCriteria": [{"id": "ac-1", "content": "User can checkout"}],
+}
+
+
+class TestCreateUserStoryDependsOn:
+    """``create --depends-on`` does a POST then a PATCH so the agent gets
+    create + dep declaration in a single CLI call."""
+
+    def test_create_with_depends_on_sends_followup_patch(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        post_resp = _mock_response(201, {"id": "story-new", "name": "Checkout", "type": "checkout"})
+        patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
+        with (
+            patch(
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
+            ),
+            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = post_resp
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                [
+                    "create",
+                    "--name",
+                    "Checkout",
+                    "--type",
+                    "checkout",
+                    "--depends-on",
+                    "story-login",
+                    "--depends-on",
+                    "story-onboarding",
+                ],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        # POST has the create payload, PATCH carries dependsOn replace.
+        instance.post.assert_called_once()
+        instance.patch.assert_called_once()
+        patch_payload = instance.patch.call_args.kwargs["json"]
+        assert patch_payload == {"dependsOn": ["story-login", "story-onboarding"]}
+
+    def test_create_without_depends_on_skips_patch(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        post_resp = _mock_response(201, {"id": "story-new", "name": "S", "type": "login"})
+        with (
+            patch(
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
+            ),
+            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = post_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["create", "--name", "S", "--type", "login"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        instance.patch.assert_not_called()
+
+
+class TestUpdateDependsOn:
+    """``update --depends-on`` is a full-set replace; ``--remove-dependency`` is a
+    surgical delta that requires fetching the current story to subtract from."""
+
+    def test_depends_on_replaces_full_set(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--depends-on", "p1", "--depends-on", "p2"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        # Pure replace path: no GET needed because the user passed the
+        # full desired set explicitly.
+        instance.get.assert_not_called()
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["dependsOn"] == ["p1", "p2"]
+
+    def test_remove_dependency_subtracts_from_current(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        get_resp = _mock_response(
+            200,
+            {
+                "id": "story-1",
+                "name": "Checkout",
+                "type": "checkout",
+                "dependsOn": ["story-login", "story-onboarding", "story-extra"],
+            },
+        )
+        patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.get.return_value = get_resp
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                [
+                    "update",
+                    "story-1",
+                    "--remove-dependency",
+                    "story-extra",
+                    "--remove-dependency",
+                    "story-onboarding",
+                ],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        # Delta needs the current set, then PATCHes with the survivors.
+        instance.get.assert_called_once()
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["dependsOn"] == ["story-login"]
+
+    def test_remove_dependency_with_unknown_id_is_a_noop(self, tmp_path):
+        # Removing an id that isn't in the current set leaves the set
+        # unchanged — we still PATCH with the full set, which is a no-op
+        # on the server.
+        settings = _make_settings(tmp_path)
+        get_resp = _mock_response(
+            200,
+            {
+                "id": "story-1",
+                "name": "Checkout",
+                "type": "checkout",
+                "dependsOn": ["a", "b"],
+            },
+        )
+        patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.get.return_value = get_resp
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--remove-dependency", "not-there"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["dependsOn"] == ["a", "b"]
+
+    def test_depends_on_wins_over_remove_dependency(self, tmp_path):
+        # Both flags present: replace wins, delta is silently dropped after a
+        # warning. The PATCH must carry only the replace set, not a subtraction.
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                [
+                    "update",
+                    "story-1",
+                    "--depends-on",
+                    "p1",
+                    "--remove-dependency",
+                    "p1",
+                ],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        instance.get.assert_not_called()
+        assert "--remove-dependency ignored" in result.output
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["dependsOn"] == ["p1"]
+
+    def test_dependency_validation_422_surfaces_kind_and_ids(self, tmp_path):
+        # The testing-service emits a structured 422 detail with kind+ids; the
+        # CLI must render it instead of a generic "API error" so the user
+        # sees which rule broke and on which IDs.
+        settings = _make_settings(tmp_path)
+        validation_resp = _mock_response(
+            422,
+            {
+                "detail": {
+                    "kind": "cycle",
+                    "message": "depends_on would create a cycle",
+                    "ids": ["a", "b", "a"],
+                }
+            },
+        )
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = validation_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--depends-on", "a"],
+                settings,
+            )
+        assert result.exit_code == 3
+        assert "cycle" in result.output.lower()
+        assert "a, b, a" in result.output
+
+
+class TestSuggestDepsCommand:
+    """Tests for ``user-story suggest-deps``."""
+
+    def test_empty_response_prints_hint(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        empty_resp = _mock_response(200, {"suggestions": []})
+        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.post.return_value = empty_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(["suggest-deps"], settings)
+        assert result.exit_code == 0
+        # Hint nudges the user toward the direct path when there's nothing to apply.
+        assert "depends-on" in result.output.lower() or "no dependencies" in result.output.lower()
+
+    def test_yes_flag_applies_grouped_per_child(self, tmp_path):
+        # Two suggestions for the same child must collapse into one PATCH —
+        # the spec calls this out as the avoid-N-PATCHes optimisation.
+        settings = _make_settings(tmp_path)
+        suggest_resp = _mock_response(
+            200,
+            {
+                "suggestions": [
+                    {
+                        "userStoryId": "child",
+                        "dependsOnUserStoryId": "parent-a",
+                        "confidence": 0.9,
+                        "reasoning": "needs a",
+                    },
+                    {
+                        "userStoryId": "child",
+                        "dependsOnUserStoryId": "parent-b",
+                        "confidence": 0.8,
+                        "reasoning": "needs b",
+                    },
+                ]
+            },
+        )
+        list_resp = _mock_response(
+            200,
+            {
+                "items": [
+                    {
+                        "id": "child",
+                        "name": "Child",
+                        "type": "checkout",
+                        "appId": "app-123",
+                        "createdAt": "2026-04-28T00:00:00Z",
+                    },
+                    {
+                        "id": "parent-a",
+                        "name": "ParentA",
+                        "type": "login",
+                        "appId": "app-123",
+                        "createdAt": "2026-04-28T00:00:00Z",
+                    },
+                    {
+                        "id": "parent-b",
+                        "name": "ParentB",
+                        "type": "onboarding",
+                        "appId": "app-123",
+                        "createdAt": "2026-04-28T00:00:00Z",
+                    },
+                ],
+                "total": 3,
+                "page": 1,
+                "pageSize": 100,
+            },
+        )
+        get_child = _mock_response(
+            200,
+            {
+                "id": "child",
+                "name": "Child",
+                "type": "checkout",
+                "dependsOn": [],
+            },
+        )
+        patch_child = _mock_response(200, {"id": "child", "dependsOn": ["parent-a", "parent-b"]})
+        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.post.return_value = suggest_resp
+            instance.get.side_effect = [list_resp, get_child]
+            instance.patch.return_value = patch_child
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["suggest-deps", "--yes"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        # One PATCH for the single child, carrying both parents merged with
+        # whatever was already there (empty here).
+        assert instance.patch.call_count == 1
+        sent = instance.patch.call_args.kwargs["json"]
+        assert set(sent["dependsOn"]) == {"parent-a", "parent-b"}
+
+    def test_yes_flag_unions_with_existing_deps(self, tmp_path):
+        # If the child already has deps wired up via the webapp, accepting a new
+        # suggestion must not clobber them — the PATCH sends the union.
+        settings = _make_settings(tmp_path)
+        suggest_resp = _mock_response(
+            200,
+            {
+                "suggestions": [
+                    {
+                        "userStoryId": "child",
+                        "dependsOnUserStoryId": "parent-new",
+                        "confidence": 0.9,
+                        "reasoning": "fresh suggestion",
+                    },
+                ]
+            },
+        )
+        list_resp = _mock_response(
+            200,
+            {
+                "items": [
+                    {
+                        "id": "child",
+                        "name": "Child",
+                        "type": "checkout",
+                        "appId": "app-123",
+                        "createdAt": "2026-04-28T00:00:00Z",
+                    },
+                    {
+                        "id": "parent-new",
+                        "name": "ParentNew",
+                        "type": "login",
+                        "appId": "app-123",
+                        "createdAt": "2026-04-28T00:00:00Z",
+                    },
+                ],
+                "total": 2,
+                "page": 1,
+                "pageSize": 100,
+            },
+        )
+        get_child = _mock_response(
+            200,
+            {
+                "id": "child",
+                "name": "Child",
+                "type": "checkout",
+                "dependsOn": ["parent-existing"],
+            },
+        )
+        patch_child = _mock_response(
+            200, {"id": "child", "dependsOn": ["parent-existing", "parent-new"]}
+        )
+        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.post.return_value = suggest_resp
+            instance.get.side_effect = [list_resp, get_child]
+            instance.patch.return_value = patch_child
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["suggest-deps", "--yes"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        sent = instance.patch.call_args.kwargs["json"]
+        assert set(sent["dependsOn"]) == {"parent-existing", "parent-new"}
+
+    def test_non_tty_without_yes_errors(self, tmp_path):
+        # CliRunner is non-TTY. Without --yes the command must fail loudly
+        # instead of hanging on typer.confirm.
+        settings = _make_settings(tmp_path)
+        suggest_resp = _mock_response(
+            200,
+            {
+                "suggestions": [
+                    {
+                        "userStoryId": "child",
+                        "dependsOnUserStoryId": "parent-a",
+                        "confidence": 0.9,
+                        "reasoning": "x",
+                    }
+                ]
+            },
+        )
+        list_resp = _mock_response(
+            200,
+            {
+                "items": [],
+                "total": 0,
+                "page": 1,
+                "pageSize": 100,
+            },
+        )
+        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.post.return_value = suggest_resp
+            instance.get.return_value = list_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(["suggest-deps"], settings)
+        assert result.exit_code == 1
+        assert "--yes" in result.output
+
+
 class TestFetchUserStoryTypes:
     """Tests for the fetch_user_story_types helper."""
 

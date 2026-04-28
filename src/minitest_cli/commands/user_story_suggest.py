@@ -72,6 +72,13 @@ def suggest_dependencies(
             )
         return
 
+    if json_mode:
+        # JSON mode renders ids only — no need to fetch the full story
+        # set just to look up display names. ``emit_json`` does its own
+        # PATCH round-trip when ``--yes`` is set.
+        emit_json(response, settings, app_id, yes=yes)
+        return
+
     # Pull every story so the prompt table can render names beside ids.
     async def _stories() -> dict[str, dict[str, Any]]:
         async with ApiClient(settings) as client:
@@ -82,10 +89,6 @@ def suggest_dependencies(
     def _label(sid: str) -> str:
         name = stories_by_id.get(sid, {}).get("name") or "<unknown>"
         return f"{name} ({sid[:8]})"
-
-    if json_mode:
-        emit_json(response, settings, app_id, yes=yes)
-        return
 
     rows = [
         [

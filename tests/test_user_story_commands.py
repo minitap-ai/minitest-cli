@@ -640,37 +640,6 @@ class TestSuggestDepsCommand:
                 ]
             },
         )
-        list_resp = _mock_response(
-            200,
-            {
-                "items": [
-                    {
-                        "id": "child",
-                        "name": "Child",
-                        "type": "checkout",
-                        "appId": "app-123",
-                        "createdAt": "2026-04-28T00:00:00Z",
-                    },
-                    {
-                        "id": "parent-a",
-                        "name": "ParentA",
-                        "type": "login",
-                        "appId": "app-123",
-                        "createdAt": "2026-04-28T00:00:00Z",
-                    },
-                    {
-                        "id": "parent-b",
-                        "name": "ParentB",
-                        "type": "onboarding",
-                        "appId": "app-123",
-                        "createdAt": "2026-04-28T00:00:00Z",
-                    },
-                ],
-                "total": 3,
-                "page": 1,
-                "pageSize": 100,
-            },
-        )
         get_child = _mock_response(
             200,
             {
@@ -684,7 +653,9 @@ class TestSuggestDepsCommand:
         with _patched_suggest_api_client() as MockClient:
             instance = AsyncMock()
             instance.post.return_value = suggest_resp
-            instance.get.side_effect = [list_resp, get_child]
+            # JSON mode skips the story-name lookup, so the only GET is the
+            # per-child fetch inside ``apply_suggestions``.
+            instance.get.side_effect = [get_child]
             instance.patch.return_value = patch_child
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -694,6 +665,9 @@ class TestSuggestDepsCommand:
                 json_mode=True,
             )
         assert result.exit_code == 0
+        # Exactly one GET — regression guard against re-introducing the
+        # pre-emptive ``fetch_all_stories_inner`` call in JSON mode.
+        assert instance.get.call_count == 1
         # One PATCH for the single child, carrying both parents merged with
         # whatever was already there (empty here).
         assert instance.patch.call_count == 1
@@ -717,30 +691,6 @@ class TestSuggestDepsCommand:
                 ]
             },
         )
-        list_resp = _mock_response(
-            200,
-            {
-                "items": [
-                    {
-                        "id": "child",
-                        "name": "Child",
-                        "type": "checkout",
-                        "appId": "app-123",
-                        "createdAt": "2026-04-28T00:00:00Z",
-                    },
-                    {
-                        "id": "parent-new",
-                        "name": "ParentNew",
-                        "type": "login",
-                        "appId": "app-123",
-                        "createdAt": "2026-04-28T00:00:00Z",
-                    },
-                ],
-                "total": 2,
-                "page": 1,
-                "pageSize": 100,
-            },
-        )
         get_child = _mock_response(
             200,
             {
@@ -756,7 +706,8 @@ class TestSuggestDepsCommand:
         with _patched_suggest_api_client() as MockClient:
             instance = AsyncMock()
             instance.post.return_value = suggest_resp
-            instance.get.side_effect = [list_resp, get_child]
+            # JSON mode skips the story-name lookup; only the per-child GET runs.
+            instance.get.side_effect = [get_child]
             instance.patch.return_value = patch_child
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)

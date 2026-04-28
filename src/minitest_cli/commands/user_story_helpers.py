@@ -68,13 +68,9 @@ def base_path(app_id: str) -> str:
 def extract_detail(resp: httpx.Response) -> str | None:
     """Return a human-readable error string from the API response body.
 
-    Handles three shapes returned by testing-service:
-
-    1. ``{"detail": "string"}`` — the FastAPI default for ``HTTPException``.
-    2. ``{"detail": {"kind": ..., "message": ..., "ids": [...]}}`` — the
-       structured shape the dep-validation 422s use (``InvalidDependencyError``
-       in testing-service). We render it as ``message — ids: a, b``.
-    3. ``{"message": "string"}`` — legacy fallback from older endpoints.
+    Accepts ``{"detail": "string"}`` (FastAPI default), ``{"detail":
+    {"kind", "message", "ids"}}`` (the structured 422 from dep-validation,
+    rendered as ``message — ids: a, b``), and ``{"message": ...}`` legacy.
     """
     try:
         body = resp.json()

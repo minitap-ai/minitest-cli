@@ -3,6 +3,7 @@
 Validates business logic, error handling, and CLI parsing.
 """
 
+import contextlib
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -582,13 +583,31 @@ class TestUpdateDependsOn:
         assert "a, b, a" in result.output
 
 
+@contextlib.contextmanager
+def _patched_suggest_api_client():
+    """Patch ``ApiClient`` in both modules that consume it for suggest-deps.
+
+    ``user_story_suggest`` runs the POST + list-fetch; the per-child PATCH
+    loop lives in ``user_story_suggest_helpers``. Tests that traverse both
+    code paths need a single mock visible from both. Yields the shared
+    ``MockClient`` so test bodies set up ``instance.post / .get / .patch``
+    once and both call sites see them.
+    """
+    MockClient = MagicMock()
+    with (
+        patch("minitest_cli.commands.user_story_suggest.ApiClient", MockClient),
+        patch("minitest_cli.commands.user_story_suggest_helpers.ApiClient", MockClient),
+    ):
+        yield MockClient
+
+
 class TestSuggestDepsCommand:
     """Tests for ``user-story suggest-deps``."""
 
     def test_empty_response_prints_hint(self, tmp_path):
         settings = _make_settings(tmp_path)
         empty_resp = _mock_response(200, {"suggestions": []})
-        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+        with _patched_suggest_api_client() as MockClient:
             instance = AsyncMock()
             instance.post.return_value = empty_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -662,7 +681,7 @@ class TestSuggestDepsCommand:
             },
         )
         patch_child = _mock_response(200, {"id": "child", "dependsOn": ["parent-a", "parent-b"]})
-        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+        with _patched_suggest_api_client() as MockClient:
             instance = AsyncMock()
             instance.post.return_value = suggest_resp
             instance.get.side_effect = [list_resp, get_child]
@@ -734,7 +753,7 @@ class TestSuggestDepsCommand:
         patch_child = _mock_response(
             200, {"id": "child", "dependsOn": ["parent-existing", "parent-new"]}
         )
-        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+        with _patched_suggest_api_client() as MockClient:
             instance = AsyncMock()
             instance.post.return_value = suggest_resp
             instance.get.side_effect = [list_resp, get_child]
@@ -776,7 +795,7 @@ class TestSuggestDepsCommand:
                 "pageSize": 100,
             },
         )
-        with patch("minitest_cli.commands.user_story.ApiClient") as MockClient:
+        with _patched_suggest_api_client() as MockClient:
             instance = AsyncMock()
             instance.post.return_value = suggest_resp
             instance.get.return_value = list_resp

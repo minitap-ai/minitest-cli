@@ -79,6 +79,15 @@ def suggest_dependencies(
         emit_json(response, settings, app_id, yes=yes)
         return
 
+    # Non-TTY without --yes would hang ``typer.confirm``; fail fast before
+    # we pay for the story-name lookup or render anything to the terminal.
+    if not yes and not sys.stdin.isatty():
+        print_error(
+            "suggest-deps in a non-TTY context requires --yes (or pipe `yes` "
+            "in). Skipping to avoid hanging on confirmation prompts."
+        )
+        raise typer.Exit(code=1)
+
     # Pull every story so the prompt table can render names beside ids.
     async def _stories() -> dict[str, dict[str, Any]]:
         async with ApiClient(settings) as client:
@@ -104,14 +113,6 @@ def suggest_dependencies(
         rows,
         title=f"Suggested dependencies ({len(response.suggestions)})",
     )
-
-    # Non-TTY without --yes would hang ``typer.confirm``; fail fast instead.
-    if not yes and not sys.stdin.isatty():
-        print_error(
-            "suggest-deps in a non-TTY context requires --yes (or pipe `yes` "
-            "in). Skipping to avoid hanging on confirmation prompts."
-        )
-        raise typer.Exit(code=1)
 
     accepted = (
         list(response.suggestions)

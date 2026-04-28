@@ -722,7 +722,9 @@ class TestSuggestDepsCommand:
 
     def test_non_tty_without_yes_errors(self, tmp_path):
         # CliRunner is non-TTY. Without --yes the command must fail loudly
-        # instead of hanging on typer.confirm.
+        # instead of hanging on typer.confirm — and must do so *before*
+        # paying for the story-name lookup, which is wasted work when we
+        # know the run will exit immediately.
         settings = _make_settings(tmp_path)
         suggest_resp = _mock_response(
             200,
@@ -737,24 +739,17 @@ class TestSuggestDepsCommand:
                 ]
             },
         )
-        list_resp = _mock_response(
-            200,
-            {
-                "items": [],
-                "total": 0,
-                "page": 1,
-                "pageSize": 100,
-            },
-        )
         with _patched_suggest_api_client() as MockClient:
             instance = AsyncMock()
             instance.post.return_value = suggest_resp
-            instance.get.return_value = list_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(["suggest-deps"], settings)
         assert result.exit_code == 1
         assert "--yes" in result.output
+        # Regression guard: the non-TTY guard must run before the
+        # ``fetch_all_stories_inner`` paged GET, so no stories are fetched.
+        assert instance.get.call_count == 0
 
 
 class TestFetchUserStoryTypes:

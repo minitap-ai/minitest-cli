@@ -38,6 +38,7 @@ class UserStoryResponse(CamelModel):
     description: str | None = None
     type: str
     created_at: datetime
+    depends_on: list[str] = []
 
 
 class UserStoryDetailResponse(UserStoryResponse):
@@ -63,6 +64,7 @@ class UpdateUserStoryRequest(CamelModel):
     description: str | None = None
     type: str | None = None
     acceptance_criteria: list[CriterionUpsertItem] | None = None
+    depends_on: list[str] | None = None
 
     def has_changes(self) -> bool:
         return any(v is not None for v in self.model_dump(exclude_none=False).values())

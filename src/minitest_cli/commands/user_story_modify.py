@@ -18,7 +18,7 @@ from minitest_cli.commands.user_story_helpers import (
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.models.user_story import UpdateUserStoryRequest
-from minitest_cli.utils.output import output, print_error, print_success
+from minitest_cli.utils.output import output, print_error, print_success, print_warning
 
 
 def _build_criteria_payload(
@@ -73,8 +73,33 @@ def update_user_story(
         list[str] | None,
         typer.Option("--add-criteria", help="Append acceptance criteria (repeatable)."),
     ] = None,
+    depends_on: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--depends-on",
+            help=(
+                "Replace the full set of parent user-story IDs (repeatable). "
+                "Pass each parent ID once. Validated server-side: same-app, "
+                "no cycles, no self-loops, references must exist."
+            ),
+        ),
+    ] = None,
+    remove_dependency: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--remove-dependency",
+            help=(
+                "Remove specific parent user-story IDs from the existing set "
+                "(repeatable). Ignored when --depends-on is also provided."
+            ),
+        ),
+    ] = None,
 ) -> None:
-    """Update an existing user story (partial update)."""
+    """Update an existing user story (partial update).
+
+    Pass ``--depends-on`` to declare which flows gate this one. The
+    server validates the graph (same-app, no cycles, references exist).
+    """
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -87,16 +112,27 @@ def update_user_story(
     if user_story_type is not None:
         validate_user_story_type(user_story_type, settings)
 
-    # When --criteria (full replace) or --add-criteria (append) is used we need
-    # the current story to preserve stable criterion identity. We defer building
-    # the final payload until we have fetched the existing criteria.
-    needs_current_story = criteria is not None or bool(add_criteria)
+    # ``--depends-on`` is the replace path; ``--remove-dependency`` is a delta
+    # against the current set. If both are given, the spec says replace wins —
+    # warn loudly so the user notices the surgical removal was dropped.
+    if depends_on is not None and remove_dependency:
+        print_warning("--remove-dependency ignored when --depends-on is set.")
+
+    # When --criteria (full replace), --add-criteria (append), or
+    # --remove-dependency (delta against the current set) is used we need the
+    # current story so we can either preserve stable criterion identity or
+    # subtract from the live dep set. We defer building the final payload
+    # until after that GET.
+    needs_current_story_criteria = criteria is not None or bool(add_criteria)
+    needs_current_story_deps = depends_on is None and bool(remove_dependency)
+    needs_current_story = needs_current_story_criteria or needs_current_story_deps
 
     req = UpdateUserStoryRequest(
         name=name,
         type=user_story_type,
         description=description,
         acceptance_criteria=None,
+        depends_on=list(depends_on) if depends_on is not None else None,
     )
     if not req.has_changes() and not needs_current_story:
         print_error("Provide at least one field to update.")
@@ -110,12 +146,20 @@ def update_user_story(
             if needs_current_story:
                 get_resp = await client.get(path)
                 handle_response_error(get_resp)
-                existing_items = extract_criteria_items(get_resp.json())
-                payload["acceptanceCriteria"] = _build_criteria_payload(
-                    existing_items,
-                    replace=list(criteria) if criteria is not None else None,
-                    add=list(add_criteria) if add_criteria else None,
-                )
+                current_story = get_resp.json()
+                if needs_current_story_criteria:
+                    existing_items = extract_criteria_items(current_story)
+                    payload["acceptanceCriteria"] = _build_criteria_payload(
+                        existing_items,
+                        replace=list(criteria) if criteria is not None else None,
+                        add=list(add_criteria) if add_criteria else None,
+                    )
+                if needs_current_story_deps:
+                    current_deps = (
+                        current_story.get("dependsOn") or current_story.get("depends_on") or []
+                    )
+                    to_remove = set(remove_dependency or [])
+                    payload["dependsOn"] = [d for d in current_deps if d not in to_remove]
             resp = await client.patch(path, json=payload)
             handle_response_error(resp)
             return resp.json()

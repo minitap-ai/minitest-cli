@@ -66,13 +66,28 @@ def base_path(app_id: str) -> str:
 
 
 def extract_detail(resp: httpx.Response) -> str | None:
+    """Return a human-readable error string from the API response body.
+
+    Accepts ``{"detail": "string"}`` (FastAPI default), ``{"detail":
+    {"kind", "message", "ids"}}`` (the structured 422 from dep-validation,
+    rendered as ``message — ids: a, b``), and ``{"message": ...}`` legacy.
+    """
     try:
         body = resp.json()
-        if isinstance(body, dict):
-            return body.get("detail") or body.get("message")
     except Exception:  # noqa: BLE001
-        pass
-    return None
+        return None
+    if not isinstance(body, dict):
+        return None
+    detail = body.get("detail")
+    if isinstance(detail, dict):
+        message = detail.get("message") or detail.get("kind") or ""
+        ids = detail.get("ids")
+        if ids:
+            return f"{message} — ids: {', '.join(str(i) for i in ids)}"
+        return message or None
+    if isinstance(detail, str):
+        return detail
+    return body.get("message")
 
 
 def handle_response_error(resp: httpx.Response, *, resource: str = "User story") -> None:

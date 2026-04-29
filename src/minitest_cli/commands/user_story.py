@@ -1,11 +1,11 @@
-"""User-story commands: create, list, get, update, delete, suggest-deps."""
+"""User-story commands: create, list, get, update, delete."""
 
 from typing import Annotated, Any
 
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands import user_story_modify, user_story_suggest
+from minitest_cli.commands import user_story_modify
 from minitest_cli.commands.user_story_helpers import (
     USER_STORY_TABLE_HEADERS,
     base_path,
@@ -26,7 +26,6 @@ app = typer.Typer(name="user-story", help="User-story operations.")
 
 app.command(name="update")(user_story_modify.update_user_story)
 app.command(name="delete")(user_story_modify.delete_user_story)
-app.command(name="suggest-deps")(user_story_suggest.suggest_dependencies)
 
 
 @app.command(name="create")
@@ -53,9 +52,9 @@ def create_user_story(
 ) -> None:
     """Create a new user story.
 
-    When you already know which flows gate this one, set ``--depends-on``
-    here rather than calling ``suggest-deps`` afterwards — it's
-    deterministic, free, and one fewer round trip.
+    Pass ``--depends-on`` to declare which flows gate this one — the
+    server validates the graph (same-app, no cycles, references exist)
+    on the follow-up PATCH.
     """
     settings = get_settings()
     json_mode = is_json_mode()

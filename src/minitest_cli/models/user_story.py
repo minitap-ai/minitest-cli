@@ -71,20 +71,3 @@ class UpdateUserStoryRequest(CamelModel):
 
     def to_payload(self) -> dict[str, Any]:
         return self.model_dump(by_alias=True, exclude_none=True)
-
-
-class SuggestedDependencyItem(CamelModel):
-    """One LLM-proposed dependency edge from ``POST .../suggest-dependencies``.
-
-    Mirrors the testing-service shape verbatim: only IDs are returned —
-    the CLI joins to story names locally for display.
-    """
-
-    user_story_id: str
-    depends_on_user_story_id: str
-    confidence: float
-    reasoning: str
-
-
-class SuggestDependenciesResponse(CamelModel):
-    suggestions: list[SuggestedDependencyItem] = []

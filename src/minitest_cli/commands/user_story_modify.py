@@ -97,8 +97,8 @@ def update_user_story(
 ) -> None:
     """Update an existing user story (partial update).
 
-    When you already know which flows gate this one, prefer ``--depends-on``
-    over the ``suggest-deps`` command — it's deterministic and free.
+    Pass ``--depends-on`` to declare which flows gate this one. The
+    server validates the graph (same-app, no cycles, references exist).
     """
     settings = get_settings()
     json_mode = is_json_mode()

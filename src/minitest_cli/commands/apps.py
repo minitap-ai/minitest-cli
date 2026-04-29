@@ -21,7 +21,20 @@ def _callback() -> None:
     """App management."""
 
 
-APP_TABLE_HEADERS = ["ID", "Name"]
+APP_TABLE_HEADERS = ["ID", "Name", "Platform"]
+
+_PLATFORM_LABELS: dict[str, str] = {
+    "android": "Android",
+    "ios": "iOS",
+    "cross_platform": "Cross-platform",
+}
+
+
+def _format_platform(value: str | None) -> str:
+    """Render an AppPlatform value for the table; pass through unknown values."""
+    if value is None:
+        return "—"
+    return _PLATFORM_LABELS.get(value, value)
 
 
 def _get_settings() -> Settings:
@@ -64,5 +77,5 @@ def list_apps() -> None:
         print_json([a.model_dump(mode="json", by_alias=True) for a in data.apps])
         return
 
-    rows = [[a.id, a.name] for a in data.apps]
+    rows = [[a.id, a.name, _format_platform(a.platform)] for a in data.apps]
     print_table(APP_TABLE_HEADERS, rows, title="Apps")

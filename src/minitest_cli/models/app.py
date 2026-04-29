@@ -9,6 +9,7 @@ class AppResponse(CamelModel):
     id: str
     name: str
     tenant_id: str
+    platform: str | None = None
 
 
 class AppListResponse(CamelModel):

@@ -14,8 +14,9 @@ runner = CliRunner()
 
 _APPS_DATA = {
     "apps": [
-        {"id": "aaa-111", "name": "My App", "tenantId": "t-1"},
-        {"id": "bbb-222", "name": "Other App", "tenantId": "t-1"},
+        {"id": "aaa-111", "name": "My App", "tenantId": "t-1", "platform": "android"},
+        {"id": "bbb-222", "name": "Other App", "tenantId": "t-1", "platform": "ios"},
+        {"id": "ccc-333", "name": "Cross App", "tenantId": "t-1", "platform": "cross_platform"},
     ]
 }
 
@@ -77,7 +78,7 @@ class TestListApps:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert len(data) == 2
+        assert len(data) == 3
         assert data[0]["id"] == "aaa-111"
         assert data[0]["name"] == "My App"
         assert data[1]["id"] == "bbb-222"
@@ -142,3 +143,50 @@ class TestListApps:
             _run_with_context(["list"], settings)
 
         client.get.assert_called_once_with("/api/v1/apps")
+
+    def test_json_output_includes_raw_platform(self, tmp_path):
+        """Agents reading --json need the raw enum value, not the table label."""
+        settings = _make_settings(tmp_path)
+        resp = _mock_response(200, _APPS_DATA)
+        client = _mock_client(resp)
+
+        with patch("minitest_cli.commands.apps.ApiClient", return_value=client):
+            result = _run_with_context(["list"], settings, json_mode=True)
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        platforms_by_id = {row["id"]: row["platform"] for row in data}
+        assert platforms_by_id == {
+            "aaa-111": "android",
+            "bbb-222": "ios",
+            "ccc-333": "cross_platform",
+        }
+
+    def test_human_output_renders_platform_labels(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        resp = _mock_response(200, _APPS_DATA)
+        client = _mock_client(resp)
+
+        with patch("minitest_cli.commands.apps.ApiClient", return_value=client):
+            result = _run_with_context(["list"], settings)
+
+        assert result.exit_code == 0
+        # Headers and per-app labels appear in the rendered table.
+        assert "Platform" in result.output
+        assert "Android" in result.output
+        assert "iOS" in result.output
+        assert "Cross-platform" in result.output
+
+    def test_human_output_handles_missing_platform(self, tmp_path):
+        """Apps from older testing-service deploys may omit platform entirely."""
+        settings = _make_settings(tmp_path)
+        legacy_payload = {"apps": [{"id": "old-1", "name": "Legacy", "tenantId": "t-1"}]}
+        resp = _mock_response(200, legacy_payload)
+        client = _mock_client(resp)
+
+        with patch("minitest_cli.commands.apps.ApiClient", return_value=client):
+            result = _run_with_context(["list"], settings)
+
+        assert result.exit_code == 0
+        assert "Legacy" in result.output
+        assert "—" in result.output

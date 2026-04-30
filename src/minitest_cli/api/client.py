@@ -61,6 +61,10 @@ class ApiClient:
         """Send a POST request."""
         return await self._ensure_client().post(path, **kwargs)
 
+    async def put(self, path: str, **kwargs: Any) -> httpx.Response:
+        """Send a PUT request."""
+        return await self._ensure_client().put(path, **kwargs)
+
     async def patch(self, path: str, **kwargs: Any) -> httpx.Response:
         """Send a PATCH request."""
         return await self._ensure_client().patch(path, **kwargs)

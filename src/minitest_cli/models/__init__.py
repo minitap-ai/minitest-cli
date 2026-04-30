@@ -1,6 +1,11 @@
 """Pydantic models for API requests and responses."""
 
-from minitest_cli.models.app import AppListResponse, AppResponse
+from minitest_cli.models.app import (
+    AppDetailResponse,
+    AppListResponse,
+    AppResponse,
+    TenantResponse,
+)
 from minitest_cli.models.base import CamelModel
 from minitest_cli.models.build import BuildListResponse, BuildResponse
 from minitest_cli.models.story_run import (
@@ -28,6 +33,7 @@ from minitest_cli.models.user_story import (
 )
 
 __all__ = [
+    "AppDetailResponse",
     "AppListResponse",
     "AppResponse",
     "AcceptanceCriteriaResponse",
@@ -48,6 +54,7 @@ __all__ = [
     "RunStatus",
     "StoryRunListResponse",
     "StoryRunResponse",
+    "TenantResponse",
     "UpdateUserStoryRequest",
     "UserStoryDetailResponse",
     "UserStoryListResponse",

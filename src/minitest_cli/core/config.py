@@ -6,6 +6,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_API_URL = "https://testing-service.app.minitap.ai"
+DEFAULT_APPS_MANAGER_URL = "https://apps-manager.app.minitap.ai"
+DEFAULT_INTEGRATIONS_URL = "https://integrations.minitap.ai"
 DEFAULT_CONFIG_DIR = Path.home() / ".minitest"
 DEFAULT_SUPABASE_URL = "https://auth.minitap.ai"
 DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_mlpTSxXqh7L3p5EY8FBEDA_yWma_vrf"
@@ -24,6 +26,14 @@ class Settings(BaseSettings):
     api_url: str = Field(
         default=DEFAULT_API_URL,
         description="Base URL of the Minitest API",
+    )
+    apps_manager_url: str = Field(
+        default=DEFAULT_APPS_MANAGER_URL,
+        description="Base URL of the apps-manager service (MINITEST_APPS_MANAGER_URL)",
+    )
+    integrations_url: str = Field(
+        default=DEFAULT_INTEGRATIONS_URL,
+        description="Base URL of the minihands-integrations service (MINITEST_INTEGRATIONS_URL)",
     )
     config_dir: Path = Field(
         default=DEFAULT_CONFIG_DIR,

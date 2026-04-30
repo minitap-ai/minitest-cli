@@ -58,17 +58,22 @@ minitest auth login
 # List your apps
 minitest apps list
 
+# Create a new app on your tenant
+minitest apps create --name "My App"
+
 # Run tests
 minitest run --app <app-id>
 ```
 
 ## Configuration
 
-| Environment Variable | Description              | Required                           |
-| -------------------- | ------------------------ | ---------------------------------- |
-| `MINITEST_TOKEN`     | API authentication token | Yes (or use `minitest auth login`) |
-| `MINITEST_APP_ID`    | Default app ID           | No (can use `--app` flag)          |
-| `MINITEST_API_URL`   | API base URL             | No (defaults to production)        |
+| Environment Variable          | Description                                                | Required                           |
+| ----------------------------- | ---------------------------------------------------------- | ---------------------------------- |
+| `MINITEST_TOKEN`              | API authentication token                                   | Yes (or use `minitest auth login`) |
+| `MINITEST_APP_ID`             | Default app ID                                             | No (can use `--app` flag)          |
+| `MINITEST_API_URL`            | testing-service base URL                                   | No (defaults to production)        |
+| `MINITEST_APPS_MANAGER_URL`   | apps-manager base URL (used by `minitest apps create`)     | No (defaults to production)        |
+| `MINITEST_INTEGRATIONS_URL`   | minihands-integrations base URL (used to list tenants)     | No (defaults to production)        |
 
 ## Global Flags
 
@@ -107,6 +112,8 @@ To point the CLI at the **dev** environment instead of production, set these env
 MINITEST_SUPABASE_URL=https://qrezuucghnmfvaxghqsv.supabase.co \
 MINITEST_SUPABASE_PUBLISHABLE_KEY=sb_publishable_4JRhoCm8pa5PbII0dhS09A_jhpkQhmy \
 MINITEST_API_URL=https://testing-service.dev.minitap.ai \
+MINITEST_APPS_MANAGER_URL=https://apps-manager.dev.minitap.ai \
+MINITEST_INTEGRATIONS_URL=https://integrations.dev.minitap.ai \
 minitest auth login
 ```
 
@@ -116,6 +123,8 @@ This authenticates against the dev environment and stores a dev-specific auth to
 MINITEST_SUPABASE_URL=https://qrezuucghnmfvaxghqsv.supabase.co \
 MINITEST_SUPABASE_PUBLISHABLE_KEY=sb_publishable_4JRhoCm8pa5PbII0dhS09A_jhpkQhmy \
 MINITEST_API_URL=https://testing-service.dev.minitap.ai \
+MINITEST_APPS_MANAGER_URL=https://apps-manager.dev.minitap.ai \
+MINITEST_INTEGRATIONS_URL=https://integrations.dev.minitap.ai \
 minitest apps list
 ```
 

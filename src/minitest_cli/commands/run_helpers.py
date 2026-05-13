@@ -12,7 +12,6 @@ from minitest_cli.api.client import ApiClient
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.config import Settings
 from minitest_cli.models.story_run import (
-    RunStatus,
     StoryRunListResponse,
     StoryRunResponse,
 )
@@ -21,6 +20,7 @@ from minitest_cli.utils.output import err_console, print_error
 from minitest_cli.commands.run_display import (  # noqa: F401
     RESULTS_TABLE_HEADERS,
     RUN_TABLE_HEADERS,
+    _derive_run_status,
     display_run_result,
     format_run_pagination_info,
     format_run_row,
@@ -35,7 +35,11 @@ UUID_PATTERN = re.compile(
 
 POLL_INTERVAL_SECONDS = 2
 
-TERMINAL_STATUSES = {RunStatus.completed, RunStatus.failed, RunStatus.cancelled}
+# Derived UI status names that count as terminal — mirrors the
+# ``_derive_run_status`` helper. ``cancelled`` is keyed off any
+# platform's ``cancellation_requested_at`` stamp; the others come from
+# collapsing per-platform ``execution_state`` values.
+TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
 def get_settings() -> Settings:
@@ -181,10 +185,11 @@ async def poll_run_status(
             handle_response_error(resp, resource="Run")
 
             run = StoryRunResponse.model_validate(resp.json())
+            status = _derive_run_status(run)
 
-            spinner.update(f"[bold blue]Running… status: {run.status.value}")
+            spinner.update(f"[bold blue]Running… status: {status}")
 
-            if run.status in TERMINAL_STATUSES:
+            if status in TERMINAL_STATUSES:
                 return run
 
             await asyncio.sleep(POLL_INTERVAL_SECONDS)

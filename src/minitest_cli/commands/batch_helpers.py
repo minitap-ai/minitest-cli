@@ -3,6 +3,7 @@
 from typing import Any
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import handle_response_error
 from minitest_cli.models.story_run import BatchResponse, CreateBatchRequest
 
@@ -31,7 +32,9 @@ def batch_summary_payload(batch: BatchResponse) -> dict[str, Any]:
             {
                 "runId": r.id,
                 "userStory": r.user_story_name or r.user_story_id,
-                "status": r.status.value,
+                # Per-platform lifecycle: collapse ``platforms[]`` down to
+                # the same UI status surface the rest of the CLI uses.
+                "status": _derive_run_status(r),
             }
             for r in batch.story_runs
         ],

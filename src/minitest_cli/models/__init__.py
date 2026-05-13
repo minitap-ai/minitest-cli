@@ -17,7 +17,7 @@ from minitest_cli.models.story_run import (
     CreateBatchRequest,
     CriterionResult,
     GitHubContextResponse,
-    RunStatus,
+    PlatformRun,
     StoryRunListResponse,
     StoryRunResponse,
 )
@@ -51,7 +51,7 @@ __all__ = [
     "CriterionUpsertItem",
     "CriterionVersionResponse",
     "GitHubContextResponse",
-    "RunStatus",
+    "PlatformRun",
     "StoryRunListResponse",
     "StoryRunResponse",
     "TenantResponse",

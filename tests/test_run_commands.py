@@ -93,18 +93,41 @@ _PENDING_RUN = {
     "userStoryId": _USER_STORY_UUID,
     "userStoryName": "Login Story",
     "tenantId": "tenant-1",
-    "status": "pending",
-    "iosBuildId": _IOS_BUILD_UUID,
-    "androidBuildId": _ANDROID_BUILD_UUID,
-    "iosRecordingPath": None,
-    "androidRecordingPath": None,
-    "iosRecordingUrl": None,
-    "androidRecordingUrl": None,
-    "iosErrorMessage": None,
-    "androidErrorMessage": None,
-    "startedAt": None,
-    "finishedAt": None,
     "createdAt": "2025-06-01T10:00:00Z",
+    "platforms": [
+        {
+            "platform": "ios",
+            "buildId": _IOS_BUILD_UUID,
+            "executionState": "pending",
+            "verdict": None,
+            "status": None,
+            "recordingPath": None,
+            "recordingUrl": None,
+            "errorMessage": None,
+            "criticals": 0,
+            "warnings": 0,
+            "skipped": 0,
+            "currentAttemptStartedAt": None,
+            "finishedAt": None,
+            "cancellationRequestedAt": None,
+        },
+        {
+            "platform": "android",
+            "buildId": _ANDROID_BUILD_UUID,
+            "executionState": "pending",
+            "verdict": None,
+            "status": None,
+            "recordingPath": None,
+            "recordingUrl": None,
+            "errorMessage": None,
+            "criticals": 0,
+            "warnings": 0,
+            "skipped": 0,
+            "currentAttemptStartedAt": None,
+            "finishedAt": None,
+            "cancellationRequestedAt": None,
+        },
+    ],
     "results": [],
 }
 
@@ -113,18 +136,41 @@ _COMPLETED_RUN = {
     "userStoryId": _USER_STORY_UUID,
     "userStoryName": "Login Story",
     "tenantId": "tenant-1",
-    "status": "completed",
-    "iosBuildId": _IOS_BUILD_UUID,
-    "androidBuildId": _ANDROID_BUILD_UUID,
-    "iosRecordingPath": "recordings/ios.mp4",
-    "androidRecordingPath": "recordings/android.mp4",
-    "iosRecordingUrl": "https://example.com/ios-rec",
-    "androidRecordingUrl": "https://example.com/android-rec",
-    "iosErrorMessage": None,
-    "androidErrorMessage": None,
-    "startedAt": "2025-06-01T10:00:30Z",
-    "finishedAt": "2025-06-01T10:05:00Z",
     "createdAt": "2025-06-01T10:00:00Z",
+    "platforms": [
+        {
+            "platform": "ios",
+            "buildId": _IOS_BUILD_UUID,
+            "executionState": "completed",
+            "verdict": "pass",
+            "status": "passed",
+            "recordingPath": "recordings/ios.mp4",
+            "recordingUrl": "https://example.com/ios-rec",
+            "errorMessage": None,
+            "criticals": 0,
+            "warnings": 0,
+            "skipped": 0,
+            "currentAttemptStartedAt": "2025-06-01T10:00:30Z",
+            "finishedAt": "2025-06-01T10:05:00Z",
+            "cancellationRequestedAt": None,
+        },
+        {
+            "platform": "android",
+            "buildId": _ANDROID_BUILD_UUID,
+            "executionState": "completed",
+            "verdict": "pass",
+            "status": "passed",
+            "recordingPath": "recordings/android.mp4",
+            "recordingUrl": "https://example.com/android-rec",
+            "errorMessage": None,
+            "criticals": 0,
+            "warnings": 0,
+            "skipped": 0,
+            "currentAttemptStartedAt": "2025-06-01T10:00:30Z",
+            "finishedAt": "2025-06-01T10:05:00Z",
+            "cancellationRequestedAt": None,
+        },
+    ],
     "results": [
         {
             "id": "r1",
@@ -147,11 +193,21 @@ _COMPLETED_RUN = {
     ],
 }
 
+# A run whose iOS platform errored out — keeps the lifecycle in
+# ``failed`` (any ``execution_state='failed'`` flips the run-level
+# derived status to ``failed``).
 _FAILED_RUN = {
     **_COMPLETED_RUN,
-    "status": "failed",
-    "iosErrorMessage": "Device crashed",
-    "androidErrorMessage": None,
+    "platforms": [
+        {
+            **_COMPLETED_RUN["platforms"][0],
+            "executionState": "failed",
+            "verdict": None,
+            "status": "failed",
+            "errorMessage": "Device crashed",
+        },
+        _COMPLETED_RUN["platforms"][1],
+    ],
 }
 
 _USER_STORY_LIST = {
@@ -298,7 +354,11 @@ class TestDisplayRunResult:
         output = capsys.readouterr().out
         data = json.loads(output)
         assert data["id"] == _RUN_UUID
-        assert data["status"] == "completed"
+        # Lifecycle now lives on per-platform children; the top-level
+        # ``status`` column is gone. Each ``platforms[]`` entry carries
+        # its own ``executionState`` / ``verdict`` / ``status``.
+        assert "status" not in data
+        assert all(p["executionState"] == "completed" for p in data["platforms"])
         # --json output uses camelCase to match the backend API contract
         assert len(data["results"]) == 2
         assert data["results"][0]["success"] is True
@@ -491,7 +551,8 @@ class TestStartCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["status"] == "completed"
+        # All platforms terminalized with ``completed`` execution_state.
+        assert all(p["executionState"] == "completed" for p in data["platforms"])
 
     def test_start_requires_at_least_one_build_flag(self, tmp_path) -> None:
         """Missing both --ios-build and --android-build exits with code 1."""
@@ -553,7 +614,8 @@ class TestStatusCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["status"] == "completed"
+        # Lifecycle is per-platform now; check each child terminalized.
+        assert all(p["executionState"] == "completed" for p in data["platforms"])
         # model_dump(mode="json") uses Python field names (snake_case)
         assert len(data["results"]) == 2
         assert data["results"][0]["success"] is True
@@ -606,12 +668,16 @@ class TestStatusCommand:
         """--watch polls a pending run until it reaches terminal status."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
+        running_run = {
+            **_PENDING_RUN,
+            "platforms": [{**p, "executionState": "running"} for p in _PENDING_RUN["platforms"]],
+        }
         client.get = AsyncMock(
             side_effect=[
                 # Initial fetch → running
-                _mock_response(200, {**_PENDING_RUN, "status": "running"}),
+                _mock_response(200, running_run),
                 # Poll → still running
-                _mock_response(200, {**_PENDING_RUN, "status": "running"}),
+                _mock_response(200, running_run),
                 # Poll → completed
                 _mock_response(200, _COMPLETED_RUN),
             ]
@@ -630,7 +696,7 @@ class TestStatusCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["status"] == "completed"
+        assert all(p["executionState"] == "completed" for p in data["platforms"])
 
     def test_status_watch_already_terminal_no_poll(self, tmp_path) -> None:
         """--watch on an already-completed run returns immediately without polling."""
@@ -883,7 +949,17 @@ class TestListRunsCommand:
 # ---------------------------------------------------------------------------
 
 
-_CANCELLED_RUN = {**_PENDING_RUN, "status": "cancelled"}
+# Cancellation now lives per-platform: stamp the iOS child to flip the
+# derived run status to ``cancelled`` while keeping the Android child
+# untouched (matches BE behaviour — a cancel request fans out to every
+# in-scope platform child but the wire shape is one stamp per row).
+_CANCELLED_RUN = {
+    **_PENDING_RUN,
+    "platforms": [
+        {**_PENDING_RUN["platforms"][0], "cancellationRequestedAt": "2025-06-01T10:00:30Z"},
+        {**_PENDING_RUN["platforms"][1], "cancellationRequestedAt": "2025-06-01T10:00:30Z"},
+    ],
+}
 
 
 class TestCancelRunCommand:
@@ -909,7 +985,12 @@ class TestCancelRunCommand:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["status"] == "cancelled"
+        # The cancelled-state signal lives per-platform now;
+        # ``_derive_run_status`` collapses any stamped child to
+        # ``"cancelled"`` for display, but the wire payload mirrors the
+        # BE model directly (one ``cancellationRequestedAt`` per
+        # platform row).
+        assert any(p["cancellationRequestedAt"] is not None for p in data["platforms"])
         assert data["id"] == _RUN_UUID
 
     def test_cancel_rejects_invalid_uuid(self, tmp_path) -> None:

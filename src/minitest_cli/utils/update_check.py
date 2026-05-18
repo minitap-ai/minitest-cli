@@ -1,4 +1,4 @@
-"""PyPI version check – cached for 24 hours, non-blocking, max 2s timeout."""
+"""PyPI version check – cached for 1 hour, non-blocking, max 2s timeout."""
 
 import json
 import shutil
@@ -13,7 +13,7 @@ from minitest_cli.core.config import Settings
 from minitest_cli.utils.output import print_warning
 
 CACHE_FILE_NAME = ".last_update_check"
-CACHE_TTL_SECONDS = 86400  # 24 hours
+CACHE_TTL_SECONDS = 3600
 CHECK_TIMEOUT_SECONDS = 2.0
 PYPI_URL = "https://pypi.org/pypi/minitest-cli/json"
 

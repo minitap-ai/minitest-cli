@@ -2,12 +2,16 @@
 
 import base64
 import json
+import os
+import stat
+import sys
 import time
 from unittest.mock import patch
 
 import typer
 from typer.testing import CliRunner
 
+from minitest_cli.commands.auth import SKILL_INSTALL_ARGS
 from minitest_cli.commands.auth import app as auth_app
 from minitest_cli.core.auth import Credentials, save_credentials
 from minitest_cli.core.config import Settings
@@ -55,13 +59,13 @@ def _patch_context(settings, json_mode=False):
     ]
 
 
-def _run_with_context(command, settings, json_mode=False, args=None):
+def _run_with_context(command, settings, json_mode=False, args=None, stdin=None):
     """Run an auth command with patched context."""
     patches = _patch_context(settings, json_mode)
     for p in patches:
         p.start()
     try:
-        result = runner.invoke(auth_app, args or [command])
+        result = runner.invoke(auth_app, args or [command], input=stdin)
     finally:
         for p in patches:
             p.stop()
@@ -84,6 +88,51 @@ class TestLoginCommand:
         mock_login.assert_called_once_with(settings)
         assert result.exit_code == 0
         assert "test@example.com" in result.output
+
+    def test_login_skill_install_uses_resolved_npx_path(self, tmp_path, monkeypatch):
+        # Regression: bare "npx" passed to subprocess.run fails on Windows where
+        # npx is npx.cmd. Verify the real shutil.which lookup happens and its
+        # absolute result is what reaches subprocess as argv[0].
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        npx_name = "npx.cmd" if sys.platform == "win32" else "npx"
+        npx_path = bin_dir / npx_name
+        npx_path.write_text("#!/bin/sh\nexit 0\n")
+        npx_path.chmod(npx_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        monkeypatch.setenv("PATH", str(bin_dir), prepend=os.pathsep)
+
+        settings = _make_settings(tmp_path)
+        creds = _make_credentials()
+
+        with (
+            patch("minitest_cli.commands.auth.oauth_pkce_login", return_value=creds),
+            patch("minitest_cli.commands.auth._is_skill_installed", return_value=False),
+            patch("minitest_cli.commands.auth.subprocess.run") as mock_run,
+        ):
+            result = _run_with_context("login", settings, stdin="y\n")
+
+        assert result.exit_code == 0
+        mock_run.assert_called_once()
+        argv = mock_run.call_args.args[0]
+        assert argv[0] != "npx"
+        assert os.path.isabs(argv[0])
+        assert os.path.samefile(argv[0], npx_path)
+        assert argv[1:] == SKILL_INSTALL_ARGS
+
+    def test_login_skill_install_skipped_when_npx_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PATH", "")
+        settings = _make_settings(tmp_path)
+        creds = _make_credentials()
+
+        with (
+            patch("minitest_cli.commands.auth.oauth_pkce_login", return_value=creds),
+            patch("minitest_cli.commands.auth._is_skill_installed", return_value=False),
+            patch("minitest_cli.commands.auth.subprocess.run") as mock_run,
+        ):
+            result = _run_with_context("login", settings, stdin="y\n")
+
+        assert result.exit_code == 0
+        mock_run.assert_not_called()
 
 
 class TestLogoutCommand:

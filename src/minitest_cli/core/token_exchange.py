@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import sys
 import time
 from typing import Any, NoReturn
@@ -40,17 +42,36 @@ def parse_and_save_token_response(settings: Settings, data: dict[str, Any]) -> C
         if not isinstance(user, dict):
             user = {}
         expires_in = data.get("expires_in", 3600)
+
+        user_id = user.get("id", "")
+        email = user.get("email", "")
+
+        if not email or not user_id:
+            claims = _decode_jwt_claims(data["access_token"])
+            user_id = user_id or claims.get("sub", "")
+            email = email or claims.get("email", "")
+
         creds = Credentials(
             access_token=data["access_token"],
             refresh_token=data["refresh_token"],
             expires_at=time.time() + int(expires_in),
-            user_id=user.get("id", ""),
-            email=user.get("email", ""),
+            user_id=user_id,
+            email=email,
         )
         save_credentials(settings, creds)
         return creds
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _decode_jwt_claims(token: str) -> dict[str, Any]:
+    """Decode JWT payload without verification. Returns empty dict on failure."""
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload))
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 def register_oauth_client(supabase_url: str, redirect_uri: str) -> str:

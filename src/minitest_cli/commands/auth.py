@@ -1,6 +1,7 @@
 """Authentication commands: login, logout, status."""
 
 import json
+import shutil
 import subprocess
 from datetime import UTC, datetime
 
@@ -20,19 +21,22 @@ from minitest_cli.utils.output import output, print_error, print_info, print_suc
 app = typer.Typer(name="auth", help="Authentication management.")
 
 SKILL_NAME = "minitest-cli"
-SKILL_INSTALL_CMD = "npx skills add minitap-ai/agent-skills --skill minitest-cli"
+SKILL_INSTALL_ARGS = ["skills", "add", "minitap-ai/agent-skills", "--skill", "minitest-cli"]
+SKILL_INSTALL_DISPLAY = "npx " + " ".join(SKILL_INSTALL_ARGS)
+
+
+def _find_npx() -> str | None:
+    return shutil.which("npx")
 
 
 def _is_skill_installed() -> bool:
-    """Check if the minitest-cli skill is installed via ``npx skills ls``.
-
-    Queries both project-level and global scopes so the detection stays in
-    sync with whatever directories the ``skills`` CLI manages.
-    """
+    npx = _find_npx()
+    if npx is None:
+        return False
     for flags in (["--json"], ["--json", "-g"]):
         try:
             result = subprocess.run(
-                ["npx", "skills", "ls", *flags],
+                [npx, "skills", "ls", *flags],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -42,7 +46,6 @@ def _is_skill_installed() -> bool:
                 if any(s.get("name") == SKILL_NAME for s in skills):
                     return True
         except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError, OSError):
-            # npx not available or unexpected output – fall through
             pass
     return False
 
@@ -81,14 +84,21 @@ def login() -> None:
             answer = "n"
             print()  # newline after ^C / ^D
         if answer in ("", "y", "yes"):
-            print_info("")
-            print_info(f"   Running: {SKILL_INSTALL_CMD}")
-            print_info("")
-            subprocess.run(SKILL_INSTALL_CMD.split(), check=False)
+            npx = _find_npx()
+            if npx is None:
+                print_info("")
+                print_error("   npx not found on PATH. Install Node.js, then run:")
+                print_info(f"   {SKILL_INSTALL_DISPLAY}")
+                print_info("")
+            else:
+                print_info("")
+                print_info(f"   Running: {SKILL_INSTALL_DISPLAY}")
+                print_info("")
+                subprocess.run([npx, *SKILL_INSTALL_ARGS], check=False)
         else:
             print_info("")
             print_info("   You can install it later with:")
-            print_info(f"   {SKILL_INSTALL_CMD}")
+            print_info(f"   {SKILL_INSTALL_DISPLAY}")
             print_info("")
 
 

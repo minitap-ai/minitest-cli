@@ -12,10 +12,13 @@ import typer
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.config import Settings
 from minitest_cli.models import BuildListResponse, BuildResponse
-from minitest_cli.utils.output import print_error
+from minitest_cli.utils.output import err_console, print_error
 
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
+EXIT_BUILD_INVALID = 5
+
+BUILD_INVALID_ERROR_CODE = "build_invalid"
 
 # ---------------------------------------------------------------------------
 # Context accessors
@@ -93,9 +96,42 @@ def handle_response_error(resp: httpx.Response, *, resource: str = "Build") -> N
     if resp.status_code == 404:
         print_error(f"{resource} not found: {extract_detail(resp)}")
         raise typer.Exit(code=EXIT_NOT_FOUND)
+    if resp.status_code == 422 and _try_handle_build_invalid(resp):
+        raise typer.Exit(code=EXIT_BUILD_INVALID)
     if resp.status_code >= 400:
         print_error(f"API error ({resp.status_code}): {extract_detail(resp)}")
         raise typer.Exit(code=EXIT_NETWORK_ERROR)
+
+
+def _try_handle_build_invalid(resp: httpx.Response) -> bool:
+    """If response is a build-invalid error, render issues and return True."""
+    try:
+        body = resp.json()
+    except Exception:  # noqa: BLE001
+        return False
+    if not isinstance(body, dict) or body.get("error_code") != BUILD_INVALID_ERROR_CODE:
+        return False
+    issues = body.get("issues") or []
+    print_error("Build rejected: failed validation for virtual-device execution.")
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        code = issue.get("code", "unknown")
+        message = issue.get("message", "")
+        err_console.print(f"  [red]✖[/red] {code}: {message}")
+    return True
+
+
+def print_validation_warnings(warnings: list[dict] | None) -> None:
+    """Print non-fatal validation warnings to stderr."""
+    if not warnings:
+        return
+    for warning in warnings:
+        if not isinstance(warning, dict):
+            continue
+        code = warning.get("code", "unknown")
+        message = warning.get("message", "")
+        err_console.print(f"  [yellow]⚠[/yellow] {code}: {message}")
 
 
 def run_api_call[T](coro: Coroutine[object, object, T]) -> T:

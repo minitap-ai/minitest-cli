@@ -13,6 +13,7 @@ class BuildResponse(CamelModel):
     original_name: str
     size_bytes: int | None = None
     created_at: datetime
+    validation_warnings: list[dict] | None = None
 
 
 class BuildListResponse(CamelModel):

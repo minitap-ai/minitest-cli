@@ -49,7 +49,7 @@ uv add <package>                                   # Add new dependency (always 
 ### Output Convention
 - `--json` flag: JSON to stdout, diagnostics to stderr
 - Without `--json`: human-friendly rich tables to stdout, diagnostics to stderr
-- Exit codes: 0=Success, 1=General error, 2=Auth error, 3=Network/API error, 4=Not found
+- Exit codes: 0=Success, 1=General error, 2=Auth error, 3=Network/API error, 4=Not found, 5=Build invalid
 
 ### No Interactive Prompts
 - All input via flags, env vars, or stdin

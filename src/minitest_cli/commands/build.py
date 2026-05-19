@@ -14,6 +14,7 @@ from minitest_cli.commands.build_helpers import (
     format_build_row,
     format_pagination_info,
     handle_response_error,
+    print_validation_warnings,
     resolve_app,
     run_api_call,
     upload_status_message,
@@ -79,6 +80,7 @@ def upload(
     if json_mode:
         output(result_dict, json_mode=True)
     else:
+        print_validation_warnings(result.validation_warnings)
         print_success(f"Build uploaded: {file.name} ({resolved_platform})")
         output(result_dict, json_mode=False)
 

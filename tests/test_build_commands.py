@@ -125,6 +125,30 @@ class TestHandleResponseError:
             handle_response_error(resp)
         assert exc_info.value.exit_code == 3
 
+    def test_422_build_invalid_exits_5(self) -> None:
+        resp = _mock_response(
+            422,
+            {
+                "error_code": "build_invalid",
+                "issues": [
+                    {
+                        "code": "android.no_compatible_abi",
+                        "message": "APK does not include x86_64 ABI.",
+                        "detail": {},
+                    },
+                ],
+            },
+        )
+        with pytest.raises(Exit) as exc_info:
+            handle_response_error(resp)
+        assert exc_info.value.exit_code == 5
+
+    def test_422_other_falls_through(self) -> None:
+        resp = _mock_response(422, {"detail": "validation error"})
+        with pytest.raises(Exit) as exc_info:
+            handle_response_error(resp)
+        assert exc_info.value.exit_code == 3
+
 
 class TestFormatPaginationInfo:
     def test_with_total_shows_page_and_range(self) -> None:
@@ -278,6 +302,55 @@ class TestUploadCommand:
             result = _run_with_context(["upload", str(build_file)], settings)
 
         assert result.exit_code == 3
+
+    def test_upload_build_invalid_422_exits_5_and_prints_issues(self, tmp_path: Path) -> None:
+        build_file = tmp_path / "bad.apk"
+        build_file.write_bytes(b"data")
+        settings = _make_settings(tmp_path)
+        body = {
+            "error_code": "build_invalid",
+            "issues": [
+                {
+                    "code": "android.no_compatible_abi",
+                    "message": "APK does not include x86_64 ABI.",
+                    "detail": {"abis": ["arm64-v8a"]},
+                },
+                {
+                    "code": "android.test_only_apk",
+                    "message": "APK is marked test-only.",
+                    "detail": {},
+                },
+            ],
+        }
+        client = _mock_upload_client(_mock_response(422, body))
+
+        with patch("minitest_cli.commands.build.ApiClient", return_value=client):
+            result = _run_with_context(["upload", str(build_file)], settings)
+
+        assert result.exit_code == 5
+        combined = result.output + (result.stderr if result.stderr_bytes else "")
+        assert "android.no_compatible_abi" in combined or "no_compatible_abi" in combined
+
+    def test_upload_with_validation_warnings_succeeds_and_prints_them(self, tmp_path: Path) -> None:
+        build_file = tmp_path / "warn.apk"
+        build_file.write_bytes(b"data")
+        settings = _make_settings(tmp_path)
+        body = {
+            **_UPLOAD_RESPONSE,
+            "validationWarnings": [
+                {
+                    "code": "android.unsigned_apk",
+                    "message": "APK is not signed.",
+                    "detail": {},
+                },
+            ],
+        }
+        client = _mock_upload_client(_mock_response(200, body))
+
+        with patch("minitest_cli.commands.build.ApiClient", return_value=client):
+            result = _run_with_context(["upload", str(build_file)], settings, json_mode=False)
+
+        assert result.exit_code == 0
 
     def test_upload_requires_auth(self, tmp_path: Path) -> None:
         build_file = tmp_path / "test.apk"

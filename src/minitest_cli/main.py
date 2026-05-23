@@ -15,8 +15,11 @@ from minitest_cli.commands import (
     maintenance_check,
     run,
     skill,
+    test_file,
+    test_profile,
     upgrade,
     user_story,
+    user_story_bindings,
 )
 from minitest_cli.core.config import get_settings
 from minitest_cli.utils.update_check import check_for_updates
@@ -32,6 +35,9 @@ app = typer.Typer(
 app.add_typer(auth.app)
 app.add_typer(apps.app)
 app.add_typer(user_story.app)
+app.add_typer(user_story_bindings.app)
+app.add_typer(test_profile.app)
+app.add_typer(test_file.app)
 app.add_typer(flow_types.app)
 app.add_typer(app_knowledge.app)
 app.add_typer(build.app)

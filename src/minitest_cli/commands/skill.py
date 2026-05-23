@@ -1,5 +1,4 @@
-"""Skill command – fetch the latest CLI skill instructions from GitHub."""
-
+import os
 import sys
 
 import httpx
@@ -9,9 +8,10 @@ from minitest_cli.utils.output import err_console, print_error
 
 app = typer.Typer(name="skill", help="Retrieve the minitest CLI skill for AI agents.")
 
-SKILL_URL = (
+_DEFAULT_SKILL_URL = (
     "https://raw.githubusercontent.com/minitap-ai/agent-skills/main/skills/minitest-cli/SKILL.md"
 )
+SKILL_URL = os.environ.get("MINITEST_SKILL_URL", _DEFAULT_SKILL_URL)
 
 EXIT_NETWORK_ERROR = 3
 

@@ -1,5 +1,3 @@
-"""Helpers for test-file commands: API paths, response handling, formatting."""
-
 from __future__ import annotations
 
 from typing import Any

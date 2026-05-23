@@ -1,5 +1,3 @@
-"""Helpers for test-profile commands: API path, response handling, table rendering."""
-
 from __future__ import annotations
 
 from typing import Any

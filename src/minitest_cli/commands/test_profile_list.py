@@ -1,5 +1,3 @@
-"""Test-profile listing commands (split out of test_profile.py to satisfy 200-LOC cap)."""
-
 from typing import Any
 
 import typer
@@ -22,11 +20,9 @@ from minitest_cli.utils.output import output, print_info, print_table
 
 
 def register(app: typer.Typer) -> None:
-    """Register the list/list-shared commands onto the given Typer sub-app."""
 
     @app.command(name="list")
     def list_profiles() -> None:
-        """List test profiles for the active app."""
         settings = get_settings()
         json_mode = is_json_mode()
         require_auth(settings)
@@ -51,7 +47,6 @@ def register(app: typer.Typer) -> None:
 
     @app.command(name="list-shared")
     def list_shared() -> None:
-        """List globally-shared test profiles (tenant-agnostic)."""
         settings = get_settings()
         json_mode = is_json_mode()
         require_auth(settings)

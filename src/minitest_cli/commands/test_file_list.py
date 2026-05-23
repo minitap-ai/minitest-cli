@@ -1,5 +1,3 @@
-"""Test-file listing command (split out of test_file.py to satisfy 200-LOC cap)."""
-
 from typing import Annotated, Any
 
 import typer
@@ -21,7 +19,6 @@ from minitest_cli.utils.output import output, print_info, print_table
 
 
 def register(app: typer.Typer) -> None:
-    """Register the list command onto the given Typer sub-app."""
 
     @app.command(name="list")
     def list_files(
@@ -34,7 +31,6 @@ def register(app: typer.Typer) -> None:
             int, typer.Option("--page-size", min=1, max=100, help="Items per page.")
         ] = 20,
     ) -> None:
-        """List test files for the active app."""
         settings = get_settings()
         json_mode = is_json_mode()
         require_auth(settings)

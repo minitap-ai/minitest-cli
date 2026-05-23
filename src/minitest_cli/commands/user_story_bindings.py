@@ -1,5 +1,3 @@
-"""User-story binding commands: bind-profile, bind-files, list-files."""
-
 from typing import Annotated, Any
 
 import typer
@@ -26,6 +24,14 @@ def _binding_row(entry: dict[str, Any]) -> list[str]:
     return [str(entry.get("id", "")), entry.get("name", ""), entry.get("kind", "") or ""]
 
 
+def _normalize_items(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, dict):
+        return data.get("items", [])
+    if isinstance(data, list):
+        return data
+    return []
+
+
 @app.command(name="set-profile")
 def set_profile(
     user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
@@ -38,7 +44,6 @@ def set_profile(
         typer.Option("--clear", help="Remove the existing profile binding."),
     ] = False,
 ) -> None:
-    """Set or clear the test profile bound to a user story."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -82,7 +87,6 @@ def set_files(
         bool, typer.Option("--clear", help="Atomically clear all file bindings.")
     ] = False,
 ) -> None:
-    """Atomically replace the set of files bound to a user story."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -107,7 +111,7 @@ def set_files(
             return resp.json()
 
     data = run_api_call(_run())
-    items: list[dict[str, Any]] = data.get("items", []) if isinstance(data, dict) else []
+    items = _normalize_items(data)
     if json_mode:
         output(data, json_mode=True)
         return
@@ -124,7 +128,6 @@ def list_files(
     page: Annotated[int, typer.Option("--page", min=1)] = 1,
     page_size: Annotated[int, typer.Option("--page-size", min=1, max=100)] = 50,
 ) -> None:
-    """List files bound to a user story."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -140,7 +143,7 @@ def list_files(
             return resp.json()
 
     data = run_api_call(_run())
-    items: list[dict[str, Any]] = data.get("items", []) if isinstance(data, dict) else []
+    items = _normalize_items(data)
     if json_mode:
         output(data, json_mode=True)
         return

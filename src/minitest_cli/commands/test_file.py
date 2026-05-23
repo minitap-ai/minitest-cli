@@ -1,5 +1,3 @@
-"""Test-file commands: upload, get, update, delete (list in test_file_list)."""
-
 import mimetypes
 from pathlib import Path
 from typing import Annotated, Any
@@ -45,7 +43,6 @@ def upload_file(
         str | None, typer.Option("--note", help="Optional 'what this file is for' note.")
     ] = None,
 ) -> None:
-    """Upload a test file (multipart, max 25 MB)."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -85,7 +82,6 @@ def upload_file(
 def get_file(
     file_id: Annotated[str, typer.Argument(help="Test file ID.")],
 ) -> None:
-    """Get a test file's metadata with a short-lived download URL."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -109,7 +105,6 @@ def update_file(
         bool, typer.Option("--clear-note", help="Remove the existing note.")
     ] = False,
 ) -> None:
-    """Update a test file's metadata (partial)."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -148,7 +143,6 @@ def delete_file(
     file_id: Annotated[str, typer.Argument(help="Test file ID.")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation.")] = False,
 ) -> None:
-    """Delete a test file. Requires --force."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)

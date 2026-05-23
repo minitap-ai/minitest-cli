@@ -1,5 +1,3 @@
-"""Test-profile commands: create, get, update, delete (list/list-shared in test_profile_list)."""
-
 import sys
 from typing import Annotated, Any
 
@@ -47,7 +45,6 @@ def create_profile(
         str | None, typer.Option("--about", help="Free-text notes about the account.")
     ] = None,
 ) -> None:
-    """Create a test profile under the active app."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -78,7 +75,6 @@ def create_profile(
 def get_profile(
     profile_id: Annotated[str, typer.Argument(help="Test profile ID.")],
 ) -> None:
-    """Show details for a specific test profile."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -113,7 +109,6 @@ def update_profile(
         str | None, typer.Option("--about", help="New about text (pass '' to clear).")
     ] = None,
 ) -> None:
-    """Update an existing test profile (partial)."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -157,7 +152,6 @@ def delete_profile(
     profile_id: Annotated[str, typer.Argument(help="Test profile ID.")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation.")] = False,
 ) -> None:
-    """Delete a test profile. Requires --force."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)

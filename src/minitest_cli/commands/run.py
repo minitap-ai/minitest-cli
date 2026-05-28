@@ -6,6 +6,7 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.batch_helpers import batch_summary_payload, post_batch
+from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
     base_path,
     display_run_result,
@@ -85,7 +86,7 @@ def start(
     run = run_api_call(_start())
     if not watch:
         if json_mode:
-            print_json({"runId": run.id, "status": run.status.value})
+            print_json({"runId": run.id, "status": _derive_run_status(run)})
         else:
             print_success(f"Run started: {run.id}")
             print_info(f"Use `minitest run status {run.id}` to check progress.")
@@ -109,7 +110,7 @@ def status(
             resp = await client.get(f"{base_path(app_id)}/{run_id}")
             handle_response_error(resp, resource="Run")
             run = StoryRunResponse.model_validate(resp.json())
-            if watch and run.status not in TERMINAL_STATUSES:
+            if watch and _derive_run_status(run) not in TERMINAL_STATUSES:
                 return await poll_run_status(client, app_id, run.id, json_mode)
             return run
 
@@ -170,7 +171,7 @@ def cancel(run_id: Annotated[str, typer.Argument(help="Run ID to cancel.")]) -> 
     if json_mode:
         output(run.model_dump(mode="json", by_alias=True), json_mode=True)
     else:
-        print_success(f"Run cancelled: {run.id} (status: {run.status.value})")
+        print_success(f"Run cancelled: {run.id} (status: {_derive_run_status(run)})")
 
 
 @app.command(name="all")

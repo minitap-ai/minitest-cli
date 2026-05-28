@@ -2,7 +2,7 @@
 
 import math
 
-from minitest_cli.models.story_run import RunStatus, StoryRunListResponse, StoryRunResponse
+from minitest_cli.models.story_run import PlatformRun, StoryRunListResponse, StoryRunResponse
 from minitest_cli.utils.output import (
     err_console,
     print_error,
@@ -17,35 +17,53 @@ RUN_TABLE_HEADERS = ["ID", "User Story", "Status", "Created"]
 RESULTS_TABLE_HEADERS = ["Criterion ID", "Platform", "Result", "Fail Reason"]
 
 
+_TERMINAL_EXEC_STATES = {"completed", "failed", "skipped"}
+
+
+def _derive_run_status(run: StoryRunResponse) -> str:
+    """Collapse the per-platform ``platforms[]`` array to a coarse run status.
+
+    Mirrors the heuristic used by the cockpit / webapp: any platform
+    with a stamped ``cancellation_requested_at`` short-circuits to
+    ``cancelled``; otherwise we pick the worst platform state in
+    lifecycle order (running > pending/blocked > failed > completed).
+    """
+    if any(p.cancellation_requested_at is not None for p in run.platforms):
+        return "cancelled"
+    states = [p.execution_state for p in run.platforms]
+    if not states:
+        return "pending"
+    if "running" in states:
+        return "running"
+    if "pending" in states or "blocked" in states:
+        return "pending"
+    if "failed" in states:
+        return "failed"
+    if all(s in _TERMINAL_EXEC_STATES for s in states) and any(s == "completed" for s in states):
+        return "completed"
+    return "pending"
+
+
 def format_run_row(run: StoryRunResponse) -> list[str]:
     """Format a single StoryRunResponse as a table row."""
     return [
         run.id,
         run.user_story_name or run.user_story_id,
-        run.status.value,
+        _derive_run_status(run),
         run.created_at.strftime("%Y-%m-%d %H:%M"),
     ]
 
 
-def _platform_status_line(platform: str, run: StoryRunResponse) -> tuple[str, str | None] | None:
-    """Build a status line for a platform from the flat run fields."""
-    if platform == "ios" and not run.ios_build_id:
-        return None
-    if platform == "android" and not run.android_build_id:
-        return None
-
-    error = run.ios_error_message if platform == "ios" else run.android_error_message
-    recording = run.ios_recording_url if platform == "ios" else run.android_recording_url
-
-    parts: list[str] = [f"  {platform}:"]
-    if error:
-        parts.append(f" [bold red]error — {error}[/bold red]")
-    elif recording:
+def _platform_status_line(p: PlatformRun) -> tuple[str, str | None]:
+    """Build a status line for a per-platform child."""
+    parts: list[str] = [f"  {p.platform}:"]
+    if p.error_message:
+        parts.append(f" [bold red]error — {p.error_message}[/bold red]")
+    elif p.recording_url:
         parts.append(" [bold green]done[/bold green]")
     else:
         parts.append(" [dim]pending[/dim]")
-
-    return "".join(parts), recording
+    return "".join(parts), p.recording_url
 
 
 def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
@@ -54,20 +72,18 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
         print_json(run.model_dump(mode="json", by_alias=True))
         return
 
+    status = _derive_run_status(run)
     status_icon = {
-        RunStatus.completed: "✓",
-        RunStatus.failed: "✗",
-        RunStatus.pending: "…",
-        RunStatus.running: "…",
-        RunStatus.cancelled: "⊘",
-    }[run.status]
-    print_info(f"Run {run.id} — {status_icon} {run.status.value}")
+        "completed": "✓",
+        "failed": "✗",
+        "pending": "…",
+        "running": "…",
+        "cancelled": "⊘",
+    }.get(status, "?")
+    print_info(f"Run {run.id} — {status_icon} {status}")
 
-    for platform in ("ios", "android"):
-        result = _platform_status_line(platform, run)
-        if result is None:
-            continue
-        line, recording = result
+    for p in run.platforms:
+        line, recording = _platform_status_line(p)
         err_console.print(line)
         if recording:
             err_console.print(f"    Recording: {recording}")
@@ -80,23 +96,19 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
     if rows:
         print_table(RESULTS_TABLE_HEADERS, rows, title="Acceptance Criteria Results")
 
-    if run.status == RunStatus.completed:
+    if status == "completed":
         all_passed = all(cr.success for cr in run.results)
         if run.results and all_passed:
             print_success("All acceptance criteria passed.")
         elif run.results:
             print_error("Some acceptance criteria failed.")
-    elif run.status == RunStatus.failed:
-        errors = []
-        if run.ios_error_message:
-            errors.append(f"iOS: {run.ios_error_message}")
-        if run.android_error_message:
-            errors.append(f"Android: {run.android_error_message}")
+    elif status == "failed":
+        errors = [f"{p.platform}: {p.error_message}" for p in run.platforms if p.error_message]
         if errors:
             print_error(f"Run failed — {'; '.join(errors)}")
         else:
             print_error("Run failed.")
-    elif run.status == RunStatus.cancelled:
+    elif status == "cancelled":
         print_info("Run cancelled.")
 
 

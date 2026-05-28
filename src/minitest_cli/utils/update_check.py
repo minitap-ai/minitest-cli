@@ -7,10 +7,10 @@ import time
 from pathlib import Path
 
 import httpx
+from rich.panel import Panel
 
 from minitest_cli import __version__
 from minitest_cli.core.config import Settings
-from minitest_cli.utils.output import print_warning
 
 CACHE_FILE_NAME = ".last_update_check"
 CACHE_TTL_SECONDS = 3600
@@ -90,11 +90,21 @@ def check_for_updates(settings: Settings) -> None:
 
         if _is_newer(latest, __version__):
             upgrade_cmd = _upgrade_command()
-            print_warning(
-                f"A new version of minitest-cli is available: {latest} "
-                f"(current: {__version__}). "
-                f"Update with: {upgrade_cmd}"
+            from minitest_cli.utils.output import err_console
+
+            err_console.print()
+            err_console.print(
+                Panel(
+                    f"[bold yellow]Update available:[/bold yellow] "
+                    f"[dim]{__version__}[/dim] → [bold green]{latest}[/bold green]\n"
+                    f"Run [bold cyan]{upgrade_cmd}[/bold cyan] to update.",
+                    border_style="yellow",
+                    title="[bold yellow]⚠ minitest-cli is out of date[/bold yellow]",
+                    title_align="left",
+                    padding=(0, 1),
+                )
             )
+            err_console.print()
     except Exception:  # noqa: BLE001
         # Never block or crash the CLI for an update check failure
         pass

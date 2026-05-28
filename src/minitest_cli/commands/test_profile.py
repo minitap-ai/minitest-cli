@@ -4,7 +4,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands import test_profile_list
+from minitest_cli.commands import test_profile_default, test_profile_list
 from minitest_cli.commands.test_profile_helpers import (
     app_base_path,
     get_app_flag,
@@ -19,6 +19,7 @@ from minitest_cli.utils.output import output, print_error, print_success
 
 app = typer.Typer(name="test-profile", help="Test-profile operations (app-scoped).")
 test_profile_list.register(app)
+test_profile_default.register(app)
 
 
 def _read_password(password: str | None, password_stdin: bool) -> str | None:

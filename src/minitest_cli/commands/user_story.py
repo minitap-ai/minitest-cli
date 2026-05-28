@@ -1,4 +1,4 @@
-"""User-story commands: create, list, get, update, delete."""
+"""User-story commands: create, list, get."""
 
 from typing import Annotated, Any
 
@@ -23,7 +23,6 @@ from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
 
 app = typer.Typer(name="user-story", help="User-story operations.")
-
 app.command(name="update")(user_story_modify.update_user_story)
 app.command(name="delete")(user_story_modify.delete_user_story)
 
@@ -49,13 +48,15 @@ def create_user_story(
             ),
         ),
     ] = None,
+    profile: Annotated[
+        str | None,
+        typer.Option(
+            "--profile",
+            help="Test profile ID to assign. If omitted, the app's default profile is used.",
+        ),
+    ] = None,
 ) -> None:
-    """Create a new user story.
-
-    Pass ``--depends-on`` to declare which flows gate this one — the
-    server validates the graph (same-app, no cycles, references exist)
-    on the follow-up PATCH.
-    """
+    """Create a new user story."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -66,17 +67,14 @@ def create_user_story(
         payload["description"] = description
     if criteria:
         payload["acceptance_criteria"] = list(criteria)
+    if profile is not None:
+        payload["test_profile_id"] = profile
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
             resp = await client.post(base_path(app_id), json=payload)
             handle_response_error(resp)
             created = resp.json()
-            # The create endpoint doesn't accept ``depends_on`` so we follow
-            # up with a PATCH. There's a small window where the story exists
-            # without deps; the validation still runs on the PATCH so a bad
-            # dep list won't leave a half-applied state — only an unintended
-            # ``depends_on=[]`` story that the user can re-update or delete.
             if depends_on:
                 story_id = created.get("id")
                 if not story_id:
@@ -93,6 +91,10 @@ def create_user_story(
     data = run_api_call(_run())
     if not json_mode:
         print_success(f"User story created: {data.get('id', '')}")
+        tp = data.get("testProfile") or data.get("test_profile")
+        if tp:
+            label = "Default profile auto-assigned" if profile is None else "Profile assigned"
+            print_info(f"{label}: {tp.get('name', '')}")
     output(data, json_mode=json_mode)
 
 

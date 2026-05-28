@@ -50,10 +50,9 @@ def _upgrade_cli() -> UpgradeStatus:
     else:
         uv_bin = shutil.which("uv")
         if uv_bin:
-            cmd = [uv_bin, "tool", "upgrade", "minitest-cli"]
+            cmd = [uv_bin, "tool", "upgrade", "--reinstall", "minitest-cli"]
         else:
-            # Last resort: try uv via the Python module interface
-            cmd = [sys.executable, "-m", "uv", "tool", "upgrade", "minitest-cli"]
+            cmd = [sys.executable, "-m", "uv", "tool", "upgrade", "--reinstall", "minitest-cli"]
 
     is_uv = "uv" in cmd[0] or cmd[:2] == [sys.executable, "-m"]
     err_console.print(f"[dim]Running: {' '.join(cmd)}[/dim]\n")

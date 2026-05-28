@@ -59,12 +59,9 @@ class TestUpgradeCLI:
             result = runner.invoke(app, ["upgrade"])
 
         assert result.exit_code == 0
-        # Should have called uv tool upgrade
         first_call_args = mock_run.call_args_list[0]
         cmd = first_call_args[0][0]
-        assert "/usr/local/bin/uv" in cmd
-        assert "upgrade" in cmd
-        assert "minitest-cli" in cmd
+        assert cmd == ["/usr/local/bin/uv", "tool", "upgrade", "--reinstall", "minitest-cli"]
 
     def test_cli_upgrade_brew_install(self) -> None:
         """When installed via brew, use brew upgrade."""

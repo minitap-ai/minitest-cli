@@ -59,3 +59,10 @@ uv add <package>                                   # Add new dependency (always 
 - Group tests in classes by feature
 - Name tests: `test_<action>_<scenario>`
 - Always check exit codes and output
+
+### Agent Skill Sync (CRITICAL)
+The public agent skill at `repos/agent-skills/skills/minitest-cli/SKILL.md` documents every CLI command for AI agents. Customers use the CLI with this skill simultaneously — they MUST stay in sync.
+
+When you add, remove, or change a CLI command/flag:
+1. Update `repos/agent-skills/skills/minitest-cli/SKILL.md` in a paired PR
+2. Update the Quick Reference table and any relevant sections

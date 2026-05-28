@@ -17,7 +17,7 @@ from minitest_cli.utils.output import print_error
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
 
-PROFILE_TABLE_HEADERS = ["ID", "Name", "Username", "Scope", "Updated At"]
+PROFILE_TABLE_HEADERS = ["ID", "Name", "Username", "Scope", "Default", "Updated At"]
 
 
 def app_base_path(app_id: str) -> str:
@@ -44,12 +44,17 @@ def profile_scope(profile: dict[str, Any]) -> str:
     return "app"
 
 
+def is_default_profile(profile: dict[str, Any]) -> bool:
+    return bool(profile.get("isDefault") or profile.get("is_default"))
+
+
 def format_profile_row(profile: dict[str, Any]) -> list[str]:
     return [
         str(profile.get("id", "")),
         profile.get("name", ""),
         profile.get("username") or "",
         profile_scope(profile),
+        "★" if is_default_profile(profile) else "",
         profile.get("updatedAt") or profile.get("updated_at") or "",
     ]
 

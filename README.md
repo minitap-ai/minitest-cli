@@ -74,6 +74,10 @@ minitest run --app <app-id>
 | `MINITEST_API_URL`            | testing-service base URL                                   | No (defaults to production)        |
 | `MINITEST_APPS_MANAGER_URL`   | apps-manager base URL (used by `minitest apps create`)     | No (defaults to production)        |
 | `MINITEST_INTEGRATIONS_URL`   | minihands-integrations base URL (used to list tenants)     | No (defaults to production)        |
+| `MINITEST_SUPABASE_URL`       | Supabase project URL used for OAuth login                  | No (defaults to production)        |
+| `MINITEST_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key used for OAuth login | No (defaults to production)        |
+
+> The recommended way to set these is to copy `.env.example` to `.env` — the CLI loads `.env` automatically. The shipped `.env.example` already targets the **dev** environment (see below).
 
 ## Global Flags
 
@@ -106,29 +110,22 @@ minitest run --app <app-id>
 
 ## Using the Dev Environment
 
-To point the CLI at the **dev** environment instead of production, set these environment variables when running `minitest`:
+The shipped `.env.example` already targets the **dev** environment, so pointing the CLI at dev is just a matter of loading it. Copy it to `.env` once:
 
 ```bash
-MINITEST_SUPABASE_URL=https://qrezuucghnmfvaxghqsv.supabase.co \
-MINITEST_SUPABASE_PUBLISHABLE_KEY=sb_publishable_4JRhoCm8pa5PbII0dhS09A_jhpkQhmy \
-MINITEST_API_URL=https://testing-service.dev.minitap.ai \
-MINITEST_APPS_MANAGER_URL=https://apps-manager.dev.minitap.ai \
-MINITEST_INTEGRATIONS_URL=https://integrations.dev.minitap.ai \
-minitest auth login
+cp .env.example .env
 ```
 
-This authenticates against the dev environment and stores a dev-specific auth token. After logging in, keep the same variables set for all subsequent commands:
+The CLI loads `.env` automatically, so every command now runs against dev — no per-command environment variables needed:
 
 ```bash
-MINITEST_SUPABASE_URL=https://qrezuucghnmfvaxghqsv.supabase.co \
-MINITEST_SUPABASE_PUBLISHABLE_KEY=sb_publishable_4JRhoCm8pa5PbII0dhS09A_jhpkQhmy \
-MINITEST_API_URL=https://testing-service.dev.minitap.ai \
-MINITEST_APPS_MANAGER_URL=https://apps-manager.dev.minitap.ai \
-MINITEST_INTEGRATIONS_URL=https://integrations.dev.minitap.ai \
-minitest apps list
+minitest auth login      # authenticates against dev, stores a dev-specific token
+minitest apps list       # runs against dev
 ```
 
-> **Tip:** You can `export` these variables in your shell session (or add them to a `.envrc` / `.env` file) to avoid repeating them on every invocation.
+To target **production** instead, either omit the `.env` file (the built-in defaults point at production) or comment out the dev values and uncomment the `# Production` lines in your `.env`.
+
+> **Tip:** You can still override any single variable inline for a one-off command, e.g. `MINITEST_API_URL=https://testing-service.dev.minitap.ai minitest apps list`.
 
 ## Development
 

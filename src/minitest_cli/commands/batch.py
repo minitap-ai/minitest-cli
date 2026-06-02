@@ -7,6 +7,7 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.batch_helpers import batches_base_path
+from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
     ensure_uuid,
     handle_response_error,
@@ -136,7 +137,7 @@ def get_batch(
             [
                 r.id,
                 r.user_story_name or r.user_story_id,
-                r.status.value,
+                _derive_run_status(r),
                 r.created_at.strftime("%Y-%m-%d %H:%M"),
             ]
         )

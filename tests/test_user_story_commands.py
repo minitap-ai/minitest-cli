@@ -124,6 +124,135 @@ class TestCreateUserStory:
         assert result.exit_code == 0
 
 
+class TestCreateUserStoryProfiles:
+    def test_repeated_profile_sends_test_profile_ids(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
+        with (
+            patch(
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
+            ),
+            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                [
+                    "create",
+                    "--name",
+                    "Story",
+                    "--type",
+                    "login",
+                    "--profile",
+                    "p-1",
+                    "--profile",
+                    "p-2",
+                ],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.post.call_args.kwargs["json"]
+        assert payload["test_profile_ids"] == ["p-1", "p-2"]
+
+    def test_no_profile_omits_field(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
+        with (
+            patch(
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
+            ),
+            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["create", "--name", "Story", "--type", "login"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.post.call_args.kwargs["json"]
+        assert "test_profile_ids" not in payload
+        assert "testProfileIds" not in payload
+
+
+class TestUpdateUserStoryProfiles:
+    def test_profile_replaces_bindings(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(
+            200,
+            {
+                "id": "story-1",
+                "name": "Login",
+                "type": "login",
+                "testProfiles": [{"id": "p-1", "name": "Alice"}],
+            },
+        )
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--profile", "p-1", "--profile", "p-2"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["testProfileIds"] == ["p-1", "p-2"]
+
+    def test_clear_profiles_sends_empty_list(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--clear-profiles"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["testProfileIds"] == []
+
+    def test_no_profile_flag_leaves_bindings_untouched(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--name", "Renamed"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        assert "testProfileIds" not in payload
+
+    def test_profile_and_clear_are_mutually_exclusive(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        result = _run_with_context(
+            ["update", "story-1", "--profile", "p-1", "--clear-profiles"],
+            settings,
+        )
+        assert result.exit_code == 1
+        assert "Use either --profile or --clear-profiles, not both" in result.output
+
+
 class TestListUserStories:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -627,3 +756,35 @@ class TestFetchUserStoryTypes:
         ):
             fetch_user_story_types(settings)
         assert exc_info.value.exit_code == 3
+
+
+class TestExtractBoundProfiles:
+    """``extract_bound_profiles`` prefers the plural list and falls back to the
+    legacy singular fields so the CLI still renders profiles against servers
+    that have not shipped the multi-profile response yet."""
+
+    def test_prefers_plural_list(self):
+        from minitest_cli.commands.user_story_profiles import extract_bound_profiles
+
+        story = {
+            "testProfiles": [{"id": "p-1", "name": "Alice"}, {"id": "p-2", "name": "Bob"}],
+            "testProfile": {"id": "p-1", "name": "Alice"},
+            "testProfileId": "p-1",
+        }
+        assert [p["id"] for p in extract_bound_profiles(story)] == ["p-1", "p-2"]
+
+    def test_falls_back_to_singular_object(self):
+        from minitest_cli.commands.user_story_profiles import extract_bound_profiles
+
+        story = {"testProfile": {"id": "p-1", "name": "Alice"}}
+        assert extract_bound_profiles(story) == [{"id": "p-1", "name": "Alice"}]
+
+    def test_falls_back_to_singular_id(self):
+        from minitest_cli.commands.user_story_profiles import extract_bound_profiles
+
+        assert extract_bound_profiles({"testProfileId": "p-1"}) == [{"id": "p-1"}]
+
+    def test_empty_when_no_profiles(self):
+        from minitest_cli.commands.user_story_profiles import extract_bound_profiles
+
+        assert extract_bound_profiles({"id": "s-1"}) == []

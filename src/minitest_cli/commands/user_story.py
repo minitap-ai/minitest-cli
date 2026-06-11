@@ -18,6 +18,7 @@ from minitest_cli.commands.user_story_helpers import (
     run_api_call,
     validate_user_story_type,
 )
+from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
@@ -49,10 +50,10 @@ def create_user_story(
         ),
     ] = None,
     profile: Annotated[
-        str | None,
+        list[str] | None,
         typer.Option(
             "--profile",
-            help="Test profile ID to assign. If omitted, the app's default profile is used.",
+            help="Test profile ID to bind (repeatable). Omit to use the server's default profile.",
         ),
     ] = None,
 ) -> None:
@@ -67,8 +68,8 @@ def create_user_story(
         payload["description"] = description
     if criteria:
         payload["acceptance_criteria"] = list(criteria)
-    if profile is not None:
-        payload["test_profile_id"] = profile
+    if profile:
+        payload["test_profile_ids"] = list(profile)
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
@@ -91,10 +92,10 @@ def create_user_story(
     data = run_api_call(_run())
     if not json_mode:
         print_success(f"User story created: {data.get('id', '')}")
-        tp = data.get("testProfile") or data.get("test_profile")
-        if tp:
-            label = "Default profile auto-assigned" if profile is None else "Profile assigned"
-            print_info(f"{label}: {tp.get('name', '')}")
+        bound = format_bound_profiles(data)
+        if bound:
+            label = "Default profile auto-assigned" if not profile else "Profiles bound"
+            print_info(f"{label}: {bound}")
     output(data, json_mode=json_mode)
 
 
@@ -193,4 +194,7 @@ def get_user_story(
             handle_response_error(resp)
             return resp.json()
 
-    output(run_api_call(_run()), json_mode=json_mode)
+    data = run_api_call(_run())
+    if not json_mode:
+        print_info(f"Bound profiles: {format_bound_profiles(data) or 'none'}")
+    output(data, json_mode=json_mode)

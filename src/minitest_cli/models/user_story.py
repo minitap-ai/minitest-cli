@@ -31,6 +31,15 @@ class CriterionUpsertItem(CamelModel):
     content: str
 
 
+class TestProfileSummary(CamelModel):
+    """Lightweight test-profile reference embedded in user-story responses."""
+
+    id: str
+    name: str
+    source: str | None = None
+    avatar_url: str | None = None
+
+
 class UserStoryResponse(CamelModel):
     id: str
     app_id: str
@@ -39,6 +48,9 @@ class UserStoryResponse(CamelModel):
     type: str
     created_at: datetime
     depends_on: list[str] = []
+    test_profile_id: str | None = None
+    test_profile: TestProfileSummary | None = None
+    test_profiles: list[TestProfileSummary] = []
 
 
 class UserStoryDetailResponse(UserStoryResponse):
@@ -57,6 +69,7 @@ class CreateUserStoryRequest(CamelModel):
     description: str | None = None
     type: str = "other"
     acceptance_criteria: list[str] = []
+    test_profile_ids: list[str] | None = None
 
 
 class UpdateUserStoryRequest(CamelModel):
@@ -65,6 +78,7 @@ class UpdateUserStoryRequest(CamelModel):
     type: str | None = None
     acceptance_criteria: list[CriterionUpsertItem] | None = None
     depends_on: list[str] | None = None
+    test_profile_ids: list[str] | None = None
 
     def has_changes(self) -> bool:
         return any(v is not None for v in self.model_dump(exclude_none=False).values())

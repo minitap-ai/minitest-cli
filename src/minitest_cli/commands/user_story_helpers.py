@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 import typer
 
+from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.config import Settings
 from minitest_cli.models.user_story import (
     UserStoryDetailResponse,
@@ -17,7 +18,7 @@ from minitest_cli.utils.output import print_error
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
 
-USER_STORY_TABLE_HEADERS = ["ID", "Name", "Type", "Description", "Acceptance Criteria"]
+USER_STORY_TABLE_HEADERS = ["ID", "Name", "Type", "Description", "Acceptance Criteria", "Profiles"]
 
 
 def fetch_user_story_types(settings: Settings) -> list[str]:
@@ -122,6 +123,7 @@ def format_user_story_row(story: dict[str, Any]) -> list[str]:
         story.get("type", ""),
         story.get("description", "") or "",
         criteria_str,
+        format_bound_profiles(story),
     ]
 
 

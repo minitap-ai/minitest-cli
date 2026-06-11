@@ -15,45 +15,18 @@ from minitest_cli.commands.user_story_helpers import (
     run_api_call,
     validate_user_story_type,
 )
+from minitest_cli.commands.user_story_criteria import build_criteria_payload
+from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.models.user_story import UpdateUserStoryRequest
-from minitest_cli.utils.output import output, print_error, print_success, print_warning
-
-
-def _build_criteria_payload(
-    existing_items: list[dict[str, str]],
-    *,
-    replace: list[str] | None,
-    add: list[str] | None,
-) -> list[dict[str, str]]:
-    """Build the acceptanceCriteria payload preserving stable criterion ids.
-
-    - ``replace`` (``--criteria``): full replacement. Any entry whose content
-      matches an existing criterion keeps its stable ``id`` so the backend does
-      not churn identity. New contents are sent without ``id``.
-    - ``add`` (``--add-criteria``): append. Existing items are passed through
-      untouched (ids preserved); new contents appended without ``id``.
-    """
-    by_content: dict[str, list[dict[str, str]]] = {}
-    for item in existing_items:
-        content = item.get("content")
-        if content:
-            by_content.setdefault(content, []).append(item)
-
-    if replace is not None:
-        out: list[dict[str, str]] = []
-        for content in replace:
-            matches = by_content.get(content)
-            match = matches.pop(0) if matches else None
-            if match and match.get("id"):
-                out.append({"id": match["id"], "content": content})
-            else:
-                out.append({"content": content})
-        return out
-
-    appended = [{"content": c} for c in (add or [])]
-    return existing_items + appended
+from minitest_cli.utils.output import (
+    output,
+    print_error,
+    print_info,
+    print_success,
+    print_warning,
+)
 
 
 def update_user_story(
@@ -94,6 +67,20 @@ def update_user_story(
             ),
         ),
     ] = None,
+    profile: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--profile",
+            help="Replace bound test profiles with these IDs (repeatable). Omit to leave as-is.",
+        ),
+    ] = None,
+    clear_profiles: Annotated[
+        bool,
+        typer.Option(
+            "--clear-profiles",
+            help="Unbind all test profiles. Mutually exclusive with --profile.",
+        ),
+    ] = False,
 ) -> None:
     """Update an existing user story (partial update).
 
@@ -107,6 +94,10 @@ def update_user_story(
 
     if criteria is not None and add_criteria is not None:
         print_error("Use either --criteria or --add-criteria, not both.")
+        raise typer.Exit(code=1)
+
+    if profile and clear_profiles:
+        print_error("Use either --profile or --clear-profiles, not both.")
         raise typer.Exit(code=1)
 
     if user_story_type is not None:
@@ -127,12 +118,21 @@ def update_user_story(
     needs_current_story_deps = depends_on is None and bool(remove_dependency)
     needs_current_story = needs_current_story_criteria or needs_current_story_deps
 
+    # ``[]`` clears bindings, a list replaces them, ``None`` leaves them untouched.
+    if clear_profiles:
+        test_profile_ids: list[str] | None = []
+    elif profile:
+        test_profile_ids = list(profile)
+    else:
+        test_profile_ids = None
+
     req = UpdateUserStoryRequest(
         name=name,
         type=user_story_type,
         description=description,
         acceptance_criteria=None,
         depends_on=list(depends_on) if depends_on is not None else None,
+        test_profile_ids=test_profile_ids,
     )
     if not req.has_changes() and not needs_current_story:
         print_error("Provide at least one field to update.")
@@ -149,7 +149,7 @@ def update_user_story(
                 current_story = get_resp.json()
                 if needs_current_story_criteria:
                     existing_items = extract_criteria_items(current_story)
-                    payload["acceptanceCriteria"] = _build_criteria_payload(
+                    payload["acceptanceCriteria"] = build_criteria_payload(
                         existing_items,
                         replace=list(criteria) if criteria is not None else None,
                         add=list(add_criteria) if add_criteria else None,
@@ -167,6 +167,10 @@ def update_user_story(
     data = run_api_call(_run())
     if not json_mode:
         print_success(f"User story updated: {user_story_id}")
+        if clear_profiles:
+            print_info("Test profiles cleared.")
+        elif profile:
+            print_info(f"Bound profiles: {format_bound_profiles(data) or ', '.join(profile)}")
     output(data, json_mode=json_mode)
 
 

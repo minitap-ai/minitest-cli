@@ -10,7 +10,7 @@ DEFAULT_APPS_MANAGER_URL = "https://apps-manager.app.minitap.ai"
 DEFAULT_INTEGRATIONS_URL = "https://integrations.minitap.ai"
 DEFAULT_CONFIG_DIR = Path.home() / ".minitest"
 DEFAULT_SUPABASE_URL = "https://auth.minitap.ai"
-DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_mlpTSxXqh7L3p5EY8FBEDA_yWma_vrf"
+DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HmeivoYFvddM7ud1z1DzUA_7zXZj5v7"
 
 
 class Settings(BaseSettings):

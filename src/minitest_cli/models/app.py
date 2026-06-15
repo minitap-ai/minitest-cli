@@ -1,11 +1,20 @@
 """Pydantic models for the apps API."""
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import ConfigDict
 
 from minitest_cli.models.base import CamelModel
+
+
+class AppPlatform(StrEnum):
+    """Target platform scope of an app, mirroring apps-manager's enum."""
+
+    ANDROID = "android"
+    IOS = "ios"
+    CROSS_PLATFORM = "cross_platform"
 
 
 class AppResponse(CamelModel):

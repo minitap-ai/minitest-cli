@@ -253,7 +253,7 @@ class TestCreateApp:
         client.upload_form.assert_called_once()
         args, kwargs = client.upload_form.call_args
         assert args[0] == "/api/v1/tenants/t-1/apps"
-        assert kwargs["data"] == {"name": "Foo"}
+        assert kwargs["data"] == {"name": "Foo", "platform": "cross_platform"}
         assert kwargs["files"] == {}
 
     def test_json_mode_prints_full_record(self, tmp_path):
@@ -291,6 +291,8 @@ class TestCreateApp:
                     "A demo",
                     "--slug",
                     "custom-slug",
+                    "--platform",
+                    "android",
                 ],
                 settings,
             )
@@ -299,9 +301,23 @@ class TestCreateApp:
         _, kwargs = client.upload_form.call_args
         assert kwargs["data"] == {
             "name": "Foo",
+            "platform": "android",
             "description": "A demo",
             "slug": "custom-slug",
         }
+
+    def test_rejects_invalid_platform(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        client = _mock_apps_manager_client(_mock_response(201, _APP_RECORD))
+
+        with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
+            result = _run_with_context(
+                ["create", "--tenant", "t-1", "--name", "Foo", "--platform", "windows"],
+                settings,
+            )
+
+        assert result.exit_code != 0
+        client.upload_form.assert_not_called()
 
     def test_auto_resolves_single_tenant(self, tmp_path):
         settings = _make_settings(tmp_path)

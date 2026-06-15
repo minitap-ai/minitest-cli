@@ -13,7 +13,7 @@ from minitest_cli.commands.apps_helpers import create_app_request
 from minitest_cli.core.auth import require_auth
 from minitest_cli.core.config import Settings
 from minitest_cli.core.tenants import fetch_user_tenants, resolve_tenant_id
-from minitest_cli.models.app import AppDetailResponse, AppListResponse
+from minitest_cli.models.app import AppDetailResponse, AppListResponse, AppPlatform
 from minitest_cli.utils.output import (
     err_console,
     print_error,
@@ -122,6 +122,13 @@ def create_app(
             help="URL-friendly slug. Auto-generated from the name if omitted.",
         ),
     ] = None,
+    platform: Annotated[
+        AppPlatform,
+        typer.Option(
+            "--platform",
+            help="Target platform scope.",
+        ),
+    ] = AppPlatform.CROSS_PLATFORM,
     icon: Annotated[
         Path | None,
         typer.Option(
@@ -155,6 +162,7 @@ def create_app(
             settings,
             tenant_id=resolved_tenant_id,
             name=name,
+            platform=platform.value,
             description=description,
             slug=slug,
             icon=icon,

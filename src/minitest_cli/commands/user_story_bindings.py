@@ -35,13 +35,17 @@ def _normalize_items(data: Any) -> list[dict[str, Any]]:
 @app.command(name="set-profile")
 def set_profile(
     user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
-    profile_id: Annotated[
-        str | None,
-        typer.Option("--profile", help="Test profile ID to bind. Omit with --clear to remove."),
+    profile_ids: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--profile",
+            help="Test profile ID to bind (repeatable). Replaces the full set. "
+            "Omit with --clear to remove all.",
+        ),
     ] = None,
     clear: Annotated[
         bool,
-        typer.Option("--clear", help="Remove the existing profile binding."),
+        typer.Option("--clear", help="Remove all profile bindings."),
     ] = False,
 ) -> None:
     settings = get_settings()
@@ -49,14 +53,14 @@ def set_profile(
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
 
-    if profile_id is not None and clear:
+    if profile_ids and clear:
         print_error("Use either --profile or --clear, not both.")
         raise typer.Exit(code=1)
-    if profile_id is None and not clear:
-        print_error("Provide --profile <id> or --clear.")
+    if not profile_ids and not clear:
+        print_error("Provide --profile <id> (repeatable) or --clear.")
         raise typer.Exit(code=1)
 
-    body: dict[str, Any] = {"testProfileId": None if clear else profile_id}
+    body: dict[str, Any] = {"testProfileIds": [] if clear else list(profile_ids or [])}
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
@@ -67,9 +71,10 @@ def set_profile(
     data = run_api_call(_run())
     if not json_mode:
         if clear:
-            print_success(f"Test profile cleared on user story {user_story_id}.")
+            print_success(f"Test profiles cleared on user story {user_story_id}.")
         else:
-            print_success(f"Test profile {profile_id} bound to user story {user_story_id}.")
+            bound = ", ".join(profile_ids or [])
+            print_success(f"Test profiles [{bound}] bound to user story {user_story_id}.")
     output(data, json_mode=json_mode)
 
 

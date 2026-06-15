@@ -22,9 +22,8 @@ from minitest_cli.commands.run_helpers import (
     RUN_TABLE_HEADERS,
     TERMINAL_STATUSES,
 )
+from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
-    BatchResponse,
-    CreateBatchRequest,
     StoryRunListResponse,
     StoryRunResponse,
 )

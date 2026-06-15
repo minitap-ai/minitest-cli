@@ -7,16 +7,20 @@ from minitest_cli.models.app import (
     TenantResponse,
 )
 from minitest_cli.models.base import CamelModel
-from minitest_cli.models.build import BuildListResponse, BuildResponse
-from minitest_cli.models.story_run import (
+from minitest_cli.models.batch import (
     BatchCounters,
     BatchListItem,
     BatchListResponse,
     BatchResponse,
     BatchStatus,
+    BatchTargetView,
     CreateBatchRequest,
-    CriterionResult,
     GitHubContextResponse,
+    UserStoryTypeBreakdownEntry,
+)
+from minitest_cli.models.build import BuildListResponse, BuildResponse
+from minitest_cli.models.story_run import (
+    CriterionResult,
     PlatformRun,
     StoryRunListResponse,
     StoryRunResponse,
@@ -42,6 +46,7 @@ __all__ = [
     "BatchListResponse",
     "BatchResponse",
     "BatchStatus",
+    "BatchTargetView",
     "BuildListResponse",
     "BuildResponse",
     "CamelModel",
@@ -59,4 +64,5 @@ __all__ = [
     "UserStoryDetailResponse",
     "UserStoryListResponse",
     "UserStoryResponse",
+    "UserStoryTypeBreakdownEntry",
 ]

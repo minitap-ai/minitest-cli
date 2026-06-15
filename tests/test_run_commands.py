@@ -235,6 +235,9 @@ _RUN_LIST_RESPONSE = {
 
 _BATCH_UUID = "99999999-8888-7777-6666-555555555555"
 
+_IOS_TARGET_UUID = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1"
+_ANDROID_TARGET_UUID = "d2d2d2d2-d2d2-d2d2-d2d2-d2d2d2d2d2d2"
+
 _BATCH_RESPONSE = {
     "id": _BATCH_UUID,
     "appId": "app-123",
@@ -242,8 +245,31 @@ _BATCH_RESPONSE = {
     "source": "api",
     "status": "pending",
     "createdAt": "2025-06-01T10:00:00Z",
-    "iosBuildId": _IOS_BUILD_UUID,
-    "androidBuildId": _ANDROID_BUILD_UUID,
+    "headlineStatus": "pending",
+    "targets": [
+        {
+            "id": _IOS_TARGET_UUID,
+            "platform": "ios",
+            "buildId": _IOS_BUILD_UUID,
+            "buildName": None,
+            "url": None,
+            "browser": None,
+            "viewport": None,
+            "label": "iOS",
+            "counters": {"headlineStatus": "pending"},
+        },
+        {
+            "id": _ANDROID_TARGET_UUID,
+            "platform": "android",
+            "buildId": _ANDROID_BUILD_UUID,
+            "buildName": None,
+            "url": None,
+            "browser": None,
+            "viewport": None,
+            "label": "Android",
+            "counters": {"headlineStatus": "pending"},
+        },
+    ],
     "storyRuns": [
         {**_PENDING_RUN, "userStoryName": "Login Story"},
         {

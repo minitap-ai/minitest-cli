@@ -14,7 +14,7 @@ from minitest_cli.commands.run_helpers import (
     resolve_app,
     run_api_call,
 )
-from minitest_cli.models.story_run import (
+from minitest_cli.models.batch import (
     BatchListItem,
     BatchListResponse,
     BatchResponse,
@@ -28,17 +28,18 @@ from minitest_cli.utils.output import (
 
 app = typer.Typer(name="batch", help="Manage batch runs (multi-story executions).")
 
-BATCH_TABLE_HEADERS = ["ID", "Status", "Source", "Commit", "Tag", "Story runs", "Created"]
+BATCH_TABLE_HEADERS = ["ID", "Status", "Source", "Commit", "Tag", "Targets", "Created"]
 
 
 def _format_batch_row(item: BatchListItem) -> list[str]:
+    targets = ", ".join(t.label for t in item.targets) or "—"
     return [
         item.id,
-        item.status.value,
+        item.headline_status or item.status.value,
         item.source,
         (item.commit_sha or "")[:10],
         item.tag_name or "",
-        str(len(item.story_runs)),
+        targets,
         item.created_at.strftime("%Y-%m-%d %H:%M"),
     ]
 
@@ -125,11 +126,32 @@ def get_batch(
         output(batch.model_dump(mode="json", by_alias=True), json_mode=True)
         return
 
-    print_info(f"Batch {batch.id} — {batch.status.value} ({batch.source})")
+    headline = batch.headline_status or batch.status.value
+    print_info(f"Batch {batch.id} — {headline} ({batch.source})")
     if batch.commit_sha:
         print_info(f"  commit: {batch.commit_sha}")
     if batch.tag_name:
         print_info(f"  tag: {batch.tag_name}")
+
+    target_rows: list[list[str]] = []
+    for t in batch.targets:
+        c = t.counters
+        target_rows.append(
+            [
+                t.label,
+                c.headline_status or c.status or "",
+                str(c.passed),
+                str(c.warnings),
+                str(c.criticals),
+                str(c.skipped),
+            ]
+        )
+    if target_rows:
+        print_table(
+            ["Target", "Status", "Passed", "Warnings", "Criticals", "Skipped"],
+            target_rows,
+            title=f"Targets ({len(target_rows)})",
+        )
 
     rows: list[list[str]] = []
     for r in batch.story_runs:

@@ -66,6 +66,9 @@ def _mock_client() -> AsyncMock:
     return client
 
 
+_IOS_TARGET_UUID = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1"
+_ANDROID_TARGET_UUID = "d2d2d2d2-d2d2-d2d2-d2d2-d2d2d2d2d2d2"
+
 _BATCH_LIST_ITEM = {
     "id": _BATCH_UUID,
     "appId": "app-123",
@@ -74,21 +77,39 @@ _BATCH_LIST_ITEM = {
     "status": "completed",
     "commitSha": "abc1234567890",
     "tagName": "v1.0.0",
+    "repoFullName": "minitap-ai/demo-app",
     "appVersion": "1.0.0",
     "buildNumber": "42",
     "userStoryTypes": ["login"],
+    "userStoryTypesBreakdown": [
+        {"type": "login", "passed": 1, "warnings": 0, "criticals": 0, "total": 1},
+    ],
     "triggeredByUserId": None,
-    "iosBuildId": None,
-    "androidBuildId": None,
-    "iosBuildName": None,
-    "androidBuildName": None,
     "startedAt": None,
     "finishedAt": None,
     "createdAt": "2025-06-01T10:00:00Z",
-    "ios": {},
-    "android": {},
+    "targets": [
+        {
+            "id": _IOS_TARGET_UUID,
+            "platform": "ios",
+            "buildId": None,
+            "buildName": "Demo iOS 1.0.0",
+            "url": None,
+            "browser": None,
+            "viewport": None,
+            "label": "iOS",
+            "counters": {
+                "status": "passed",
+                "headlineStatus": "passed",
+                "criticals": 0,
+                "warnings": 0,
+                "skipped": 0,
+                "passed": 1,
+            },
+        },
+    ],
+    "headlineStatus": "passed",
     "githubContext": None,
-    "storyRuns": [],
 }
 
 _BATCH_LIST_RESPONSE = {
@@ -107,14 +128,50 @@ _BATCH_RESPONSE = {
     "commitSha": None,
     "tagName": None,
     "triggeredByUserId": None,
-    "iosBuildId": None,
-    "androidBuildId": None,
-    "awaitingBuildId": None,
     "startedAt": None,
     "finishedAt": None,
     "createdAt": "2025-06-01T10:00:00Z",
-    "ios": {},
-    "android": {},
+    "targets": [
+        {
+            "id": _IOS_TARGET_UUID,
+            "platform": "ios",
+            "buildId": None,
+            "buildName": None,
+            "url": None,
+            "browser": None,
+            "viewport": None,
+            "label": "iOS",
+            "counters": {
+                "status": None,
+                "headlineStatus": "running",
+                "criticals": 0,
+                "warnings": 0,
+                "skipped": 0,
+                "passed": 0,
+                "running": 1,
+            },
+        },
+        {
+            "id": _ANDROID_TARGET_UUID,
+            "platform": "android",
+            "buildId": None,
+            "buildName": None,
+            "url": None,
+            "browser": None,
+            "viewport": None,
+            "label": "Android",
+            "counters": {
+                "status": None,
+                "headlineStatus": "running",
+                "criticals": 0,
+                "warnings": 0,
+                "skipped": 0,
+                "passed": 0,
+                "running": 1,
+            },
+        },
+    ],
+    "headlineStatus": "running",
     "githubContext": None,
     "storyRuns": [
         {
@@ -122,26 +179,24 @@ _BATCH_RESPONSE = {
             "userStoryId": _USER_STORY_UUID,
             "userStoryName": "Login Story",
             "tenantId": "tenant-1",
-            "status": "pending",
-            "iosBuildId": None,
-            "androidBuildId": None,
-            "iosRecordingPath": None,
-            "androidRecordingPath": None,
-            "iosRecordingUrl": None,
-            "androidRecordingUrl": None,
-            "iosErrorMessage": None,
-            "androidErrorMessage": None,
-            "iosSessionPaths": [],
-            "androidSessionPaths": [],
-            "iosRecordingStartedAt": None,
-            "androidRecordingStartedAt": None,
-            "iosSegmentMap": None,
-            "androidSegmentMap": None,
-            "iosStatus": None,
-            "androidStatus": None,
-            "startedAt": None,
-            "finishedAt": None,
+            "platforms": [
+                {
+                    "platform": "ios",
+                    "buildId": None,
+                    "executionState": "pending",
+                    "verdict": None,
+                    "status": None,
+                },
+                {
+                    "platform": "android",
+                    "buildId": None,
+                    "executionState": "pending",
+                    "verdict": None,
+                    "status": None,
+                },
+            ],
             "createdAt": "2025-06-01T10:00:00Z",
+            "results": [],
         }
     ],
 }
@@ -160,6 +215,8 @@ class TestListBatchesCommand:
 
         assert result.exit_code == 0
         assert _BATCH_UUID[:8] in result.output
+        # The runs list renders per-target labels (replaces the old story-run count).
+        assert "iOS" in result.output
         assert client.get.call_args[0][0] == "/api/v1/apps/app-123/batches"
 
     def test_list_json_mode(self, tmp_path) -> None:
@@ -173,7 +230,18 @@ class TestListBatchesCommand:
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total"] == 1
-        assert data["items"][0]["id"] == _BATCH_UUID
+        item = data["items"][0]
+        assert item["id"] == _BATCH_UUID
+        # New target-centric shape round-trips through the model (by_alias).
+        assert item["targets"][0]["label"] == "iOS"
+        assert item["targets"][0]["platform"] == "ios"
+        assert item["headlineStatus"] == "passed"
+        assert item["repoFullName"] == "minitap-ai/demo-app"
+        assert item["userStoryTypesBreakdown"][0]["type"] == "login"
+        # Legacy per-platform fields are gone from the wire shape.
+        assert "ios" not in item
+        assert "android" not in item
+        assert "storyRuns" not in item
 
     def test_list_forwards_filters(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
@@ -236,6 +304,9 @@ class TestGetBatchCommand:
         assert result.exit_code == 0
         assert _BATCH_UUID in result.output  # full UUID appears in header line
         assert _RUN_UUID[:8] in result.output
+        # Per-target table renders both lanes' labels.
+        assert "iOS" in result.output
+        assert "Android" in result.output
         assert client.get.call_args[0][0] == f"/api/v1/apps/app-123/batches/{_BATCH_UUID}"
 
     def test_get_json_mode(self, tmp_path) -> None:
@@ -250,6 +321,10 @@ class TestGetBatchCommand:
         data = json.loads(result.output)
         assert data["id"] == _BATCH_UUID
         assert data["status"] == "running"
+        assert data["headlineStatus"] == "running"
+        assert [t["label"] for t in data["targets"]] == ["iOS", "Android"]
+        assert "ios" not in data
+        assert "android" not in data
 
     def test_get_rejects_invalid_uuid(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)

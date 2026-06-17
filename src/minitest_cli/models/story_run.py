@@ -37,6 +37,10 @@ class PlatformRun(CamelModel):
     """
 
     platform: str
+    batch_target_id: str | None = None
+    browser: str | None = None
+    viewport: str | None = None
+    label: str | None = None
     build_id: UUID | None = None
     recording_path: str | None = None
     recording_url: str | None = None

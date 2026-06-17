@@ -1,6 +1,7 @@
 """Tests for minitest_cli.commands.run — start, status, all commands."""
 
 import json
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -1157,14 +1158,29 @@ class TestCancelRunCommand:
 # ---------------------------------------------------------------------------
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain_help(output: str) -> str:
+    """Strip ANSI styling so flag names render as contiguous substrings.
+
+    Rich (Typer's help renderer) interleaves color escape codes inside option
+    names when a TTY/`FORCE_COLOR` is present (CI), e.g. ``--web`` becomes
+    ``\\x1b[1;36m-\\x1b[0m\\x1b[1;36m-web\\x1b[0m``. Removing the escapes restores
+    the literal flag strings the assertions look for.
+    """
+    return _ANSI_RE.sub("", output)
+
+
 class TestRunLaneFlagSurface:
     @pytest.mark.parametrize("command", ["start", "all"])
     def test_only_lane_flags_are_exposed(self, command) -> None:
         result = runner.invoke(run_app, [command, "--help"])
 
         assert result.exit_code == 0
-        assert "--web" in result.output
-        assert "--ios-build" in result.output
-        assert "--android-build" in result.output
+        output = _plain_help(result.output)
+        assert "--web" in output
+        assert "--ios-build" in output
+        assert "--android-build" in output
         for forbidden in ("--target", "--web-url", "--browser", "--viewport"):
-            assert forbidden not in result.output
+            assert forbidden not in output

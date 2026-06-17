@@ -65,13 +65,16 @@ async def create_app_request(
     *,
     tenant_id: str,
     name: str,
-    platform: str,
+    platforms: list[str],
+    web_url: str | None,
     description: str | None,
     slug: str | None,
     icon: Path | None,
 ) -> AppDetailResponse:
     """Send the multipart POST to apps-manager and return the parsed response."""
-    data: dict[str, str] = {"name": name, "platform": platform}
+    data: dict[str, Any] = {"name": name, "platforms": platforms}
+    if web_url is not None:
+        data["web_url"] = web_url
     if description is not None:
         data["description"] = description
     if slug is not None:

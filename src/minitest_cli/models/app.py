@@ -10,11 +10,11 @@ from minitest_cli.models.base import CamelModel
 
 
 class AppPlatform(StrEnum):
-    """Target platform scope of an app, mirroring apps-manager's enum."""
+    """A platform lane an app can target, mirroring apps-manager's Platform."""
 
     ANDROID = "android"
     IOS = "ios"
-    CROSS_PLATFORM = "cross_platform"
+    WEB = "web"
 
 
 class AppResponse(CamelModel):
@@ -23,7 +23,8 @@ class AppResponse(CamelModel):
     id: str
     name: str
     tenant_id: str
-    platform: str | None = None
+    platforms: list[str] = []
+    web_url: str | None = None
 
 
 class AppListResponse(CamelModel):
@@ -59,6 +60,9 @@ class AppDetailResponse(CamelModel):
     tenant_id: str
     name: str
     slug: str
+    platforms: list[str] = []
+    web_url: str | None = None
+    default_web_targets: list[Any] = []
     description: str | None = None
     icon_url: str | None = None
     is_default: bool = False

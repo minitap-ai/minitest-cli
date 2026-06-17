@@ -16,9 +16,15 @@ runner = CliRunner()
 
 _APPS_DATA = {
     "apps": [
-        {"id": "aaa-111", "name": "My App", "tenantId": "t-1", "platform": "android"},
-        {"id": "bbb-222", "name": "Other App", "tenantId": "t-1", "platform": "ios"},
-        {"id": "ccc-333", "name": "Cross App", "tenantId": "t-1", "platform": "cross_platform"},
+        {"id": "aaa-111", "name": "My App", "tenantId": "t-1", "platforms": ["android"]},
+        {"id": "bbb-222", "name": "Other App", "tenantId": "t-1", "platforms": ["ios"]},
+        {
+            "id": "ccc-333",
+            "name": "Web App",
+            "tenantId": "t-1",
+            "platforms": ["ios", "web"],
+            "webUrl": "https://example.com",
+        },
     ]
 }
 
@@ -146,8 +152,8 @@ class TestListApps:
 
         client.get.assert_called_once_with("/api/v1/apps")
 
-    def test_json_output_includes_raw_platform(self, tmp_path):
-        """Agents reading --json need the raw enum value, not the table label."""
+    def test_json_output_includes_raw_platforms(self, tmp_path):
+        """Agents reading --json need the raw platform lanes, not the table label."""
         settings = _make_settings(tmp_path)
         resp = _mock_response(200, _APPS_DATA)
         client = _mock_client(resp)
@@ -157,11 +163,11 @@ class TestListApps:
 
         assert result.exit_code == 0
         data = json.loads(result.output)
-        platforms_by_id = {row["id"]: row["platform"] for row in data}
+        platforms_by_id = {row["id"]: row["platforms"] for row in data}
         assert platforms_by_id == {
-            "aaa-111": "android",
-            "bbb-222": "ios",
-            "ccc-333": "cross_platform",
+            "aaa-111": ["android"],
+            "bbb-222": ["ios"],
+            "ccc-333": ["ios", "web"],
         }
 
     def test_human_output_renders_platform_labels(self, tmp_path):
@@ -173,17 +179,16 @@ class TestListApps:
             result = _run_with_context(["list"], settings)
 
         assert result.exit_code == 0
-        # Headers and per-app labels appear in the rendered table.
         assert "Platform" in result.output
         assert "Android" in result.output
         assert "iOS" in result.output
-        assert "Cross-platform" in result.output
+        assert "Web" in result.output
 
-    def test_human_output_handles_missing_platform(self, tmp_path):
-        """Apps from older testing-service deploys may omit platform entirely."""
+    def test_human_output_handles_missing_platforms(self, tmp_path):
+        """Apps with no configured lanes render a placeholder, not a crash."""
         settings = _make_settings(tmp_path)
-        legacy_payload = {"apps": [{"id": "old-1", "name": "Legacy", "tenantId": "t-1"}]}
-        resp = _mock_response(200, legacy_payload)
+        payload = {"apps": [{"id": "old-1", "name": "Legacy", "tenantId": "t-1"}]}
+        resp = _mock_response(200, payload)
         client = _mock_client(resp)
 
         with patch("minitest_cli.commands.apps.ApiClient", return_value=client):
@@ -242,7 +247,7 @@ class TestCreateApp:
 
         with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
             result = _run_with_context(
-                ["create", "--tenant", "t-1", "--name", "Foo"],
+                ["create", "--tenant", "t-1", "--name", "Foo", "--platform", "ios"],
                 settings,
             )
 
@@ -253,8 +258,49 @@ class TestCreateApp:
         client.upload_form.assert_called_once()
         args, kwargs = client.upload_form.call_args
         assert args[0] == "/api/v1/tenants/t-1/apps"
-        assert kwargs["data"] == {"name": "Foo", "platform": "cross_platform"}
+        assert kwargs["data"] == {"name": "Foo", "platforms": ["ios"]}
         assert kwargs["files"] == {}
+
+    def test_requires_at_least_one_platform(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        am_client = MagicMock()
+
+        with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=am_client):
+            result = _run_with_context(["create", "--tenant", "t-1", "--name", "Foo"], settings)
+
+        assert result.exit_code == 1
+        am_client.assert_not_called()
+
+    def test_repeatable_platforms_and_web_url(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        resp = _mock_response(201, _APP_RECORD)
+        client = _mock_apps_manager_client(resp)
+
+        with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
+            result = _run_with_context(
+                [
+                    "create",
+                    "--tenant",
+                    "t-1",
+                    "--name",
+                    "Foo",
+                    "--platform",
+                    "ios",
+                    "--platform",
+                    "web",
+                    "--web-url",
+                    "https://example.com",
+                ],
+                settings,
+            )
+
+        assert result.exit_code == 0, result.output
+        _, kwargs = client.upload_form.call_args
+        assert kwargs["data"] == {
+            "name": "Foo",
+            "platforms": ["ios", "web"],
+            "web_url": "https://example.com",
+        }
 
     def test_json_mode_prints_full_record(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -263,7 +309,7 @@ class TestCreateApp:
 
         with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
             result = _run_with_context(
-                ["create", "--tenant", "t-1", "--name", "Foo"],
+                ["create", "--tenant", "t-1", "--name", "Foo", "--platform", "ios"],
                 settings,
                 json_mode=True,
             )
@@ -301,7 +347,7 @@ class TestCreateApp:
         _, kwargs = client.upload_form.call_args
         assert kwargs["data"] == {
             "name": "Foo",
-            "platform": "android",
+            "platforms": ["android"],
             "description": "A demo",
             "slug": "custom-slug",
         }
@@ -333,7 +379,7 @@ class TestCreateApp:
             patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client),
         ):
             result = _run_with_context(
-                ["create", "--name", "Foo"],
+                ["create", "--name", "Foo", "--platform", "ios"],
                 settings,
             )
 
@@ -361,7 +407,7 @@ class TestCreateApp:
                 return_value=am_client,
             ),
         ):
-            result = _run_with_context(["create", "--name", "Foo"], settings)
+            result = _run_with_context(["create", "--name", "Foo", "--platform", "ios"], settings)
 
         assert result.exit_code == 1
         # Backend must NOT have been contacted.
@@ -385,7 +431,7 @@ class TestCreateApp:
             patch("minitest_cli.core.tenants.typer.prompt", return_value="2"),
             patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client),
         ):
-            result = _run_with_context(["create", "--name", "Foo"], settings)
+            result = _run_with_context(["create", "--name", "Foo", "--platform", "ios"], settings)
 
         assert result.exit_code == 0, result.output
         # Tenant 2 (= t-2) must be the one used.
@@ -405,7 +451,7 @@ class TestCreateApp:
                 return_value=am_client,
             ),
         ):
-            result = _run_with_context(["create", "--name", "Foo"], settings)
+            result = _run_with_context(["create", "--name", "Foo", "--platform", "ios"], settings)
 
         assert result.exit_code == 1
         am_client.assert_not_called()
@@ -417,7 +463,7 @@ class TestCreateApp:
 
         with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
             result = _run_with_context(
-                ["create", "--tenant", "t-1", "--name", "Foo"],
+                ["create", "--tenant", "t-1", "--name", "Foo", "--platform", "ios"],
                 settings,
             )
 
@@ -430,7 +476,7 @@ class TestCreateApp:
 
         with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
             result = _run_with_context(
-                ["create", "--tenant", "t-1", "--name", "Foo"],
+                ["create", "--tenant", "t-1", "--name", "Foo", "--platform", "ios"],
                 settings,
             )
 
@@ -443,7 +489,7 @@ class TestCreateApp:
 
         with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
             result = _run_with_context(
-                ["create", "--tenant", "t-1", "--name", "Foo"],
+                ["create", "--tenant", "t-1", "--name", "Foo", "--platform", "ios"],
                 settings,
             )
 
@@ -475,7 +521,7 @@ class TestCreateApp:
 
         with patch("minitest_cli.commands.apps_helpers.AppsManagerClient", return_value=client):
             result = _run_with_context(
-                ["create", "--tenant", "t-1", "--name", "Foo"],
+                ["create", "--tenant", "t-1", "--name", "Foo", "--platform", "ios"],
                 settings,
             )
 

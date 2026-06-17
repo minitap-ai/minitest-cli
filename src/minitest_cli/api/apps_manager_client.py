@@ -73,7 +73,7 @@ class AppsManagerClient:
         self,
         path: str,
         *,
-        data: dict[str, str] | None = None,
+        data: dict[str, Any] | None = None,
         files: dict[str, Any] | None = None,
         timeout: float = UPLOAD_TIMEOUT,
         **kwargs: Any,

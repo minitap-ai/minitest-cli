@@ -37,15 +37,15 @@ APP_TABLE_HEADERS = ["ID", "Name", "Platform"]
 _PLATFORM_LABELS: dict[str, str] = {
     "android": "Android",
     "ios": "iOS",
-    "cross_platform": "Cross-platform",
+    "web": "Web",
 }
 
 
-def _format_platform(value: str | None) -> str:
-    """Render an AppPlatform value for the table; pass through unknown values."""
-    if value is None:
+def _format_platforms(values: list[str]) -> str:
+    """Render an app's platform lanes for the table."""
+    if not values:
         return "—"
-    return _PLATFORM_LABELS.get(value, value)
+    return ", ".join(_PLATFORM_LABELS.get(v, v) for v in values)
 
 
 def _get_settings() -> Settings:
@@ -88,7 +88,7 @@ def list_apps() -> None:
         print_json([a.model_dump(mode="json", by_alias=True) for a in data.apps])
         return
 
-    rows = [[a.id, a.name, _format_platform(a.platform)] for a in data.apps]
+    rows = [[a.id, a.name, _format_platforms(a.platforms)] for a in data.apps]
     print_table(APP_TABLE_HEADERS, rows, title="Apps")
 
 
@@ -123,12 +123,16 @@ def create_app(
         ),
     ] = None,
     platform: Annotated[
-        AppPlatform,
+        list[AppPlatform] | None,
         typer.Option(
             "--platform",
-            help="Target platform scope.",
+            help="Platform lane (repeatable): ios, android, or web. At least one required.",
         ),
-    ] = AppPlatform.CROSS_PLATFORM,
+    ] = None,
+    web_url: Annotated[
+        str | None,
+        typer.Option("--web-url", help="Web/PWA URL the app is reachable at (for --platform web)."),
+    ] = None,
     icon: Annotated[
         Path | None,
         typer.Option(
@@ -149,6 +153,10 @@ def create_app(
     json_mode = _is_json_mode()
     require_auth(settings)
 
+    if not platform:
+        print_error("Select at least one --platform: ios, android, or web.")
+        raise typer.Exit(code=1)
+
     async def _run() -> AppDetailResponse:
         if tenant:
             resolved_tenant_id = tenant
@@ -162,7 +170,8 @@ def create_app(
             settings,
             tenant_id=resolved_tenant_id,
             name=name,
-            platform=platform.value,
+            platforms=[p.value for p in platform],
+            web_url=web_url,
             description=description,
             slug=slug,
             icon=icon,

@@ -3,6 +3,7 @@
 import math
 
 from minitest_cli.models.story_run import PlatformRun, StoryRunListResponse, StoryRunResponse
+from minitest_cli.models.targets import target_label
 from minitest_cli.utils.output import (
     err_console,
     print_error,
@@ -54,9 +55,13 @@ def format_run_row(run: StoryRunResponse) -> list[str]:
     ]
 
 
+def _platform_label(p: PlatformRun) -> str:
+    return p.label or target_label(p.platform, p.browser, p.viewport)
+
+
 def _platform_status_line(p: PlatformRun) -> tuple[str, str | None]:
     """Build a status line for a per-platform child."""
-    parts: list[str] = [f"  {p.platform}:"]
+    parts: list[str] = [f"  {_platform_label(p)}:"]
     if p.error_message:
         parts.append(f" [bold red]error — {p.error_message}[/bold red]")
     elif p.recording_url:
@@ -91,7 +96,8 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
     rows: list[list[str]] = []
     for cr in run.results:
         result_str = "[green]✓ pass[/green]" if cr.success else "[red]✗ fail[/red]"
-        rows.append([cr.criterion_version_id, cr.platform, result_str, cr.fail_reason or ""])
+        platform_label = target_label(cr.platform, None, None)
+        rows.append([cr.criterion_version_id, platform_label, result_str, cr.fail_reason or ""])
 
     if rows:
         print_table(RESULTS_TABLE_HEADERS, rows, title="Acceptance Criteria Results")
@@ -103,7 +109,9 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
         elif run.results:
             print_error("Some acceptance criteria failed.")
     elif status == "failed":
-        errors = [f"{p.platform}: {p.error_message}" for p in run.platforms if p.error_message]
+        errors = [
+            f"{_platform_label(p)}: {p.error_message}" for p in run.platforms if p.error_message
+        ]
         if errors:
             print_error(f"Run failed — {'; '.join(errors)}")
         else:

@@ -22,6 +22,12 @@ from minitest_cli.commands.run_helpers import (
     RUN_TABLE_HEADERS,
     TERMINAL_STATUSES,
 )
+from minitest_cli.commands.run_targets import (
+    AndroidBuildOpt,
+    build_targets,
+    IosBuildOpt,
+    WebOpt,
+)
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
     StoryRunListResponse,
@@ -38,41 +44,25 @@ from minitest_cli.utils.output import (
 
 app = typer.Typer(name="run", help="Test execution.")
 
-IosBuildOpt = Annotated[
-    str | None, typer.Option("--ios-build", help="iOS build ID (omit for Android-only apps).")
-]
-AndroidBuildOpt = Annotated[
-    str | None, typer.Option("--android-build", help="Android build ID (omit for iOS-only apps).")
-]
-
-
-def _require_build(ios_build: str | None, android_build: str | None) -> None:
-    if not ios_build and not android_build:
-        print_error("Provide at least one of --ios-build or --android-build.")
-        raise typer.Exit(code=1)
-
 
 @app.command()
 def start(
     user_story: Annotated[str, typer.Argument(help="User-story name or UUID to run.")],
     ios_build: IosBuildOpt = None,
     android_build: AndroidBuildOpt = None,
+    web: WebOpt = False,
     watch: Annotated[
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
 ) -> None:
     """Start a new test run for a user story (via the batches endpoint)."""
     settings, app_id, json_mode = resolve_app()
-    _require_build(ios_build, android_build)
+    targets = build_targets(ios_build, android_build, web)
 
     async def _start() -> StoryRunResponse:
         async with ApiClient(settings) as client:
             user_story_id = await resolve_user_story_id(client, app_id, user_story)
-            body = CreateBatchRequest(
-                user_story_ids=[user_story_id],
-                ios_build_id=ios_build,
-                android_build_id=android_build,
-            )
+            body = CreateBatchRequest(user_story_ids=[user_story_id], targets=targets)
             batch = await post_batch(client, app_id, body)
             if not batch.story_runs:
                 print_error("Batch created but no story runs were returned.")
@@ -177,14 +167,15 @@ def cancel(run_id: Annotated[str, typer.Argument(help="Run ID to cancel.")]) -> 
 def run_all(
     ios_build: IosBuildOpt = None,
     android_build: AndroidBuildOpt = None,
+    web: WebOpt = False,
 ) -> None:
     """Start a batch covering every user story for the app."""
     settings, app_id, json_mode = resolve_app()
-    _require_build(ios_build, android_build)
+    targets = build_targets(ios_build, android_build, web)
 
     async def _run_all() -> BatchResponse:
         async with ApiClient(settings) as client:
-            body = CreateBatchRequest(ios_build_id=ios_build, android_build_id=android_build)
+            body = CreateBatchRequest(targets=targets)
             return await post_batch(client, app_id, body)
 
     batch = run_api_call(_run_all())

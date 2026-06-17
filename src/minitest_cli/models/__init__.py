@@ -25,6 +25,7 @@ from minitest_cli.models.story_run import (
     StoryRunListResponse,
     StoryRunResponse,
 )
+from minitest_cli.models.targets import BatchTarget, target_label
 from minitest_cli.models.user_story import (
     AcceptanceCriteriaResponse,
     CreateUserStoryRequest,
@@ -46,6 +47,7 @@ __all__ = [
     "BatchListResponse",
     "BatchResponse",
     "BatchStatus",
+    "BatchTarget",
     "BatchTargetView",
     "BuildListResponse",
     "BuildResponse",
@@ -60,6 +62,7 @@ __all__ = [
     "StoryRunListResponse",
     "StoryRunResponse",
     "TenantResponse",
+    "target_label",
     "UpdateUserStoryRequest",
     "UserStoryDetailResponse",
     "UserStoryListResponse",

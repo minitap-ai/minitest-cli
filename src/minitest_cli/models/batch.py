@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from minitest_cli.models.base import CamelModel
 from minitest_cli.models.story_run import StoryRunResponse
+from minitest_cli.models.targets import BatchTarget
 
 
 class BatchStatus(StrEnum):
@@ -72,16 +73,13 @@ class GitHubContextResponse(CamelModel):
 class CreateBatchRequest(CamelModel):
     """Request body for POST /api/v1/apps/{app_id}/batches.
 
-    The native ``ios_build_id`` / ``android_build_id`` pair is the legacy
-    (server-deprecated but still accepted) request shape; the server maps
-    it to native execution targets on creation. Batch *responses* are now
-    target-centric, but the request side keeps these fields so the
-    ``--ios-build`` / ``--android-build`` flags keep working.
+    Lanes are selected through :attr:`targets`: native lanes carry their
+    build id, the web lane is the bare ``{platform: "web"}`` marker the
+    server expands into the app's default web targets.
     """
 
     user_story_ids: list[str] | None = None
-    ios_build_id: str | None = None
-    android_build_id: str | None = None
+    targets: list[BatchTarget] | None = None
     commit_sha: str | None = None
     tag_name: str | None = None
 

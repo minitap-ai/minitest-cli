@@ -399,6 +399,34 @@ class TestDisplayRunResult:
         assert _CRITERIA_UUID_1 in combined
         assert "Button not found" in combined
 
+    def test_web_platform_prefers_server_label(self, capsys) -> None:
+        run = StoryRunResponse.model_validate(
+            {
+                "id": _RUN_UUID,
+                "userStoryId": _USER_STORY_UUID,
+                "createdAt": "2025-01-01T00:00:00Z",
+                "platforms": [{"platform": "web", "label": "Chrome · Mobile"}],
+                "results": [],
+            }
+        )
+        display_run_result(run, json_mode=False)
+        captured = capsys.readouterr()
+        assert "Chrome · Mobile" in captured.out + captured.err
+
+    def test_web_platform_falls_back_to_generic_web_label(self, capsys) -> None:
+        run = StoryRunResponse.model_validate(
+            {
+                "id": _RUN_UUID,
+                "userStoryId": _USER_STORY_UUID,
+                "createdAt": "2025-01-01T00:00:00Z",
+                "platforms": [{"platform": "web"}],
+                "results": [],
+            }
+        )
+        display_run_result(run, json_mode=False)
+        captured = capsys.readouterr()
+        assert "Web:" in captured.out + captured.err
+
 
 # ---------------------------------------------------------------------------
 # start command
@@ -460,8 +488,8 @@ class TestStartCommand:
 
         assert result.exit_code == 0
 
-    def test_start_posts_correct_build_ids(self, tmp_path) -> None:
-        """Build IDs from flags are sent in the POST body."""
+    def test_start_posts_native_targets(self, tmp_path) -> None:
+        """Native build flags are sent as a target-centric POST body."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
@@ -474,10 +502,66 @@ class TestStartCommand:
             )
 
         assert result.exit_code == 0
-        post_call = client.post.call_args
-        body = post_call[1]["json"]
-        assert body["iosBuildId"] == _IOS_BUILD_UUID
-        assert body["androidBuildId"] == _ANDROID_BUILD_UUID
+        body = client.post.call_args[1]["json"]
+        assert "iosBuildId" not in body
+        assert "androidBuildId" not in body
+        assert body["targets"] == [
+            {"platform": "ios", "buildId": _IOS_BUILD_UUID},
+            {"platform": "android", "buildId": _ANDROID_BUILD_UUID},
+        ]
+
+    def test_start_web_posts_bare_web_marker(self, tmp_path) -> None:
+        """--web alone posts a single bare web target marker (no build)."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, "--no-watch", "--web"],
+                settings,
+                json_mode=True,
+            )
+
+        assert result.exit_code == 0
+        body = client.post.call_args[1]["json"]
+        assert body["targets"] == [{"platform": "web"}]
+
+    def test_start_web_plus_ios_posts_both_targets(self, tmp_path) -> None:
+        """--ios-build X --web posts a native ios target and a web marker."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, "--no-watch", "--ios-build", _IOS_BUILD_UUID, "--web"],
+                settings,
+                json_mode=True,
+            )
+
+        assert result.exit_code == 0
+        body = client.post.call_args[1]["json"]
+        assert body["targets"] == [
+            {"platform": "ios", "buildId": _IOS_BUILD_UUID},
+            {"platform": "web"},
+        ]
+
+    def test_start_web_unconfigured_surfaces_server_error_verbatim(self, tmp_path) -> None:
+        """A 422 from the server (app has no web config) is surfaced to the user."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        detail = "App app-123 has no web targets configured."
+        client.post = AsyncMock(return_value=_mock_response(422, {"detail": detail}))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, "--no-watch", "--web"],
+                settings,
+            )
+
+        assert result.exit_code == 3
+        assert detail in result.output
 
     def test_start_no_watch_human_output(self, tmp_path) -> None:
         """No-watch mode without --json shows human-friendly message."""
@@ -580,8 +664,8 @@ class TestStartCommand:
         # All platforms terminalized with ``completed`` execution_state.
         assert all(p["executionState"] == "completed" for p in data["platforms"])
 
-    def test_start_requires_at_least_one_build_flag(self, tmp_path) -> None:
-        """Missing both --ios-build and --android-build exits with code 1."""
+    def test_start_requires_at_least_one_target_flag(self, tmp_path) -> None:
+        """No lane flag (--ios-build / --android-build / --web) exits with code 1."""
         settings = _make_settings(tmp_path)
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=_mock_client()):
@@ -591,7 +675,8 @@ class TestStartCommand:
             )
 
         assert result.exit_code == 1
-        assert "at least one of --ios-build or --android-build" in result.output
+        for flag in ("--ios-build", "--android-build", "--web"):
+            assert flag in result.output
 
     def test_start_accepts_android_only(self, tmp_path) -> None:
         """Android-only apps can omit --ios-build."""
@@ -615,8 +700,7 @@ class TestStartCommand:
 
         assert result.exit_code == 0
         body = client.post.call_args[1]["json"]
-        assert "iosBuildId" not in body
-        assert body["androidBuildId"] == _ANDROID_BUILD_UUID
+        assert body["targets"] == [{"platform": "android", "buildId": _ANDROID_BUILD_UUID}]
 
 
 # ---------------------------------------------------------------------------
@@ -815,8 +899,8 @@ class TestRunAllCommand:
         assert _BATCH_UUID in result.output
         assert "Login Story" in result.output
 
-    def test_all_posts_correct_build_ids(self, tmp_path) -> None:
-        """Build IDs from flags are sent in the batch POST body."""
+    def test_all_posts_native_targets(self, tmp_path) -> None:
+        """Native build flags are sent as a target-centric batch POST body."""
         settings = _make_settings(tmp_path)
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
@@ -829,9 +913,25 @@ class TestRunAllCommand:
             )
 
         assert result.exit_code == 0
-        post_body = client.post.call_args[1]["json"]
-        assert post_body["iosBuildId"] == _IOS_BUILD_UUID
-        assert post_body["androidBuildId"] == _ANDROID_BUILD_UUID
+        body = client.post.call_args[1]["json"]
+        assert "iosBuildId" not in body
+        assert "androidBuildId" not in body
+        assert body["targets"] == [
+            {"platform": "ios", "buildId": _IOS_BUILD_UUID},
+            {"platform": "android", "buildId": _ANDROID_BUILD_UUID},
+        ]
+
+    def test_all_web_posts_bare_web_marker(self, tmp_path) -> None:
+        """run all --web posts a single bare web target marker."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(["all", "--web"], settings, json_mode=True)
+
+        assert result.exit_code == 0
+        assert client.post.call_args[1]["json"]["targets"] == [{"platform": "web"}]
 
     def test_all_api_error_exits_3(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
@@ -864,14 +964,16 @@ class TestRunAllCommand:
 
         assert result.exit_code == 2
 
-    def test_all_requires_both_build_flags(self, tmp_path) -> None:
-        """Missing --ios-build or --android-build shows usage error."""
+    def test_all_requires_at_least_one_target_flag(self, tmp_path) -> None:
+        """run all with no lane flag exits with code 1, naming all three lanes."""
         settings = _make_settings(tmp_path)
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=_mock_client()):
             result = _run_with_context(["all"], settings)
 
-        assert result.exit_code != 0
+        assert result.exit_code == 1
+        for flag in ("--ios-build", "--android-build", "--web"):
+            assert flag in result.output
 
 
 class TestListRunsCommand:
@@ -1047,3 +1149,22 @@ class TestCancelRunCommand:
             result = _run_with_context(["cancel", _RUN_UUID], settings)
 
         assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# Lane-flag surface (help) — per-run web-target overrides are CI-only, so the
+# CLI must NOT expose --target / --web-url / --browser / --viewport.
+# ---------------------------------------------------------------------------
+
+
+class TestRunLaneFlagSurface:
+    @pytest.mark.parametrize("command", ["start", "all"])
+    def test_only_lane_flags_are_exposed(self, command) -> None:
+        result = runner.invoke(run_app, [command, "--help"])
+
+        assert result.exit_code == 0
+        assert "--web" in result.output
+        assert "--ios-build" in result.output
+        assert "--android-build" in result.output
+        for forbidden in ("--target", "--web-url", "--browser", "--viewport"):
+            assert forbidden not in result.output

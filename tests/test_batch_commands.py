@@ -309,6 +309,37 @@ class TestGetBatchCommand:
         assert "Android" in result.output
         assert client.get.call_args[0][0] == f"/api/v1/apps/app-123/batches/{_BATCH_UUID}"
 
+    def test_get_renders_web_target_label(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path)
+        web_target = {
+            "id": _IOS_TARGET_UUID,
+            "platform": "web",
+            "buildId": None,
+            "buildName": None,
+            "url": "https://example.com",
+            "browser": "chrome",
+            "viewport": "mobile",
+            "label": "Chrome · Mobile",
+            "counters": {
+                "status": None,
+                "headlineStatus": "running",
+                "criticals": 0,
+                "warnings": 0,
+                "skipped": 0,
+                "passed": 0,
+                "running": 1,
+            },
+        }
+        batch = {**_BATCH_RESPONSE, "targets": [web_target]}
+        client = _mock_client()
+        client.get = AsyncMock(return_value=_mock_response(200, batch))
+
+        with patch("minitest_cli.commands.batch.ApiClient", return_value=client):
+            result = _run_with_context(["get", _BATCH_UUID], settings)
+
+        assert result.exit_code == 0
+        assert "Chrome · Mobile" in result.output
+
     def test_get_json_mode(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
         client = _mock_client()

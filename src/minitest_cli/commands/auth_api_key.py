@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.core.auth import require_auth
+from minitest_cli.core.auth import load_or_refresh_credentials
 from minitest_cli.core.config import Settings, get_settings
 from minitest_cli.utils.output import print_json
 
@@ -26,13 +26,16 @@ def _ensure_oauth(settings: Settings) -> str:
     Minting/revoking keys requires OAuth (or MINITEST_TOKEN); an mtk_ key cannot
     manage other keys.
     """
-    if settings.api_key and not settings.token:
-        err_console.print(
-            "[bold red]Error:[/bold red] Managing API keys requires OAuth login or "
-            "MINITEST_TOKEN. An mtk_ API key cannot manage keys."
-        )
-        raise typer.Exit(code=2)
-    return require_auth(settings)
+    if settings.token:
+        return settings.token
+    creds = load_or_refresh_credentials(settings)
+    if creds is not None:
+        return creds.access_token
+    err_console.print(
+        "[bold red]Error:[/bold red] Managing API keys requires OAuth login or "
+        "MINITEST_TOKEN. An mtk_ API key cannot manage keys."
+    )
+    raise typer.Exit(code=2)
 
 
 @app.command()
@@ -123,4 +126,4 @@ def revoke(
         print_json({"revoked": True, "keyId": str(key)})
         return
 
-    err_console.print(f"[bold green]Revoked key {key}[/bold green]")
+    Console().print(f"[bold green]Revoked key {key}[/bold green]")

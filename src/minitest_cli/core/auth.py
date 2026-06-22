@@ -110,7 +110,7 @@ def require_auth(settings: Settings) -> str:
 
 
 def get_auth_method(settings: Settings) -> AuthMethod:
-    """Return the active auth method: 'env_token', 'oauth', or 'none'.
+    """Return the active auth method: 'env_token', 'api_key', 'oauth', or 'none'.
 
     For OAuth, validates that stored credentials are usable (not expired,
     or successfully refreshed). Returns 'none' if credentials exist but

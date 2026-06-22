@@ -30,12 +30,13 @@ class AppsManagerClient:
             response = await client.post("/api/v1/tenants/<id>/apps", data=...)
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, token_override: str | None = None) -> None:
         self._settings = settings
+        self._token_override = token_override
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "AppsManagerClient":
-        token = load_token(self._settings)
+        token = self._token_override or load_token(self._settings)
         self._client = httpx.AsyncClient(
             base_url=self._settings.apps_manager_url,
             headers={

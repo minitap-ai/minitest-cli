@@ -22,12 +22,13 @@ class ApiClient:
             response = await client.get("/api/v1/apps")
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, token_override: str | None = None) -> None:
         self._settings = settings
+        self._token_override = token_override
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "ApiClient":
-        token = load_token(self._settings)
+        token = self._token_override or load_token(self._settings)
         self._client = httpx.AsyncClient(
             base_url=self._settings.api_url,
             headers={

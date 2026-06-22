@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_API_URL = "https://testing-service.app.minitap.ai"
@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     token: str | None = Field(
         default=None,
         description="API authentication token (MINITEST_TOKEN)",
+    )
+    api_key: SecretStr | None = Field(
+        default=None,
+        description="Tenant-scoped minitest API key (MINITEST_API_KEY)",
     )
     app_id: str | None = Field(
         default=None,

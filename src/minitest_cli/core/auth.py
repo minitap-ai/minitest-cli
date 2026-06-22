@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import sys
 from typing import Any, Literal, TypedDict
 
 from minitest_cli.core.config import Settings
@@ -39,7 +40,22 @@ __all__ = [
     "save_credentials",
 ]
 
-AuthMethod = Literal["env_token", "oauth", "none"]
+AuthMethod = Literal["api_key", "env_token", "oauth", "none"]
+
+_PRIORITY_WARNING_EMITTED = False
+
+
+def _warn_priority_once(settings: Settings) -> None:
+    global _PRIORITY_WARNING_EMITTED
+    if _PRIORITY_WARNING_EMITTED:
+        return
+    if settings.token and settings.api_key:
+        print(
+            "[minitest] MINITEST_TOKEN and MINITEST_API_KEY are both set. "
+            "MINITEST_TOKEN takes precedence. Unset one to silence this warning.",
+            file=sys.stderr,
+        )
+        _PRIORITY_WARNING_EMITTED = True
 
 
 class AuthStatus(TypedDict):
@@ -66,22 +82,22 @@ def load_or_refresh_credentials(settings: Settings) -> Credentials | None:
 
 
 def load_token(settings: Settings) -> str:
-    """Load the auth token.
+    """Load the auth token, preferring MINITEST_TOKEN, then MINITEST_API_KEY, then OAuth."""
+    _warn_priority_once(settings)
 
-    Priority:
-      1. MINITEST_TOKEN environment variable (via settings.token)
-      2. Stored credentials (auto-refresh if near expiry)
-
-    Returns the bearer token string, or exits with code 2 on failure.
-    """
     if settings.token:
         return settings.token
+
+    if settings.api_key:
+        return settings.api_key.get_secret_value()
 
     creds = load_or_refresh_credentials(settings)
     if creds is not None:
         return creds.access_token
 
-    auth_error("Not authenticated. Run `minitest auth login` or set MINITEST_TOKEN.")
+    auth_error(
+        "Not authenticated. Set MINITEST_API_KEY, run `minitest auth login`, or set MINITEST_TOKEN."
+    )
 
 
 def require_auth(settings: Settings) -> str:
@@ -102,6 +118,8 @@ def get_auth_method(settings: Settings) -> AuthMethod:
     """
     if settings.token:
         return "env_token"
+    if settings.api_key:
+        return "api_key"
     if load_or_refresh_credentials(settings) is not None:
         return "oauth"
     return "none"

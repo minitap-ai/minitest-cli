@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import typer
 
+from minitest_cli.commands.auth_api_key import app as api_key_app
 from minitest_cli.core.auth import (
     AuthStatus,
     clear_credentials,
@@ -19,6 +20,7 @@ from minitest_cli.core.config import Settings
 from minitest_cli.utils.output import output, print_error, print_info, print_success
 
 app = typer.Typer(name="auth", help="Authentication management.")
+app.add_typer(api_key_app, name="api-key")
 
 SKILL_NAME = "minitest-cli"
 SKILL_INSTALL_ARGS = ["skills", "add", "minitap-ai/agent-skills", "--skill", "minitest-cli"]

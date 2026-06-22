@@ -130,6 +130,14 @@ class TestGetAuthMethod:
         save_credentials(settings, _make_credentials())
         assert get_auth_method(settings) == "env_token"
 
+    def test_api_key_when_only_api_key_set(self, tmp_path):
+        settings = _make_settings(tmp_path, api_key="mtk_x")
+        assert get_auth_method(settings) == "api_key"
+
+    def test_env_token_beats_api_key(self, tmp_path):
+        settings = _make_settings(tmp_path, token="jwt", api_key="mtk_x")
+        assert get_auth_method(settings) == "env_token"
+
     def test_oauth_when_credentials_exist(self, tmp_path):
         settings = _make_settings(tmp_path)
         save_credentials(settings, _make_credentials())
@@ -189,6 +197,36 @@ class TestLoadToken:
             with pytest.raises(SystemExit) as exc_info:
                 load_token(settings)
             assert exc_info.value.code == EXIT_CODE_AUTH_ERROR
+
+
+class TestTokenPriority:
+    @pytest.fixture(autouse=True)
+    def _reset_warning(self, monkeypatch):
+        monkeypatch.setattr("minitest_cli.core.auth._PRIORITY_WARNING_EMITTED", False)
+
+    def test_token_beats_api_key_and_warns_once(self, tmp_path, capsys):
+        settings = _make_settings(tmp_path, token="jwt", api_key="mtk_x")
+
+        assert load_token(settings) == "jwt"
+        # A subsequent call must not re-emit the warning.
+        assert load_token(settings) == "jwt"
+
+        warning = "MINITEST_TOKEN and MINITEST_API_KEY are both set"
+        captured = capsys.readouterr()
+        assert captured.err.count(warning) == 1
+
+    def test_api_key_used_when_no_token(self, tmp_path, capsys):
+        settings = _make_settings(tmp_path, api_key="mtk_x")
+
+        assert load_token(settings) == "mtk_x"
+
+        captured = capsys.readouterr()
+        assert "both set" not in captured.err
+
+    def test_api_key_is_secret_str(self, tmp_path):
+        """The raw key must never leak via repr/str of Settings."""
+        settings = _make_settings(tmp_path, api_key="mtk_secret")
+        assert "mtk_secret" not in repr(settings)
 
 
 class TestRefreshToken:

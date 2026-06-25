@@ -12,6 +12,7 @@ from minitest_cli.commands import (
     batch,
     build,
     flow_types,
+    init,
     run,
     skill,
     test_file,
@@ -31,6 +32,7 @@ app = typer.Typer(
 )
 
 # Register command groups
+app.add_typer(init.app)
 app.add_typer(auth.app)
 app.add_typer(apps.app)
 app.add_typer(user_story.app)

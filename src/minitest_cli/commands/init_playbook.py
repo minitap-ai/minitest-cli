@@ -34,10 +34,12 @@ Record each returned profile id.
 
 ## 4. Map the user journeys
 Run `minitest flow-types list` to see the valid scenario types. Read the app's
-navigation, screens, and features to enumerate the key journeys: core flows,
-meaningful interactions, and important edge cases. Aim for a representative suite
-that reflects how users actually use the app — not just happy paths, but not
-exhaustive either.
+navigation, screens, and features and map ALL the main user paths the app
+genuinely warrants — every key journey, not just a sample. Cover the happy paths
+AND, especially, the paths that can BREAK: failure states, validation errors,
+permission/auth denials, empty states, and important edge cases. These are what
+real testing must catch. Write goal-oriented acceptance criteria (each criterion
+is a job to be done, not a micro-step).
 
 ## 5. Create scenarios, wired together
 Create one user story per journey. Create prerequisites BEFORE the scenarios that

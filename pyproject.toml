@@ -98,6 +98,9 @@ fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
+[tool.ruff.lint.per-file-ignores]
+"src/minitest_cli/commands/init_playbook.py" = ["E501"]
+
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 

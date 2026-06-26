@@ -27,9 +27,18 @@ Only if no app matches, inspect the repo to detect the platform (iOS: `.xcodepro
 
 ## 3. Define personas (test profiles)
 Scan the codebase for the user types the app supports (e.g. logged-out visitor,
-standard user, admin). Create one test profile per persona. Pass the password via
-stdin only, and ask the user for any real credentials you need:
-`printf '%s' "<password>" | minitest test-profile create --name "<Persona>" --username "<username>" --password-stdin --about "<short description>"`
+standard user, admin). Create one test profile per persona.
+
+Default to email-OTP personas: give each a `<prefix>@qa.minitap.ai` username and NO
+password. The Minitest agent receives mail for any `@qa.minitap.ai` address and reads
+login codes from that inbox at runtime, so it can sign in (or sign up) without you
+managing real credentials:
+`minitest test-profile create --name "<Persona>" --username "<persona>@qa.minitap.ai" --about "<short description>"`
+A non-`@qa.minitap.ai` username with no password is rejected — keep the domain.
+
+Only when the user gives you a real account they own (and the app needs a password)
+pass both, via stdin for the password:
+`printf '%s' "<password>" | minitest test-profile create --name "<Persona>" --username "<real-email>" --password-stdin --about "<short description>"`
 Record each returned profile id.
 
 ## 4. Map the user journeys

@@ -39,6 +39,17 @@ A non-`@qa.minitap.ai` username with no password is rejected — keep the domain
 Only when the user gives you a real account they own (and the app needs a password)
 pass both, via stdin for the password:
 `printf '%s' "<password>" | minitest test-profile create --name "<Persona>" --username "<real-email>" --password-stdin --about "<short description>"`
+
+To exercise a flow that needs a specific account state (e.g. a Pro/premium account),
+proactively create a `<something>@qa.minitap.ai` persona WITH an explicit password, then
+ask the user to link that exact email+password combo to a pro/specific-state account in
+their backend — the `@qa.minitap.ai` address keeps the inbox readable for any OTP while
+the password lets them pre-provision the account state.
+
+If a scenario has NO persona bound, the agent defaults to anonymous (skip login). If a
+flow forces authentication, it self-generates a `<random-str>@qa.minitap.ai` with a
+password it picks at runtime, signs up, and reads the inbox for the confirmation/OTP code
+— so unbound scenarios still work without you provisioning anything.
 Record each returned profile id.
 
 ## 4. Map the user journeys

@@ -91,10 +91,17 @@ class TestPlaybookContent:
             "minitest flow-types list",
             "minitest user-story create",
             "minitest apps dependencies",
-            "minitest build upload",
-            "minitest run all",
         ):
             assert command in PLAYBOOK
+
+    def test_stops_before_build_and_run(self):
+        # `minitest init` wires the suite, then hands off to the web app's
+        # "Run tests" button — it must NOT tell the agent to upload a build
+        # or start runs from the CLI.
+        assert "minitest build upload" not in PLAYBOOK
+        assert "minitest run all" not in PLAYBOOK
+        assert "minitest run start" not in PLAYBOOK
+        assert "Run tests" in PLAYBOOK
 
     def test_wires_dependencies_and_personas(self):
         assert "--depends-on" in PLAYBOOK

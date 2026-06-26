@@ -81,26 +81,15 @@ uncommon — only do it when the journey genuinely depends on a pre-seeded file.
 Run `minitest apps dependencies` and review the wiring. Fix mistakes with
 `minitest user-story update` or `minitest user-story-binding set-profile`.
 
-## 7. Get a build to test
-You already know the platform from step 2 — do not ask. Find or obtain an
-installable build that runs on an emulator/simulator on the first try. First search
-the repo for an existing artifact (`build/`, `DerivedData`, `**/outputs/apk/**`,
-release folders). If none exists, ask the user whether they have one (get the path)
-or want you to build it. Guardrails:
-- Android: an x86_64 / universal DEBUG `.apk` (debug-signed; avoid release/unsigned
-  builds that need a keystore).
-- iOS: a Simulator build (simulator arch, no code signing; NOT a device build that
-  needs a provisioning profile).
-- React Native / Expo: the JS bundle MUST be embedded (release-style bundling), NOT
-  served from the Metro dev server — a dev client hangs waiting for Metro.
-Then upload it: `minitest build upload <path>` (add `--app <id>` if more than one
-app could match). The build is stored against the active app from step 2, so it
-shows up in the web app scoped to that app and is reusable across runs. Record the
-build id.
+## 7. Hand off to the web app to run
+This is where `minitest init` stops. Do NOT upload a build and do NOT start runs
+from the CLI — that is the web app's job now. The user still has the Minitest web
+app open on the onboarding screen; the app, personas, scenarios, and dependency
+graph you just created make a **"Run tests"** button appear there. Tell the user to
+click it: that opens a dedicated screen which handles getting a build and launching
+the suite for them.
 
-## 8. Run the suite
-Run every scenario against the build:
-`minitest run all [--ios-build <id>] [--android-build <id>]`
-(or `minitest run start "<scenario>"` for a single one). Report the pass/fail
-results and the reason for any failure back to the user.
+Finish by summarizing what you created — the app, the personas, the scenarios, and
+the dependency wiring — so the user knows exactly what will run when they click
+**Run tests**.
 """

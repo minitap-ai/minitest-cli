@@ -108,3 +108,9 @@ class TestPlaybookContent:
     def test_offline_wording_avoids_airplane_mode(self):
         assert "Offline (wifi off)" in PLAYBOOK
         assert 'never write "airplane mode"' in PLAYBOOK
+
+    def test_personas_default_to_qa_minitap_otp(self):
+        assert "@qa.minitap.ai" in PLAYBOOK
+        passwordless = PLAYBOOK.index("@qa.minitap.ai")
+        with_password = PLAYBOOK.index("--password-stdin")
+        assert passwordless < with_password

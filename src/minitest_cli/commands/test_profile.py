@@ -34,7 +34,14 @@ def _read_password(password: str | None, password_stdin: bool) -> str | None:
 @app.command(name="create")
 def create_profile(
     name: Annotated[str, typer.Option("--name", help="Profile name.")],
-    username: Annotated[str | None, typer.Option("--username", help="Account username.")] = None,
+    username: Annotated[
+        str | None,
+        typer.Option(
+            "--username",
+            help="Account email. Use <prefix>@qa.minitap.ai for OTP personas (no password); "
+            "the agent reads login codes from that inbox. Omit to auto-generate one.",
+        ),
+    ] = None,
     password: Annotated[
         str | None, typer.Option("--password", help="Account password (use stdin for security).")
     ] = None,

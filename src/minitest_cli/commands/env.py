@@ -11,6 +11,7 @@ from typing import Annotated, Any
 
 import httpx
 import typer
+from rich.markup import escape
 
 from minitest_cli.commands.env_helpers import (
     MASK,
@@ -86,7 +87,7 @@ def list_env(
     if not env_vars:
         print_success("No environment variables configured for this app.")
         return
-    rows = [[k, rendered[k]] for k in sorted(rendered)]
+    rows = [[escape(k), escape(rendered[k])] for k in sorted(rendered)]
     print_table(["Key", "Value"], rows, title="Environment variables")
 
 

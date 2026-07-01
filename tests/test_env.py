@@ -100,6 +100,18 @@ class TestList:
         assert result.exit_code == 0, result.output
         assert "supersecret" in result.stdout
 
+    def test_show_renders_markup_like_value_intact(self, tmp_path):
+        dsn = "https://[email protected]/4508123456"
+        settings = _make_settings(tmp_path)
+        result = _invoke(
+            ["list", "--show"],
+            settings,
+            apps_resp=_mock_response(200, _APPS_PAYLOAD),
+            apps_manager_resp={"get": _env_response({"SENTRY_DSN": dsn})},
+        )
+        assert result.exit_code == 0, result.output
+        assert "https:///" not in result.stdout
+
     def test_no_env_vars_reports_empty(self, tmp_path):
         settings = _make_settings(tmp_path)
         result = _invoke(

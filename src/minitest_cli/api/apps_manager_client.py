@@ -70,6 +70,14 @@ class AppsManagerClient:
         """Send a POST request."""
         return await self._ensure_client().post(path, **kwargs)
 
+    async def put(self, path: str, **kwargs: Any) -> httpx.Response:
+        """Send a PUT request."""
+        return await self._ensure_client().put(path, **kwargs)
+
+    async def delete(self, path: str, **kwargs: Any) -> httpx.Response:
+        """Send a DELETE request."""
+        return await self._ensure_client().delete(path, **kwargs)
+
     async def upload_form(
         self,
         path: str,

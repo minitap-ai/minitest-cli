@@ -11,6 +11,7 @@ from minitest_cli.commands import (
     auth,
     batch,
     build,
+    env,
     flow_types,
     init,
     run,
@@ -42,6 +43,7 @@ app.add_typer(test_file.app)
 app.add_typer(flow_types.app)
 app.add_typer(app_knowledge.app)
 app.add_typer(build.app)
+app.add_typer(env.app)
 app.add_typer(run.app)
 app.add_typer(batch.app)
 app.add_typer(skill.app)

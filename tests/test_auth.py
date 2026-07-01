@@ -10,11 +10,13 @@ import pytest
 from minitest_cli.core.auth import (
     Credentials,
     EXIT_CODE_AUTH_ERROR,
+    SessionRevokedError,
     clear_credentials,
     decode_jwt_claims,
     get_auth_method,
     get_credentials_path,
     load_credentials,
+    load_or_refresh_credentials,
     load_token,
     refresh_token,
     save_credentials,
@@ -199,6 +201,37 @@ class TestLoadToken:
             assert exc_info.value.code == EXIT_CODE_AUTH_ERROR
 
 
+class TestSessionRevocation:
+    def test_load_or_refresh_clears_stale_creds_and_propagates(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        save_credentials(settings, _make_credentials(expires_at=time.time() - 60))
+
+        with patch("minitest_cli.core.auth.refresh_token", side_effect=SessionRevokedError):
+            with pytest.raises(SessionRevokedError):
+                load_or_refresh_credentials(settings)
+
+        assert not get_credentials_path(settings).exists()
+
+    def test_load_token_prompts_relogin_on_revoked_session(self, tmp_path, capsys):
+        settings = _make_settings(tmp_path)
+        save_credentials(settings, _make_credentials(expires_at=time.time() - 60))
+
+        with patch("minitest_cli.core.auth.refresh_token", side_effect=SessionRevokedError):
+            with pytest.raises(SystemExit) as exc_info:
+                load_token(settings)
+
+        assert exc_info.value.code == EXIT_CODE_AUTH_ERROR
+        assert "minitest auth login" in capsys.readouterr().err
+        assert not get_credentials_path(settings).exists()
+
+    def test_get_auth_method_none_when_session_revoked(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        save_credentials(settings, _make_credentials(expires_at=time.time() - 60))
+
+        with patch("minitest_cli.core.auth.refresh_token", side_effect=SessionRevokedError):
+            assert get_auth_method(settings) == "none"
+
+
 class TestTokenPriority:
     @pytest.fixture(autouse=True)
     def _reset_warning(self, monkeypatch):
@@ -255,15 +288,29 @@ class TestRefreshToken:
         assert loaded is not None
         assert loaded.access_token == "new-access"
 
-    def test_returns_none_on_http_error(self, tmp_path):
+    def test_returns_none_on_transient_network_error(self, tmp_path):
+        """A network-level failure is transient — creds are worth keeping and retrying."""
         settings = _make_settings(tmp_path)
         old_creds = _make_credentials()
 
         with patch(
             "minitest_cli.core.oauth.httpx.post",
-            side_effect=httpx.HTTPStatusError("401", request=MagicMock(), response=MagicMock()),
+            side_effect=httpx.ConnectError("connection refused"),
         ):
             assert refresh_token(settings, old_creds) is None
+
+    def test_raises_session_revoked_on_4xx(self, tmp_path):
+        """A 4xx from the auth server means the stored token can never succeed."""
+        settings = _make_settings(tmp_path)
+        old_creds = _make_credentials()
+
+        rejected = MagicMock()
+        rejected.status_code = 400
+        rejected.json.return_value = {"error_code": "validation_failed"}
+
+        with patch("minitest_cli.core.oauth.httpx.post", return_value=rejected):
+            with pytest.raises(SessionRevokedError):
+                refresh_token(settings, old_creds)
 
     def test_returns_none_without_supabase_url(self, tmp_path):
         settings = _make_settings(tmp_path, supabase_url="")
@@ -278,6 +325,7 @@ class TestRefreshToken:
         old_creds = _make_credentials(refresh_token="my-refresh")
 
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "access_token": "new",
             "refresh_token": "new-r",

@@ -23,6 +23,7 @@ class Credentials(BaseModel):
     expires_at: float
     user_id: str
     email: str
+    client_id: str | None = None
 
     @property
     def is_expired(self) -> bool:

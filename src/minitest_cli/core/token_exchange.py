@@ -43,8 +43,14 @@ def get_apikey_header(settings: Settings) -> str:
     )
 
 
-def parse_and_save_token_response(settings: Settings, data: dict[str, Any]) -> Credentials | None:
-    """Parse a Supabase token response and persist credentials."""
+def parse_and_save_token_response(
+    settings: Settings, data: dict[str, Any], client_id: str | None = None
+) -> Credentials | None:
+    """Parse a Supabase token response and persist credentials.
+
+    client_id is the OAuth client that owns the session; it must be persisted
+    so refresh_token can re-authenticate against the same client.
+    """
     try:
         user = data.get("user", {})
         if not isinstance(user, dict):
@@ -65,6 +71,7 @@ def parse_and_save_token_response(settings: Settings, data: dict[str, Any]) -> C
             expires_at=time.time() + int(expires_in),
             user_id=user_id,
             email=email,
+            client_id=client_id,
         )
         save_credentials(settings, creds)
         return creds

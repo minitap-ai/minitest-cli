@@ -31,19 +31,27 @@ _ASSETS = importlib.resources.files("minitest_cli.assets")
 def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
     """Refresh an expired access token, saving new credentials to disk.
 
-    Returns None on a transient failure. Raises SessionRevokedError when the
-    auth server rejects the token (4xx) so callers can clear it and re-login.
+    OAuth sessions must refresh against the same client that created them, so a
+    persisted client_id is required. Returns None on a transient failure. Raises
+    SessionRevokedError when the token can never succeed (missing client_id, or a
+    4xx rejection) so callers can clear it and re-login.
     """
     if not settings.supabase_url or not settings.supabase_publishable_key:
         return None
+    if not creds.client_id:
+        raise SessionRevokedError
 
     supabase_url = settings.supabase_url.rstrip("/")
     try:
         response = httpx.post(
-            f"{supabase_url}/auth/v1/token?grant_type=refresh_token",
-            json={"refresh_token": creds.refresh_token},
+            f"{supabase_url}/auth/v1/oauth/token",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": creds.refresh_token,
+                "client_id": creds.client_id,
+            },
             headers={
-                "Content-Type": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
                 "apikey": settings.supabase_publishable_key,
             },
             timeout=15.0,
@@ -64,21 +72,11 @@ def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
     if not isinstance(data, dict):
         return None
 
-    return parse_and_save_token_response(settings, data)
+    return parse_and_save_token_response(settings, data, creds.client_id)
 
 
 def oauth_pkce_login(settings: Settings) -> Credentials:
-    """Run the full OAuth PKCE login flow via Supabase's OAuth2 server.
-
-    Steps:
-      1. Start local callback server
-      2. Dynamically register an OAuth2 client with Supabase
-      3. Generate PKCE code verifier + challenge
-      4. Open browser to Supabase authorize endpoint (shows hosted sign-in page)
-      5. Wait for callback with authorization code
-      6. Exchange code + verifier for tokens at Supabase token endpoint
-      7. Save and return credentials
-    """
+    """Run the full OAuth PKCE login flow via Supabase's OAuth2 server."""
     supabase_url = settings.supabase_url.rstrip("/")
 
     # PKCE challenge: base64url(sha256(verifier)) without padding
@@ -191,7 +189,7 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     if not isinstance(response_data, dict):
         auth_error("Token exchange returned unexpected response format.")
 
-    creds = parse_and_save_token_response(settings, response_data)
+    creds = parse_and_save_token_response(settings, response_data, client_id)
     if creds is None:
         auth_error("Failed to parse token response.")
 

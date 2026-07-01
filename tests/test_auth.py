@@ -45,6 +45,7 @@ def _make_credentials(**overrides):
         "expires_at": time.time() + 3600,  # 1 hour from now
         "user_id": "user-789",
         "email": "test@example.com",
+        "client_id": "client-abc",
     }
     defaults.update(overrides)
     return Credentials(**defaults)
@@ -283,10 +284,19 @@ class TestRefreshToken:
         assert result is not None
         assert result.access_token == "new-access"
         assert result.refresh_token == "new-refresh"
-        # Credentials should be saved to disk
+        assert result.client_id == "client-abc"
         loaded = load_credentials(settings)
         assert loaded is not None
         assert loaded.access_token == "new-access"
+        assert loaded.client_id == "client-abc"
+
+    def test_raises_session_revoked_without_client_id(self, tmp_path):
+        """A session stored before client_id was persisted can never refresh."""
+        settings = _make_settings(tmp_path)
+        legacy_creds = _make_credentials(client_id=None)
+
+        with pytest.raises(SessionRevokedError):
+            refresh_token(settings, legacy_creds)
 
     def test_returns_none_on_transient_network_error(self, tmp_path):
         """A network-level failure is transient — creds are worth keeping and retrying."""
@@ -320,9 +330,10 @@ class TestRefreshToken:
         settings = _make_settings(tmp_path, supabase_publishable_key="")
         assert refresh_token(settings, _make_credentials()) is None
 
-    def test_sends_correct_request(self, tmp_path):
+    def test_refreshes_against_oauth_endpoint_with_client_id(self, tmp_path):
+        """OAuth sessions must refresh at /oauth/token with the owning client_id."""
         settings = _make_settings(tmp_path)
-        old_creds = _make_credentials(refresh_token="my-refresh")
+        old_creds = _make_credentials(refresh_token="my-refresh", client_id="client-xyz")
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -332,16 +343,18 @@ class TestRefreshToken:
             "expires_in": 3600,
             "user": {"id": "u", "email": "e@e.com"},
         }
-        mock_response.raise_for_status = MagicMock()
 
         with patch("minitest_cli.core.oauth.httpx.post", return_value=mock_response) as mock_post:
             refresh_token(settings, old_creds)
 
         mock_post.assert_called_once()
         call_args = mock_post.call_args
-        assert "grant_type=refresh_token" in call_args.args[0]
-        assert call_args.kwargs["json"]["refresh_token"] == "my-refresh"
-        assert call_args.kwargs["headers"]["apikey"] == "test-publishable-key"
+        assert call_args.args[0].endswith("/auth/v1/oauth/token")
+        assert call_args.kwargs["data"] == {
+            "grant_type": "refresh_token",
+            "refresh_token": "my-refresh",
+            "client_id": "client-xyz",
+        }
 
 
 class TestDecodeJwtClaims:

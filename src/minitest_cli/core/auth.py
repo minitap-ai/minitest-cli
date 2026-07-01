@@ -20,7 +20,11 @@ from minitest_cli.core.credentials import (
     save_credentials,
 )
 from minitest_cli.core.oauth import oauth_pkce_login, refresh_token
-from minitest_cli.core.token_exchange import EXIT_CODE_AUTH_ERROR, auth_error
+from minitest_cli.core.token_exchange import (
+    EXIT_CODE_AUTH_ERROR,
+    SessionRevokedError,
+    auth_error,
+)
 
 __all__ = [
     "AuthStatus",
@@ -38,6 +42,7 @@ __all__ = [
     "require_auth",
     "refresh_token",
     "save_credentials",
+    "SessionRevokedError",
 ]
 
 AuthMethod = Literal["api_key", "env_token", "oauth", "none"]
@@ -71,14 +76,20 @@ class AuthStatus(TypedDict):
 def load_or_refresh_credentials(settings: Settings) -> Credentials | None:
     """Load stored credentials, auto-refreshing if near expiry.
 
-    Returns refreshed credentials, original credentials, or None.
+    Returns refreshed credentials, original credentials, or None. When the auth
+    server rejects the stored token outright, the dead credentials are cleared
+    and SessionRevokedError propagates so callers can prompt a fresh login.
     """
     creds = load_credentials(settings)
     if creds is None:
         return None
-    if creds.is_expired:
+    if not creds.is_expired:
+        return creds
+    try:
         return refresh_token(settings, creds)
-    return creds
+    except SessionRevokedError:
+        clear_credentials(settings)
+        raise
 
 
 def load_token(settings: Settings) -> str:
@@ -91,7 +102,13 @@ def load_token(settings: Settings) -> str:
     if settings.api_key:
         return settings.api_key.get_secret_value()
 
-    creds = load_or_refresh_credentials(settings)
+    try:
+        creds = load_or_refresh_credentials(settings)
+    except SessionRevokedError:
+        auth_error(
+            "Your saved session is no longer valid (the auth server rejected it). "
+            "Run `minitest auth login` to sign in again."
+        )
     if creds is not None:
         return creds.access_token
 
@@ -120,8 +137,11 @@ def get_auth_method(settings: Settings) -> AuthMethod:
         return "env_token"
     if settings.api_key:
         return "api_key"
-    if load_or_refresh_credentials(settings) is not None:
-        return "oauth"
+    try:
+        if load_or_refresh_credentials(settings) is not None:
+            return "oauth"
+    except SessionRevokedError:
+        return "none"
     return "none"
 
 

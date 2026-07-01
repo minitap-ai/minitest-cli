@@ -16,6 +16,14 @@ from minitest_cli.core.credentials import Credentials, save_credentials
 EXIT_CODE_AUTH_ERROR = 2
 
 
+class SessionRevokedError(Exception):
+    """The auth server rejected the stored refresh token outright (4xx).
+
+    Distinct from a transient network/server error: the token can never
+    succeed (e.g. issued by a project decommissioned after a migration).
+    """
+
+
 def require_supabase_url(settings: Settings) -> str:
     """Return the supabase URL or exit with code 2."""
     if settings.supabase_url:

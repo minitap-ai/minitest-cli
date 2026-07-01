@@ -19,6 +19,7 @@ import httpx
 from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import Credentials
 from minitest_cli.core.token_exchange import (
+    SessionRevokedError,
     auth_error,
     parse_and_save_token_response,
     register_oauth_client,
@@ -28,9 +29,10 @@ _ASSETS = importlib.resources.files("minitest_cli.assets")
 
 
 def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
-    """Refresh an expired access token using the refresh token.
+    """Refresh an expired access token, saving new credentials to disk.
 
-    Returns updated credentials (also saved to disk), or None on failure.
+    Returns None on a transient failure. Raises SessionRevokedError when the
+    auth server rejects the token (4xx) so callers can clear it and re-login.
     """
     if not settings.supabase_url or not settings.supabase_publishable_key:
         return None
@@ -46,9 +48,17 @@ def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
             },
             timeout=15.0,
         )
-        response.raise_for_status()
+    except httpx.HTTPError:
+        return None
+
+    if 400 <= response.status_code < 500:
+        raise SessionRevokedError
+    if response.status_code >= 500:
+        return None
+
+    try:
         data = response.json()
-    except (httpx.HTTPError, ValueError):
+    except ValueError:
         return None
 
     if not isinstance(data, dict):

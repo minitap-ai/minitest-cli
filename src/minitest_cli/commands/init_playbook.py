@@ -46,10 +46,12 @@ ask the user to link that exact email+password combo to a pro/specific-state acc
 their backend — the `@qa.minitap.ai` address keeps the inbox readable for any OTP while
 the password lets them pre-provision the account state.
 
-If a scenario has NO persona bound, the agent defaults to anonymous (skip login). If a
-flow forces authentication, it self-generates a `<random-str>@qa.minitap.ai` with a
-password it picks at runtime, signs up, and reads the inbox for the confirmation/OTP code
-— so unbound scenarios still work without you provisioning anything.
+Every scenario is bound to a persona. If you create one without any, the backend
+auto-binds the system "New user" persona: a genuine brand-new user that gets a fresh
+disposable `<random-str>@qa.minitap.ai` inbox each run, signs up via OTP when the flow
+needs an identity, and proceeds anonymously where the app allows it. Use it deliberately
+for first-launch, guest, registration, and anonymous flows — don't create your own
+anonymous profile (the "New user" persona is system-managed and immutable).
 Record each returned profile id.
 
 ## 4. Map the user journeys

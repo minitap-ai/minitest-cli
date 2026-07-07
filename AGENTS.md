@@ -14,7 +14,7 @@ uv add <package>                                   # Add new dependency (always 
 ## Project Structure
 
 - `src/minitest_cli/` - Main package
-- `commands/` - One Typer sub-app per command group (auth, apps, flow, build, run)
+- `commands/` - One Typer sub-app per command group (auth, apps, flow, build, run, maintenance)
 - `core/`
   - `config.py` - pydantic-settings: MINITEST_API_URL, MINITEST_TOKEN, config dir
   - `app_context.py` - --app flag / MINITEST_APP_ID resolution

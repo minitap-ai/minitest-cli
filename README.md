@@ -74,6 +74,7 @@ minitest run --app <app-id>
 | `MINITEST_API_URL`            | testing-service base URL                                   | No (defaults to production)        |
 | `MINITEST_APPS_MANAGER_URL`   | apps-manager base URL (used by `minitest apps create`)     | No (defaults to production)        |
 | `MINITEST_INTEGRATIONS_URL`   | minihands-integrations base URL (used to list tenants)     | No (defaults to production)        |
+| `MINITEST_WEBAPP_URL`         | Minitest webapp base URL (used for review links)            | No (defaults to production)        |
 | `MINITEST_SUPABASE_URL`       | Supabase project URL used for OAuth login                  | No (defaults to production)        |
 | `MINITEST_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key used for OAuth login | No (defaults to production)        |
 
@@ -97,6 +98,29 @@ minitest run --app <app-id>
 | `minitest user-story` | User-story operations |
 | `minitest build` | Build management          |
 | `minitest run`   | Test execution            |
+| `minitest maintenance` | CLI-only test-flow maintenance against local code |
+
+## CLI-only maintenance
+
+`minitest maintenance` lets a coding agent keep Minitest user stories in sync
+without connecting GitHub. Run it from the app repository: the code stays on the
+machine, while the CLI sends only proposed test-flow edits and the local HEAD SHA.
+
+```bash
+# Print the server-composed maintenance instructions for your coding agent
+minitest maintenance --agent
+
+# Agent workflow primitives
+minitest --json maintenance context
+minitest maintenance affected --file affected.json
+minitest maintenance change --file change.json
+minitest maintenance status --phase writing --message "Updating affected stories"
+minitest maintenance complete --changed
+
+# Apply proposed edits now, or open the web review queue
+minitest maintenance apply
+minitest maintenance apply --review
+```
 
 ## Exit Codes
 

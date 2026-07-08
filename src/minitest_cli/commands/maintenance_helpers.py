@@ -13,9 +13,11 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.core.config import Settings
+from minitest_cli.models.app import AppListResponse
 from minitest_cli.utils.output import print_error
 
 EXIT_NETWORK_ERROR = 3
+EXIT_NOT_FOUND = 4
 
 CALLBACK_BASE = "/api/v1/internal/maintenance-runs"
 CLI_RUNS_PATH = "/api/v1/maintenance/cli/runs"
@@ -95,9 +97,22 @@ async def apply_pending(settings: Settings, app_id: str) -> dict[str, Any]:
     return resp.json()
 
 
-def review_queue_url(settings: Settings, app_id: str) -> str:
-    """Return the Release Queue URL for manual review."""
-    return f"{settings.webapp_url}/apps/{app_id}/test/queue"
+async def fetch_app_tenant(settings: Settings, app_id: str) -> str:
+    """Resolve the tenant that owns the app so review links target the right tenant."""
+    async with ApiClient(settings) as client:
+        resp = await client.get("/api/v1/apps")
+    if resp.status_code >= 400:
+        _fail(resp)
+    for app in AppListResponse.model_validate(resp.json()).apps:
+        if app.id == app_id:
+            return app.tenant_id
+    print_error(f"App not found: {app_id}")
+    raise typer.Exit(code=EXIT_NOT_FOUND)
+
+
+def review_queue_url(settings: Settings, app_id: str, tenant: str) -> str:
+    """Return the tenant-scoped Release Queue URL for manual review."""
+    return f"{settings.webapp_url}/t/{tenant}/apps/{app_id}/test/queue"
 
 
 def change_idempotency_key(payload: dict[str, Any]) -> str:

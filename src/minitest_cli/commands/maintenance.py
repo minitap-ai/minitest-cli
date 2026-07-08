@@ -17,6 +17,7 @@ from minitest_cli.commands.init import _is_agent_context
 from minitest_cli.commands.maintenance_helpers import (
     apply_pending,
     complete_run,
+    fetch_app_tenant,
     fetch_context,
     fetch_reasoning,
     open_run,
@@ -121,7 +122,8 @@ def apply(
     """Apply pending maintenance edits now, or print the Release Queue link."""
     settings, app_id, _ = resolve_app()
     if review:
-        print_info(f"Review maintenance changes: {review_queue_url(settings, app_id)}")
+        tenant = run_api_call(fetch_app_tenant(settings, app_id))
+        print_info(f"Review maintenance changes: {review_queue_url(settings, app_id, tenant)}")
         return
     result = run_api_call(apply_pending(settings, app_id))
     print_success(f"Applied {result.get('appliedCount', 0)} maintenance change(s).")

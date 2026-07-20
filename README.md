@@ -1,6 +1,6 @@
 # minitest-cli
 
-Command-line interface for the Minitest testing platform.
+Command-line interface for the Minitest testing platform for mobile and web apps.
 
 ## Installation
 
@@ -59,10 +59,18 @@ minitest auth login
 minitest apps list
 
 # Create a new app on your tenant
-minitest apps create --name "My App"
+minitest apps create --name "My Mobile App" --platform ios --platform android
+
+# Or create a web app target
+minitest apps create --name "My Web App" --platform web --web-url https://example.com
+
+# Upload native builds when testing iOS/Android apps
+minitest --app <app-id> build upload ./app-release.apk
 
 # Run tests
-minitest run --app <app-id>
+minitest --app <app-id> run all --web
+# or, for native lanes:
+minitest --app <app-id> run all --ios-build <ios-build-id> --android-build <android-build-id>
 ```
 
 ## Configuration
@@ -96,8 +104,8 @@ minitest run --app <app-id>
 | `minitest auth`  | Authentication management |
 | `minitest apps`  | App management            |
 | `minitest user-story` | User-story operations |
-| `minitest build` | Build management          |
-| `minitest run`   | Test execution            |
+| `minitest build` | Native iOS/Android build management |
+| `minitest run`   | Test execution for mobile and web lanes |
 | `minitest maintenance` | CLI-only test-flow maintenance against local code |
 
 ## CLI-only maintenance

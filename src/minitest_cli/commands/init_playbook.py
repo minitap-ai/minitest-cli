@@ -69,11 +69,12 @@ depend on them, and pass the returned ids to `--depends-on`:
 `minitest user-story create --name "<Scenario>" --type "<flow type>" --criteria "<acceptance criterion>" [--criteria ...] --profile "<persona id>" [--depends-on "<prerequisite story id>" ...]`
 Dependencies are validated server-side (same app, must exist, no cycles).
 
-When a criterion involves offline behaviour, word it as "Offline (wifi off)" — the
-cloud test devices have no airplane mode, so never write "airplane mode".
+When a criterion involves offline behaviour, word it as "Offline (wifi off)" —
+mobile cloud test devices have no airplane mode, so never write "airplane mode".
 
-If a scenario needs a file present on the device (e.g. a document to upload, a photo
-to attach), upload it and bind it to the story so it is seeded before the run:
+If a scenario needs a file present in the test environment (e.g. a document to
+upload, a photo to attach), upload it and bind it to the story so it is seeded
+before the run:
 `minitest test-file upload <path>` (record the file id), then
 `minitest user-story-binding set-files <story id> --file <file id> [--file ...]`
 (`minitest user-story-binding list-files <story id>` shows what is bound). This is

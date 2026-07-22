@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 import typer
 
+from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.config import Settings
 from minitest_cli.models.user_story import (
@@ -67,12 +68,7 @@ def base_path(app_id: str) -> str:
 
 
 def extract_detail(resp: httpx.Response) -> str | None:
-    """Return a human-readable error string from the API response body.
-
-    Accepts ``{"detail": "string"}`` (FastAPI default), ``{"detail":
-    {"kind", "message", "ids"}}`` (the structured 422 from dep-validation,
-    rendered as ``message — ids: a, b``), and ``{"message": ...}`` legacy.
-    """
+    """Human-readable error from a FastAPI ``detail`` (string or structured) or ``message`` body."""
     try:
         body = resp.json()
     except Exception:  # noqa: BLE001
@@ -110,14 +106,14 @@ def run_api_call[T](coro: Coroutine[Any, Any, T]) -> T:
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
 
-def format_user_story_row(story: dict[str, Any]) -> list[str]:
+def format_user_story_row(story: dict[str, Any], *, show_devices: bool = False) -> list[str]:
     criteria_str = ""
     try:
         parsed = UserStoryDetailResponse.model_validate(story)
         criteria_str = "; ".join(c.content for c in parsed.acceptance_criteria)
     except Exception:  # noqa: BLE001
         pass
-    return [
+    row = [
         str(story.get("id", "")),
         story.get("name", ""),
         story.get("type", ""),
@@ -125,6 +121,10 @@ def format_user_story_row(story: dict[str, Any]) -> list[str]:
         criteria_str,
         format_bound_profiles(story),
     ]
+    if show_devices:
+        count = effective_device_count(story)
+        row.append(str(count) if count > 1 else "")
+    return row
 
 
 def extract_criteria_strings(story_data: dict[str, Any]) -> list[str]:

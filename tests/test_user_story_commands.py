@@ -90,7 +90,7 @@ class TestCreateUserStory:
                 "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
                 return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.side_effect = httpx.ConnectError("Connection refused")
@@ -111,7 +111,7 @@ class TestCreateUserStory:
                 "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
                 return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.return_value = mock_resp
@@ -133,7 +133,7 @@ class TestCreateUserStoryProfiles:
                 "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
                 return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.return_value = mock_resp
@@ -166,7 +166,7 @@ class TestCreateUserStoryProfiles:
                 "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
                 return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.return_value = mock_resp
@@ -512,7 +512,7 @@ class TestCreateUserStoryDependsOn:
                 "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
                 return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.return_value = post_resp
@@ -549,7 +549,7 @@ class TestCreateUserStoryDependsOn:
                 "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
                 return_value=VALID_USER_STORY_TYPES,
             ),
-            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
             instance.post.return_value = post_resp
@@ -788,3 +788,105 @@ class TestExtractBoundProfiles:
         from minitest_cli.commands.user_story_profiles import extract_bound_profiles
 
         assert extract_bound_profiles({"id": "s-1"}) == []
+
+
+class TestDeviceCountCreate:
+    def _run_create(self, tmp_path, extra_args):
+        settings = _make_settings(tmp_path)
+        mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
+        with (
+            patch(
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
+            ),
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["create", "--name", "Story", "--type", "login", *extra_args],
+                settings,
+                json_mode=True,
+            )
+        return result, instance
+
+    def test_device_count_sends_override(self, tmp_path):
+        result, instance = self._run_create(tmp_path, ["--device-count", "2"])
+        assert result.exit_code == 0
+        assert instance.post.call_args.kwargs["json"]["deviceCount"] == 2
+
+    def test_omitted_device_count_leaves_field_out(self, tmp_path):
+        result, instance = self._run_create(tmp_path, [])
+        assert result.exit_code == 0
+        payload = instance.post.call_args.kwargs["json"]
+        assert "deviceCount" not in payload
+
+    def test_zero_device_count_rejected(self, tmp_path):
+        result, _ = self._run_create(tmp_path, ["--device-count", "0"])
+        assert result.exit_code != 0
+
+
+class TestDeviceCountUpdate:
+    def _run_update(self, tmp_path, extra_args):
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(
+            200,
+            {"id": "story-1", "name": "Login", "type": "login", "effectiveDeviceCount": 1},
+        )
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", *extra_args],
+                settings,
+                json_mode=True,
+            )
+        return result, instance
+
+    def test_integer_override_sends_value(self, tmp_path):
+        result, instance = self._run_update(tmp_path, ["--device-count", "3"])
+        assert result.exit_code == 0
+        assert instance.patch.call_args.kwargs["json"]["deviceCount"] == 3
+
+    def test_auto_sends_explicit_null_to_reset(self, tmp_path):
+        result, instance = self._run_update(tmp_path, ["--device-count", "auto"])
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        assert "deviceCount" in payload
+        assert payload["deviceCount"] is None
+
+    def test_device_count_alone_is_a_valid_update(self, tmp_path):
+        result, instance = self._run_update(tmp_path, ["--device-count", "2"])
+        assert result.exit_code == 0
+        instance.patch.assert_awaited_once()
+
+    def test_invalid_device_count_rejected_without_api_call(self, tmp_path):
+        result, instance = self._run_update(tmp_path, ["--device-count", "lots"])
+        assert result.exit_code == 1
+        instance.patch.assert_not_awaited()
+
+
+class TestDeviceCountDisplay:
+    def test_effective_device_count_defaults_to_one(self):
+        from minitest_cli.commands.user_story_device_count import effective_device_count
+
+        assert effective_device_count({"id": "s"}) == 1
+        assert effective_device_count({"effectiveDeviceCount": 3}) == 3
+
+    def test_row_shows_count_only_when_above_one(self):
+        from minitest_cli.commands.user_story_helpers import format_user_story_row
+
+        multi = format_user_story_row({"id": "s", "effectiveDeviceCount": 2}, show_devices=True)
+        single = format_user_story_row({"id": "s", "effectiveDeviceCount": 1}, show_devices=True)
+        assert multi[-1] == "2"
+        assert single[-1] == ""
+
+    def test_parse_device_count_auto_is_none(self):
+        from minitest_cli.commands.user_story_device_count import parse_device_count
+
+        assert parse_device_count("auto") is None
+        assert parse_device_count("3") == 3

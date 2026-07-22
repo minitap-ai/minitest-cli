@@ -1,18 +1,24 @@
 """User-story modification commands: update, delete."""
 
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.user_story_camera import (
+    CAMERA_MEDIA_HELP,
+    resolve_camera_media_file_id,
+    resolve_camera_source,
+)
 from minitest_cli.commands.user_story_device_count import (
     DeviceCountUpdateOption,
     describe_device_count_change,
     parse_device_count,
 )
+from minitest_cli.commands.user_story_criteria import apply_current_story_fields
 from minitest_cli.commands.user_story_helpers import (
     base_path,
-    extract_criteria_items,
     get_app_flag,
     get_settings,
     handle_response_error,
@@ -20,7 +26,6 @@ from minitest_cli.commands.user_story_helpers import (
     run_api_call,
     validate_user_story_type,
 )
-from minitest_cli.commands.user_story_criteria import build_criteria_payload
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
@@ -81,6 +86,16 @@ def update_user_story(
         ),
     ] = False,
     device_count: DeviceCountUpdateOption = None,
+    camera_media: Annotated[
+        str | None, typer.Option("--camera-media", help=CAMERA_MEDIA_HELP)
+    ] = None,
+    clear_camera_media: Annotated[
+        bool,
+        typer.Option(
+            "--clear-camera-media",
+            help="Reset the camera media to the default feed. Excludes --camera-media.",
+        ),
+    ] = False,
 ) -> None:
     """Update an existing user story (partial update)."""
     settings = get_settings()
@@ -95,6 +110,12 @@ def update_user_story(
     if profile and clear_profiles:
         print_error("Use either --profile or --clear-profiles, not both.")
         raise typer.Exit(code=1)
+
+    if camera_media is not None and clear_camera_media:
+        print_error("Use either --camera-media or --clear-camera-media, not both.")
+        raise typer.Exit(code=1)
+
+    camera_source = resolve_camera_source(camera_media)
 
     if user_story_type is not None:
         validate_user_story_type(user_story_type, settings)
@@ -127,34 +148,40 @@ def update_user_story(
         depends_on=list(depends_on) if depends_on is not None else None,
         test_profile_ids=test_profile_ids,
     )
-    if not req.has_changes() and not needs_current_story and not device_count_provided:
+    has_camera_change = camera_source is not None or clear_camera_media
+    has_any_change = (
+        req.has_changes() or needs_current_story or device_count_provided or has_camera_change
+    )
+    if not has_any_change:
         print_error("Provide at least one field to update.")
         raise typer.Exit(code=1)
 
     payload = req.to_payload()
     if device_count_provided:
         payload["deviceCount"] = device_count_value
+    # Explicit null clears server-side; to_payload's exclude_none would drop it.
+    if clear_camera_media:
+        payload["cameraMediaFileId"] = None
+    elif isinstance(camera_source, str):
+        payload["cameraMediaFileId"] = camera_source
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
             path = f"{base_path(app_id)}/{user_story_id}"
+            if isinstance(camera_source, Path):
+                payload["cameraMediaFileId"] = await resolve_camera_media_file_id(
+                    client, app_id, camera_source
+                )
             if needs_current_story:
-                get_resp = await client.get(path)
-                handle_response_error(get_resp)
-                current_story = get_resp.json()
-                if needs_current_story_criteria:
-                    existing_items = extract_criteria_items(current_story)
-                    payload["acceptanceCriteria"] = build_criteria_payload(
-                        existing_items,
-                        replace=list(criteria) if criteria is not None else None,
-                        add=list(add_criteria) if add_criteria else None,
-                    )
-                if needs_current_story_deps:
-                    current_deps = (
-                        current_story.get("dependsOn") or current_story.get("depends_on") or []
-                    )
-                    to_remove = set(remove_dependency or [])
-                    payload["dependsOn"] = [d for d in current_deps if d not in to_remove]
+                await apply_current_story_fields(
+                    client,
+                    path,
+                    payload,
+                    criteria=criteria,
+                    add_criteria=add_criteria,
+                    remove_dependency=remove_dependency,
+                    subtract_deps=needs_current_story_deps,
+                )
             resp = await client.patch(path, json=payload)
             handle_response_error(resp)
             return resp.json()
@@ -168,29 +195,6 @@ def update_user_story(
             print_info(f"Bound profiles: {format_bound_profiles(data) or ', '.join(profile)}")
         if device_count_provided:
             print_info(describe_device_count_change(data, device_count_value))
+        if clear_camera_media:
+            print_info("Camera media reset to the built-in default feed.")
     output(data, json_mode=json_mode)
-
-
-def delete_user_story(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
-    force: Annotated[bool, typer.Option("--force", help="Skip confirmation.")] = False,
-) -> None:
-    """Delete a user story. Requires --force flag."""
-    settings = get_settings()
-    json_mode = is_json_mode()
-    require_auth(settings)
-    if not force:
-        print_error("Delete requires --force flag.")
-        raise typer.Exit(code=1)
-    app_id = resolve_app_id(settings, get_app_flag())
-
-    async def _run() -> None:
-        async with ApiClient(settings) as client:
-            resp = await client.delete(f"{base_path(app_id)}/{user_story_id}")
-            handle_response_error(resp)
-
-    run_api_call(_run())
-    if json_mode:
-        output({"deleted": True, "id": user_story_id}, json_mode=True)
-    else:
-        print_success(f"User story deleted: {user_story_id}")

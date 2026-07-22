@@ -1,10 +1,16 @@
 """User-story create command."""
 
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.user_story_camera import (
+    CAMERA_MEDIA_HELP,
+    resolve_camera_media_file_id,
+    resolve_camera_source,
+)
 from minitest_cli.commands.user_story_device_count import DeviceCountCreateOption
 from minitest_cli.commands.user_story_helpers import (
     base_path,
@@ -49,6 +55,9 @@ def create_user_story(
         ),
     ] = None,
     device_count: DeviceCountCreateOption = None,
+    camera_media: Annotated[
+        str | None, typer.Option("--camera-media", help=CAMERA_MEDIA_HELP)
+    ] = None,
 ) -> None:
     """Create a new user story."""
     settings = get_settings()
@@ -56,6 +65,7 @@ def create_user_story(
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
     validate_user_story_type(user_story_type, settings)
+    camera_source = resolve_camera_source(camera_media)
     payload: dict[str, Any] = {"name": name, "type": user_story_type}
     if description is not None:
         payload["description"] = description
@@ -65,9 +75,15 @@ def create_user_story(
         payload["test_profile_ids"] = list(profile)
     if device_count is not None:
         payload["deviceCount"] = device_count
+    if isinstance(camera_source, str):
+        payload["camera_media_file_id"] = camera_source
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
+            if isinstance(camera_source, Path):
+                payload["camera_media_file_id"] = await resolve_camera_media_file_id(
+                    client, app_id, camera_source
+                )
             resp = await client.post(base_path(app_id), json=payload)
             handle_response_error(resp)
             created = resp.json()

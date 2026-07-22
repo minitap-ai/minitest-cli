@@ -51,6 +51,7 @@ class UserStoryResponse(CamelModel):
     test_profile_id: str | None = None
     test_profile: TestProfileSummary | None = None
     test_profiles: list[TestProfileSummary] = []
+    camera_media_file_id: str | None = None
 
 
 class UserStoryDetailResponse(UserStoryResponse):
@@ -70,6 +71,7 @@ class CreateUserStoryRequest(CamelModel):
     type: str = "other"
     acceptance_criteria: list[str] = []
     test_profile_ids: list[str] | None = None
+    camera_media_file_id: str | None = None
 
 
 class UpdateUserStoryRequest(CamelModel):
@@ -79,6 +81,9 @@ class UpdateUserStoryRequest(CamelModel):
     acceptance_criteria: list[CriterionUpsertItem] | None = None
     depends_on: list[str] | None = None
     test_profile_ids: list[str] | None = None
+    # ``None`` means "leave untouched"; an explicit-null clear is injected into
+    # the payload post-``to_payload()`` because it uses ``exclude_none=True``.
+    camera_media_file_id: str | None = None
 
     def has_changes(self) -> bool:
         return any(v is not None for v in self.model_dump(exclude_none=False).values())

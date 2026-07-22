@@ -478,7 +478,7 @@ class TestDeleteUserStory:
     def test_not_found_exits_4(self, tmp_path):
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(404, {"detail": "User story not found"})
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_delete.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.delete.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -890,3 +890,142 @@ class TestDeviceCountDisplay:
 
         assert parse_device_count("auto") is None
         assert parse_device_count("3") == 3
+
+
+CAMERA_FILE_ID = "0e5a4c1a-4a6f-4c2b-9d3e-1f2a3b4c5d6e"
+
+
+class TestCameraMediaCreate:
+    def test_uuid_reuses_test_file_without_upload(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        post_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
+        with (
+            patch(
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
+            ),
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = post_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["create", "--name", "Story", "--type", "login", "--camera-media", CAMERA_FILE_ID],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.post.call_args.kwargs["json"]
+        assert payload["camera_media_file_id"] == CAMERA_FILE_ID
+        instance.upload_file.assert_not_called()
+
+    def test_local_path_uploads_then_uses_returned_id(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        image = tmp_path / "webcam.png"
+        image.write_bytes(b"PNGDATA")
+        upload_resp = _mock_response(201, {"id": "file-x", "kind": "image"})
+        post_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
+        with (
+            patch(
+                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
+                return_value=VALID_USER_STORY_TYPES,
+            ),
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.upload_file.return_value = upload_resp
+            instance.post.return_value = post_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["create", "--name", "Story", "--type", "login", "--camera-media", str(image)],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        instance.upload_file.assert_awaited_once()
+        payload = instance.post.call_args.kwargs["json"]
+        assert payload["camera_media_file_id"] == "file-x"
+
+
+class TestCameraMediaUpdate:
+    def test_uuid_sends_camera_media_file_id(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--camera-media", CAMERA_FILE_ID],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["cameraMediaFileId"] == CAMERA_FILE_ID
+
+    def test_clear_sends_explicit_null(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
+        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.patch.return_value = patch_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--clear-camera-media"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        body = instance.patch.call_args.kwargs["json"]
+        assert "cameraMediaFileId" in body and body["cameraMediaFileId"] is None
+
+    def test_camera_media_and_clear_are_mutually_exclusive(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        result = _run_with_context(
+            ["update", "story-1", "--camera-media", CAMERA_FILE_ID, "--clear-camera-media"],
+            settings,
+        )
+        assert result.exit_code == 1
+        assert "Use either --camera-media or --clear-camera-media, not both" in result.output
+
+
+class TestParseCameraMedia:
+    """``parse_camera_media`` guards media kind and per-kind size caps directly,
+    so the CLI never uploads a non-media or oversize file. Unit-tested rather
+    than driven through the CLI to keep the oversize case fast (no 25 MB write
+    through the Typer/upload stack)."""
+
+    def test_oversize_image_rejected(self, tmp_path):
+        from click.exceptions import Exit
+
+        from minitest_cli.commands.user_story_camera import (
+            CAMERA_IMAGE_MAX_BYTES,
+            parse_camera_media,
+        )
+
+        image = tmp_path / "big.png"
+        image.write_bytes(b"x" * (CAMERA_IMAGE_MAX_BYTES + 1))
+        with pytest.raises(Exit) as exc_info:
+            parse_camera_media(str(image))
+        assert exc_info.value.exit_code == 1
+
+    def test_non_media_file_rejected(self, tmp_path):
+        from click.exceptions import Exit
+
+        from minitest_cli.commands.user_story_camera import parse_camera_media
+
+        note = tmp_path / "notes.txt"
+        note.write_text("not media")
+        with pytest.raises(Exit) as exc_info:
+            parse_camera_media(str(note))
+        assert exc_info.value.exit_code == 1
+
+    def test_uuid_returned_as_string_id(self):
+        from minitest_cli.commands.user_story_camera import parse_camera_media
+
+        assert parse_camera_media(CAMERA_FILE_ID) == CAMERA_FILE_ID

@@ -5,7 +5,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands import user_story_create, user_story_modify
+from minitest_cli.commands import user_story_create, user_story_delete, user_story_modify
 from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_helpers import (
     USER_STORY_TABLE_HEADERS,
@@ -27,7 +27,7 @@ from minitest_cli.utils.output import output, print_info, print_table
 app = typer.Typer(name="user-story", help="User-story operations.")
 app.command(name="create")(user_story_create.create_user_story)
 app.command(name="update")(user_story_modify.update_user_story)
-app.command(name="delete")(user_story_modify.delete_user_story)
+app.command(name="delete")(user_story_delete.delete_user_story)
 
 
 @app.command(name="list")

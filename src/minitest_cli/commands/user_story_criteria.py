@@ -1,5 +1,41 @@
 """Acceptance-criteria payload helpers for user-story update."""
 
+from typing import Any
+
+from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.user_story_helpers import extract_criteria_items, handle_response_error
+
+
+async def apply_current_story_fields(
+    client: ApiClient,
+    path: str,
+    payload: dict[str, Any],
+    *,
+    criteria: list[str] | None,
+    add_criteria: list[str] | None,
+    remove_dependency: list[str] | None,
+    subtract_deps: bool,
+) -> None:
+    """Fetch the current story and merge criteria/dependency edits into payload.
+
+    Criteria edits preserve stable criterion ids and dependency removals subtract
+    from the live set, so both need the server's current state before the PATCH.
+    """
+    get_resp = await client.get(path)
+    handle_response_error(get_resp)
+    current_story = get_resp.json()
+    if criteria is not None or add_criteria:
+        existing_items = extract_criteria_items(current_story)
+        payload["acceptanceCriteria"] = build_criteria_payload(
+            existing_items,
+            replace=list(criteria) if criteria is not None else None,
+            add=list(add_criteria) if add_criteria else None,
+        )
+    if subtract_deps:
+        current_deps = current_story.get("dependsOn") or current_story.get("depends_on") or []
+        to_remove = set(remove_dependency or [])
+        payload["dependsOn"] = [d for d in current_deps if d not in to_remove]
+
 
 def build_criteria_payload(
     existing_items: list[dict[str, str]],

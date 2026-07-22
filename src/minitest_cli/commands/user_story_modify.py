@@ -5,6 +5,11 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.user_story_device_count import (
+    DeviceCountUpdateOption,
+    describe_device_count_change,
+    parse_device_count,
+)
 from minitest_cli.commands.user_story_helpers import (
     base_path,
     extract_criteria_items,
@@ -20,13 +25,7 @@ from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.models.user_story import UpdateUserStoryRequest
-from minitest_cli.utils.output import (
-    output,
-    print_error,
-    print_info,
-    print_success,
-    print_warning,
-)
+from minitest_cli.utils.output import output, print_error, print_info, print_success, print_warning
 
 
 def update_user_story(
@@ -81,12 +80,9 @@ def update_user_story(
             help="Unbind all test profiles. Mutually exclusive with --profile.",
         ),
     ] = False,
+    device_count: DeviceCountUpdateOption = None,
 ) -> None:
-    """Update an existing user story (partial update).
-
-    Pass ``--depends-on`` to declare which flows gate this one. The
-    server validates the graph (same-app, no cycles, references exist).
-    """
+    """Update an existing user story (partial update)."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -103,22 +99,19 @@ def update_user_story(
     if user_story_type is not None:
         validate_user_story_type(user_story_type, settings)
 
-    # ``--depends-on`` is the replace path; ``--remove-dependency`` is a delta
-    # against the current set. If both are given, the spec says replace wins —
-    # warn loudly so the user notices the surgical removal was dropped.
+    device_count_provided = device_count is not None
+    device_count_value = parse_device_count(device_count) if device_count_provided else None
+
+    # --depends-on (replace) wins over --remove-dependency (delta); warn on the dropped removal.
     if depends_on is not None and remove_dependency:
         print_warning("--remove-dependency ignored when --depends-on is set.")
 
-    # When --criteria (full replace), --add-criteria (append), or
-    # --remove-dependency (delta against the current set) is used we need the
-    # current story so we can either preserve stable criterion identity or
-    # subtract from the live dep set. We defer building the final payload
-    # until after that GET.
+    # Criteria edits and dependency removals need the current story to preserve
+    # criterion identity or subtract from the live dep set, so defer the payload.
     needs_current_story_criteria = criteria is not None or bool(add_criteria)
     needs_current_story_deps = depends_on is None and bool(remove_dependency)
     needs_current_story = needs_current_story_criteria or needs_current_story_deps
 
-    # ``[]`` clears bindings, a list replaces them, ``None`` leaves them untouched.
     if clear_profiles:
         test_profile_ids: list[str] | None = []
     elif profile:
@@ -134,11 +127,13 @@ def update_user_story(
         depends_on=list(depends_on) if depends_on is not None else None,
         test_profile_ids=test_profile_ids,
     )
-    if not req.has_changes() and not needs_current_story:
+    if not req.has_changes() and not needs_current_story and not device_count_provided:
         print_error("Provide at least one field to update.")
         raise typer.Exit(code=1)
 
     payload = req.to_payload()
+    if device_count_provided:
+        payload["deviceCount"] = device_count_value
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
@@ -171,6 +166,8 @@ def update_user_story(
             print_info("Test profiles cleared.")
         elif profile:
             print_info(f"Bound profiles: {format_bound_profiles(data) or ', '.join(profile)}")
+        if device_count_provided:
+            print_info(describe_device_count_change(data, device_count_value))
     output(data, json_mode=json_mode)
 
 

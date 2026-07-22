@@ -1,11 +1,12 @@
-"""User-story commands: create, list, get."""
+"""User-story commands: list, get."""
 
 from typing import Annotated, Any
 
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands import user_story_modify
+from minitest_cli.commands import user_story_create, user_story_modify
+from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_helpers import (
     USER_STORY_TABLE_HEADERS,
     base_path,
@@ -21,82 +22,12 @@ from minitest_cli.commands.user_story_helpers import (
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
-from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
+from minitest_cli.utils.output import output, print_info, print_table
 
 app = typer.Typer(name="user-story", help="User-story operations.")
+app.command(name="create")(user_story_create.create_user_story)
 app.command(name="update")(user_story_modify.update_user_story)
 app.command(name="delete")(user_story_modify.delete_user_story)
-
-
-@app.command(name="create")
-def create_user_story(
-    name: Annotated[str, typer.Option("--name", help="User-story name.")],
-    user_story_type: Annotated[str, typer.Option("--type", help="User-story type.")],
-    description: Annotated[
-        str | None, typer.Option("--description", help="User-story description.")
-    ] = None,
-    criteria: Annotated[
-        list[str] | None, typer.Option("--criteria", help="Acceptance criteria (repeatable).")
-    ] = None,
-    depends_on: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--depends-on",
-            help=(
-                "Parent user-story IDs this story depends on (repeatable). "
-                "Validated server-side after creation: same-app, no cycles, "
-                "references must exist."
-            ),
-        ),
-    ] = None,
-    profile: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--profile",
-            help="Test profile ID to bind (repeatable). Omit to use the server's default profile.",
-        ),
-    ] = None,
-) -> None:
-    """Create a new user story."""
-    settings = get_settings()
-    json_mode = is_json_mode()
-    require_auth(settings)
-    app_id = resolve_app_id(settings, get_app_flag())
-    validate_user_story_type(user_story_type, settings)
-    payload: dict[str, Any] = {"name": name, "type": user_story_type}
-    if description is not None:
-        payload["description"] = description
-    if criteria:
-        payload["acceptance_criteria"] = list(criteria)
-    if profile:
-        payload["test_profile_ids"] = list(profile)
-
-    async def _run() -> dict[str, Any]:
-        async with ApiClient(settings) as client:
-            resp = await client.post(base_path(app_id), json=payload)
-            handle_response_error(resp)
-            created = resp.json()
-            if depends_on:
-                story_id = created.get("id")
-                if not story_id:
-                    print_error("Server did not return an id for the new user story.")
-                    raise typer.Exit(code=1)
-                patch_resp = await client.patch(
-                    f"{base_path(app_id)}/{story_id}",
-                    json={"dependsOn": list(depends_on)},
-                )
-                handle_response_error(patch_resp)
-                return patch_resp.json()
-            return created
-
-    data = run_api_call(_run())
-    if not json_mode:
-        print_success(f"User story created: {data.get('id', '')}")
-        bound = format_bound_profiles(data)
-        if bound:
-            label = "Default profile auto-assigned" if not profile else "Profiles bound"
-            print_info(f"{label}: {bound}")
-    output(data, json_mode=json_mode)
 
 
 @app.command(name="list")
@@ -172,8 +103,10 @@ def list_user_stories(
         title, tip = format_pagination_info(data, page, page_size)
     else:
         title, tip = "User stories", None
-    rows = [format_user_story_row(s) for s in items]
-    print_table(USER_STORY_TABLE_HEADERS, rows, title=title)
+    show_devices = any(effective_device_count(s) > 1 for s in items)
+    headers = [*USER_STORY_TABLE_HEADERS, "Devices"] if show_devices else USER_STORY_TABLE_HEADERS
+    rows = [format_user_story_row(s, show_devices=show_devices) for s in items]
+    print_table(headers, rows, title=title)
     if tip:
         print_info(tip)
 
@@ -197,4 +130,7 @@ def get_user_story(
     data = run_api_call(_run())
     if not json_mode:
         print_info(f"Bound profiles: {format_bound_profiles(data) or 'none'}")
+        effective = effective_device_count(data)
+        if effective > 1:
+            print_info(f"Devices per run: {effective}")
     output(data, json_mode=json_mode)

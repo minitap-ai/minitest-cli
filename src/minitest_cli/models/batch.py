@@ -27,9 +27,12 @@ class BatchCounters(CamelModel):
 
     status: str | None = None
     headline_status: str | None = None
+    execution_state: str | None = None
+    verdict: str | None = None
     criticals: int = 0
     warnings: int = 0
     skipped: int = 0
+    skipped_by_cascade: int = 0
     passed: int = 0
     running: int = 0
     queued: int = 0

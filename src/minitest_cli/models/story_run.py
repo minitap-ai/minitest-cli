@@ -20,6 +20,7 @@ class CriterionResult(CamelModel):
     evidence: str | None = None
     confidence: int | None = None
     result_summary: str | None = None
+    content: str | None = None
     created_at: datetime
 
 
@@ -44,7 +45,9 @@ class PlatformRun(CamelModel):
     build_id: UUID | None = None
     recording_path: str | None = None
     recording_url: str | None = None
+    session_paths: list[str] = []
     error_message: str | None = None
+    skip_reason: str | None = None
     status: str | None = None
     execution_state: str = "pending"
     verdict: str | None = None
@@ -81,3 +84,64 @@ class StoryRunListResponse(CamelModel):
     total: int
     page: int
     page_size: int
+
+
+class VerdictTarget(CamelModel):
+    """Per-platform aggregate roll-up for a batch target."""
+
+    platform: str
+    build_id: str | None = None
+    verdict: str | None = None
+    execution_state: str | None = None
+    passed: int = 0
+    criticals: int = 0
+    warnings: int = 0
+    skipped: int = 0
+    failed_infra: int = 0
+    skipped_by_cascade: int = 0
+
+
+class VerdictStoryPlatform(CamelModel):
+    """Per-platform outcome of one story within the verdict projection."""
+
+    platform: str
+    verdict: str | None = None
+    execution_state: str | None = None
+    skip_reason: str | None = None
+    build_id: str | None = None
+    recording_path: str | None = None
+    session_paths: list[str] = []
+    criticals: int = 0
+    warnings: int = 0
+    skipped: int = 0
+
+
+class VerdictCriterion(CamelModel):
+    """A single acceptance-criterion outcome in the verdict projection."""
+
+    platform: str
+    status: str | None = None
+    criticality: str | None = None
+    fail_reason: str | None = None
+    result_summary: str | None = None
+    confidence: int | None = None
+    content: str | None = None
+    evidence: str | None = None
+
+
+class VerdictStory(CamelModel):
+    """One story's verdict: per-platform outcomes plus actionable criteria."""
+
+    user_story_name: str | None = None
+    story_run_id: str
+    platforms: list[VerdictStoryPlatform] = []
+    criteria: list[VerdictCriterion] = []
+
+
+class BatchVerdictsResponse(CamelModel):
+    """Product-level verdict projection for a whole batch."""
+
+    batch_id: str
+    app_id: str
+    targets: list[VerdictTarget] = []
+    stories: list[VerdictStory] = []

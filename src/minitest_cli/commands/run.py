@@ -28,6 +28,7 @@ from minitest_cli.commands.run_targets import (
     IosBuildOpt,
     WebOpt,
 )
+from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
     StoryRunListResponse,
@@ -188,3 +189,6 @@ def run_all(
         f"Started {len(batch.story_runs)} runs. "
         f"Use `minitest batch get {batch.id}` or `minitest run status <id>` to follow up."
     )
+
+
+app.command(name="verdicts")(verdicts)

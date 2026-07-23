@@ -16,11 +16,7 @@ async def apply_current_story_fields(
     remove_dependency: list[str] | None,
     subtract_deps: bool,
 ) -> None:
-    """Fetch the current story and merge criteria/dependency edits into payload.
-
-    Criteria edits preserve stable criterion ids and dependency removals subtract
-    from the live set, so both need the server's current state before the PATCH.
-    """
+    """Fetch the current story and merge criteria/dependency edits into payload."""
     get_resp = await client.get(path)
     handle_response_error(get_resp)
     current_story = get_resp.json()

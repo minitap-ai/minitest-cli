@@ -11,6 +11,7 @@ from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.config import Settings
 from minitest_cli.models.user_story import (
+    CriterionVersionResponse,
     UserStoryDetailResponse,
     UserStoryListResponse,
 )
@@ -106,11 +107,18 @@ def run_api_call[T](coro: Coroutine[Any, Any, T]) -> T:
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
 
+def _criterion_label(criterion: CriterionVersionResponse) -> str:
+    if not criterion.platform_overrides:
+        return criterion.content
+    platforms = ",".join(sorted(criterion.platform_overrides))
+    return f"{criterion.content} [{platforms}*]"
+
+
 def format_user_story_row(story: dict[str, Any], *, show_devices: bool = False) -> list[str]:
     criteria_str = ""
     try:
         parsed = UserStoryDetailResponse.model_validate(story)
-        criteria_str = "; ".join(c.content for c in parsed.acceptance_criteria)
+        criteria_str = "; ".join(_criterion_label(c) for c in parsed.acceptance_criteria)
     except Exception:  # noqa: BLE001
         pass
     row = [
@@ -135,29 +143,6 @@ def extract_criteria_strings(story_data: dict[str, Any]) -> list[str]:
         for item in raw
         if (item.get("content") if isinstance(item, dict) else item)
     ]
-
-
-def extract_criteria_items(story_data: dict[str, Any]) -> list[dict[str, str]]:
-    """Extract existing criteria as upsert items ``{id, content}``.
-
-    The ``id`` uses the stable criterion identifier (``criterionId`` in the API
-    response) so the backend preserves identity across updates.
-    """
-    raw = story_data.get("acceptanceCriteria") or story_data.get("acceptance_criteria") or []
-    items: list[dict[str, str]] = []
-    for entry in raw:
-        if isinstance(entry, dict):
-            content = entry.get("content")
-            if not content:
-                continue
-            stable_id = entry.get("criterionId") or entry.get("criterion_id")
-            item: dict[str, str] = {"content": content}
-            if stable_id:
-                item["id"] = stable_id
-            items.append(item)
-        elif entry:
-            items.append({"content": str(entry)})
-    return items
 
 
 def format_pagination_info(

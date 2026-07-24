@@ -97,6 +97,8 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
     for cr in run.results:
         result_str = "[green]✓ pass[/green]" if cr.success else "[red]✗ fail[/red]"
         platform_label = target_label(cr.platform, None, None)
+        if cr.is_platform_override:
+            platform_label += " *"
         rows.append([cr.criterion_version_id, platform_label, result_str, cr.fail_reason or ""])
 
     if rows:

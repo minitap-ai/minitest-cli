@@ -66,3 +66,9 @@ The public agent skill at `repos/agent-skills/skills/minitest-cli/SKILL.md` docu
 When you add, remove, or change a CLI command/flag:
 1. Update `repos/agent-skills/skills/minitest-cli/SKILL.md` in a paired PR
 2. Update the Quick Reference table and any relevant sections
+
+The skill now has two writers — do not confuse them:
+- **Hand-maintained:** `SKILL.md` and its Quick Reference table. These are the CLI's responsibility; the paired PR above applies to them.
+- **CI-generated:** the `reference/*.md` files under `repos/agent-skills/skills/minitest-cli/reference/` are produced by testing-service CI — never hand-edit them. That CI also owns the machine-managed `<!-- skill-references-hash: <sha256> -->` line inside `SKILL.md`, which it bumps whenever the reference files change.
+
+Both file sets ship to users together via `npx skills add/update` (whole-skill sync). The CLI's refresh check (`utils/skill_refresh.py`) md5-compares `SKILL.md` only, so reference-file changes stay visible to `minitest upgrade` solely because the CI-managed hash line flips `SKILL.md`. Leave that hash line alone in hand-written edits.

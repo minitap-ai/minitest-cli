@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from minitest_cli.models.base import CamelModel
+from minitest_cli.models.targets import Platform
 
 
 class CriterionVersionResponse(CamelModel):
@@ -12,6 +13,7 @@ class CriterionVersionResponse(CamelModel):
     id: str
     criterion_id: str
     content: str
+    platform_overrides: dict[str, str] | None = None
     created_at: datetime
 
 
@@ -29,6 +31,8 @@ class CriterionUpsertItem(CamelModel):
 
     id: str | None = None
     content: str
+    # Omit to inherit the previous version's overrides; send a map (or ``{}`` to clear).
+    platform_overrides: dict[Platform, str] | None = None
 
 
 class TestProfileSummary(CamelModel):

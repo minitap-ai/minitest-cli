@@ -6,9 +6,12 @@ the app's configured default web targets. Per-run web overrides (url, browser,
 viewport) are CI-only and intentionally absent from the CLI.
 """
 
-from typing import Literal
+from typing import Literal, get_args
 
 from minitest_cli.models.base import CamelModel
+
+Platform = Literal["ios", "android", "web"]
+PLATFORMS: tuple[str, ...] = get_args(Platform)
 
 _VIEWPORT_LABELS: dict[str, str] = {
     "mobile": "Mobile",
@@ -25,7 +28,7 @@ class BatchTarget(CamelModel):
     web targets.
     """
 
-    platform: Literal["ios", "android", "web"]
+    platform: Platform
     build_id: str | None = None
 
 

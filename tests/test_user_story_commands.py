@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from minitest_cli.commands.user_story import app as user_story_app
 from minitest_cli.core.config import Settings
+from minitest_cli.models.user_story import CriterionVersionResponse
 
 runner = CliRunner()
 
@@ -195,7 +196,7 @@ class TestUpdateUserStoryProfiles:
                 "testProfiles": [{"id": "p-1", "name": "Alice"}],
             },
         )
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -212,7 +213,7 @@ class TestUpdateUserStoryProfiles:
     def test_clear_profiles_sends_empty_list(self, tmp_path):
         settings = _make_settings(tmp_path)
         patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -229,7 +230,7 @@ class TestUpdateUserStoryProfiles:
     def test_no_profile_flag_leaves_bindings_untouched(self, tmp_path):
         settings = _make_settings(tmp_path)
         patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -303,7 +304,7 @@ class TestUpdateUserStory:
         settings = _make_settings(tmp_path)
         get_resp = _mock_response(200, SAMPLE_USER_STORY)
         patch_resp = _mock_response(200, SAMPLE_USER_STORY)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = get_resp
             instance.patch.return_value = patch_resp
@@ -341,7 +342,7 @@ class TestUpdateUserStory:
         }
         get_resp = _mock_response(200, story)
         patch_resp = _mock_response(200, story)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = get_resp
             instance.patch.return_value = patch_resp
@@ -381,7 +382,7 @@ class TestUpdateUserStory:
         }
         get_resp = _mock_response(200, story)
         patch_resp = _mock_response(200, story)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = get_resp
             instance.patch.return_value = patch_resp
@@ -411,7 +412,7 @@ class TestUpdateUserStory:
         }
         get_resp = _mock_response(200, story)
         patch_resp = _mock_response(200, story)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = get_resp
             instance.patch.return_value = patch_resp
@@ -466,6 +467,130 @@ class TestUpdateUserStory:
             )
         assert result.exit_code != 0
         assert "invalid" in result.output.lower() or "nonsense" in result.output.lower()
+
+
+STORY_WITH_OVERRIDES = {
+    "id": "story-1",
+    "name": "Login",
+    "type": "login",
+    "acceptanceCriteria": [
+        {
+            "id": "v-1",
+            "criterionId": "crit-alpha",
+            "content": "alpha",
+            "platformOverrides": {"ios": "alpha on iOS"},
+        },
+        {"id": "v-2", "criterionId": "crit-beta", "content": "beta"},
+    ],
+}
+
+
+def _run_update_capturing_payload(tmp_path, args, story=STORY_WITH_OVERRIDES):
+    settings = _make_settings(tmp_path)
+    with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
+        instance = AsyncMock()
+        instance.get.return_value = _mock_response(200, story)
+        instance.patch.return_value = _mock_response(200, story)
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+        result = _run_with_context(["update", "story-1", *args], settings, json_mode=True)
+    payload = instance.patch.call_args.kwargs["json"] if instance.patch.called else None
+    return result, payload
+
+
+class TestCriterionPlatformOverrides:
+    def test_replace_criteria_roundtrips_existing_overrides(self, tmp_path):
+        result, payload = _run_update_capturing_payload(
+            tmp_path, ["--criteria", "alpha", "--criteria", "beta"]
+        )
+        assert result.exit_code == 0
+        assert payload is not None
+        sent = {c["content"]: c for c in payload["acceptanceCriteria"]}
+        assert sent["alpha"]["platformOverrides"] == {"ios": "alpha on iOS"}
+        assert "platformOverrides" not in sent["beta"]
+
+    def test_override_sets_platform_text_by_index(self, tmp_path):
+        result, payload = _run_update_capturing_payload(
+            tmp_path, ["--override", "android:2:beta on Android"]
+        )
+        assert result.exit_code == 0
+        assert payload is not None
+        sent = {c["content"]: c for c in payload["acceptanceCriteria"]}
+        assert sent["beta"]["platformOverrides"] == {"android": "beta on Android"}
+        # An untouched criterion re-sends its overrides so the server keeps them.
+        assert sent["alpha"]["platformOverrides"] == {"ios": "alpha on iOS"}
+
+    def test_override_text_may_contain_colons(self, tmp_path):
+        result, payload = _run_update_capturing_payload(
+            tmp_path, ["--override", "web:crit-alpha:see http://x for detail"]
+        )
+        assert result.exit_code == 0
+        assert payload is not None
+        sent = {c["content"]: c for c in payload["acceptanceCriteria"]}
+        assert sent["alpha"]["platformOverrides"] == {
+            "ios": "alpha on iOS",
+            "web": "see http://x for detail",
+        }
+
+    def test_clear_override_emits_explicit_empty_map(self, tmp_path):
+        result, payload = _run_update_capturing_payload(
+            tmp_path, ["--clear-override", "ios:crit-alpha"]
+        )
+        assert result.exit_code == 0
+        assert payload is not None
+        sent = {c["content"]: c for c in payload["acceptanceCriteria"]}
+        # Explicit empty map (not omitted) so the server does not inherit the override back.
+        assert sent["alpha"]["platformOverrides"] == {}
+
+    def test_invalid_platform_rejected(self, tmp_path):
+        result, payload = _run_update_capturing_payload(tmp_path, ["--override", "bogus:1:text"])
+        assert result.exit_code == 1
+        assert payload is None
+        assert "Invalid platform" in result.output
+
+    def test_override_index_out_of_range_rejected(self, tmp_path):
+        result, payload = _run_update_capturing_payload(tmp_path, ["--override", "ios:9:text"])
+        assert result.exit_code == 1
+        assert "out of range" in result.output
+
+    def test_override_conflicts_with_criteria(self, tmp_path):
+        result, _ = _run_update_capturing_payload(
+            tmp_path, ["--override", "ios:1:text", "--criteria", "alpha"]
+        )
+        assert result.exit_code == 1
+        assert "without --criteria" in result.output
+
+    def test_read_model_tolerates_camel_and_snake(self):
+        camel = CriterionVersionResponse.model_validate(
+            {
+                "id": "v-1",
+                "criterionId": "crit-alpha",
+                "content": "alpha",
+                "platformOverrides": {"ios": "x"},
+                "createdAt": "2026-01-01T00:00:00Z",
+            }
+        )
+        snake = CriterionVersionResponse.model_validate(
+            {
+                "id": "v-1",
+                "criterion_id": "crit-alpha",
+                "content": "alpha",
+                "platform_overrides": {"ios": "x"},
+                "created_at": "2026-01-01T00:00:00Z",
+            }
+        )
+        assert camel.platform_overrides == snake.platform_overrides == {"ios": "x"}
+
+    def test_read_model_without_overrides_defaults_none(self):
+        parsed = CriterionVersionResponse.model_validate(
+            {
+                "id": "v-1",
+                "criterionId": "crit-alpha",
+                "content": "alpha",
+                "createdAt": "2026-01-01T00:00:00Z",
+            }
+        )
+        assert parsed.platform_overrides is None
 
 
 class TestDeleteUserStory:
@@ -571,7 +696,7 @@ class TestUpdateDependsOn:
     def test_depends_on_replaces_full_set(self, tmp_path):
         settings = _make_settings(tmp_path)
         patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -600,7 +725,7 @@ class TestUpdateDependsOn:
             },
         )
         patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = get_resp
             instance.patch.return_value = patch_resp
@@ -639,7 +764,7 @@ class TestUpdateDependsOn:
             },
         )
         patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.get.return_value = get_resp
             instance.patch.return_value = patch_resp
@@ -659,7 +784,7 @@ class TestUpdateDependsOn:
         # warning. The PATCH must carry only the replace set, not a subtraction.
         settings = _make_settings(tmp_path)
         patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -697,7 +822,7 @@ class TestUpdateDependsOn:
                 }
             },
         )
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = validation_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -835,7 +960,7 @@ class TestDeviceCountUpdate:
             200,
             {"id": "story-1", "name": "Login", "type": "login", "effectiveDeviceCount": 1},
         )
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -890,6 +1015,34 @@ class TestDeviceCountDisplay:
 
         assert parse_device_count("auto") is None
         assert parse_device_count("3") == 3
+
+    def test_row_marks_overridden_criteria(self):
+        from minitest_cli.commands.user_story_helpers import format_user_story_row
+
+        created = "2026-01-01T00:00:00Z"
+        row = format_user_story_row(
+            {
+                "id": "s",
+                "appId": "app-1",
+                "name": "Login",
+                "type": "login",
+                "createdAt": created,
+                "acceptanceCriteria": [
+                    {
+                        "id": "v-1",
+                        "criterionId": "c-1",
+                        "content": "alpha",
+                        "platformOverrides": {"web": "w", "ios": "i"},
+                        "createdAt": created,
+                    },
+                    {"id": "v-2", "criterionId": "c-2", "content": "beta", "createdAt": created},
+                ],
+            }
+        )
+        criteria_cell = row[4]
+        assert "alpha [ios,web*]" in criteria_cell
+        assert "beta" in criteria_cell
+        assert "beta [" not in criteria_cell
 
 
 CAMERA_FILE_ID = "0e5a4c1a-4a6f-4c2b-9d3e-1f2a3b4c5d6e"
@@ -953,7 +1106,7 @@ class TestCameraMediaUpdate:
     def test_uuid_sends_camera_media_file_id(self, tmp_path):
         settings = _make_settings(tmp_path)
         patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
@@ -970,7 +1123,7 @@ class TestCameraMediaUpdate:
     def test_clear_sends_explicit_null(self, tmp_path):
         settings = _make_settings(tmp_path)
         patch_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "login"})
-        with patch("minitest_cli.commands.user_story_modify.ApiClient") as MockClient:
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
             instance = AsyncMock()
             instance.patch.return_value = patch_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)

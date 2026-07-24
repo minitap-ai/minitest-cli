@@ -13,6 +13,8 @@ class CriterionResult(CamelModel):
     story_run_id: str
     criterion_version_id: str
     platform: str
+    # Populated only by servers that expose whether a platform override was evaluated.
+    is_platform_override: bool | None = None
     status: str | None = None
     success: bool
     fail_reason: str | None = None

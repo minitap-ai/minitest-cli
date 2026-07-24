@@ -14,9 +14,10 @@ function Write-Warn  { param([string]$Message) Write-Host "Warning: $Message" -F
 function Write-Err   { param([string]$Message) Write-Host "Error: $Message" -ForegroundColor Red }
 
 function Resolve-Uv {
-    # Prefer a uv already resolvable on PATH.
-    $cmd = Get-Command uv -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
+    # Prefer a uv already resolvable on PATH. Restrict to Application so an
+    # alias/function named uv (whose .Path is empty) can't shadow the exe.
+    $cmd = Get-Command uv -CommandType Application -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Path }
     # Otherwise look in the known install locations. A freshly bootstrapped uv
     # is on disk but not yet reliably resolvable by name in this session
     # (PowerShell caches command lookups), so we call it by full path.
@@ -91,7 +92,7 @@ function Install-Uv {
 # -------------------------------------------------------------------
 
 # 1. uv already installed? Use it
-if (Get-Command uv -ErrorAction SilentlyContinue) {
+if (Resolve-Uv) {
     Install-WithUv | Out-Null
 }
 

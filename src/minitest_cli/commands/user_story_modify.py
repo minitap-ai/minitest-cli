@@ -19,6 +19,11 @@ from minitest_cli.commands.user_story_helpers import (
     run_api_call,
     validate_user_story_type,
 )
+from minitest_cli.commands.user_story_criterion_edits import (
+    RevertCriterionOption,
+    SetCriterionOption,
+    parse_criterion_edit_flags,
+)
 from minitest_cli.commands.user_story_overrides import (
     guard_conflicting_flags,
     parse_clear_override,
@@ -51,6 +56,8 @@ def update_user_story(
         list[str] | None,
         typer.Option("--add-criteria", help="Append acceptance criteria (repeatable)."),
     ] = None,
+    set_criterion: SetCriterionOption = None,
+    revert_criterion: RevertCriterionOption = None,
     override: Annotated[
         list[str] | None,
         typer.Option(
@@ -70,9 +77,8 @@ def update_user_story(
         typer.Option(
             "--depends-on",
             help=(
-                "Replace the full set of parent user-story IDs (repeatable). "
-                "Pass each parent ID once. Validated server-side: same-app, "
-                "no cycles, no self-loops, references must exist."
+                "Replace the full set of parent user-story IDs (repeatable). Validated "
+                "server-side: same-app, no cycles, no self-loops, references must exist."
             ),
         ),
     ] = None,
@@ -81,8 +87,8 @@ def update_user_story(
         typer.Option(
             "--remove-dependency",
             help=(
-                "Remove specific parent user-story IDs from the existing set "
-                "(repeatable). Ignored when --depends-on is also provided."
+                "Remove specific parent user-story IDs from the existing set (repeatable). "
+                "Ignored when --depends-on is also provided."
             ),
         ),
     ] = None,
@@ -95,10 +101,7 @@ def update_user_story(
     ] = None,
     clear_profiles: Annotated[
         bool,
-        typer.Option(
-            "--clear-profiles",
-            help="Unbind all test profiles. Mutually exclusive with --profile.",
-        ),
+        typer.Option("--clear-profiles", help="Unbind all test profiles. Excludes --profile."),
     ] = False,
     device_count: DeviceCountUpdateOption = None,
     camera_media: Annotated[
@@ -120,6 +123,9 @@ def update_user_story(
 
     set_overrides = [parse_set_override(v) for v in (override or [])]
     clear_overrides = [parse_clear_override(v) for v in (clear_override or [])]
+    set_criteria, revert_criteria = parse_criterion_edit_flags(
+        set_criterion, revert_criterion, criteria=criteria, add_criteria=add_criteria
+    )
     guard_conflicting_flags(
         criteria=criteria,
         add_criteria=add_criteria,
@@ -143,12 +149,9 @@ def update_user_story(
 
     # Criteria/override/dependency edits defer the payload until the live story is read.
     needs_current_story_deps = depends_on is None and bool(remove_dependency)
+    criterion_edits = set_overrides or clear_overrides or set_criteria or revert_criteria
     needs_current_story = bool(
-        criteria is not None
-        or add_criteria
-        or needs_current_story_deps
-        or set_overrides
-        or clear_overrides
+        criteria is not None or add_criteria or needs_current_story_deps or criterion_edits
     )
 
     payload = build_update_payload(
@@ -179,6 +182,8 @@ def update_user_story(
             subtract_deps=needs_current_story_deps,
             set_overrides=set_overrides,
             clear_overrides=clear_overrides,
+            set_criteria=set_criteria,
+            revert_criteria=revert_criteria,
         )
     )
     if not json_mode:

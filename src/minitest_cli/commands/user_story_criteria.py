@@ -3,6 +3,12 @@
 from typing import Any
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.user_story_criterion_edits import (
+    RevertCriterion,
+    SetCriterion,
+    apply_revert_criterion_edits,
+    apply_set_criterion_edits,
+)
 from minitest_cli.commands.user_story_helpers import handle_response_error
 from minitest_cli.commands.user_story_overrides import (
     ClearOverride,
@@ -51,6 +57,9 @@ async def apply_current_story_fields(
     subtract_deps: bool,
     set_overrides: list[SetOverride] | None = None,
     clear_overrides: list[ClearOverride] | None = None,
+    set_criteria: list[SetCriterion] | None = None,
+    revert_criteria: list[RevertCriterion] | None = None,
+    app_id: str | None = None,
 ) -> None:
     """Fetch the current story and merge criteria/override/dependency edits into payload."""
     get_resp = await client.get(path)
@@ -63,12 +72,19 @@ async def apply_current_story_fields(
             replace=list(criteria) if criteria is not None else None,
             add=list(add_criteria) if add_criteria else None,
         )
-    elif set_overrides or clear_overrides:
+    elif set_overrides or clear_overrides or set_criteria or revert_criteria:
         items = existing_items
     else:
         items = None
     if items is not None and (set_overrides or clear_overrides):
         items = apply_override_edits(items, set_overrides or [], clear_overrides or [])
+    if items is not None and set_criteria:
+        items = apply_set_criterion_edits(items, set_criteria)
+    if items is not None and revert_criteria:
+        if app_id is None:
+            msg = "app_id is required for --revert-criterion"
+            raise ValueError(msg)
+        items = await apply_revert_criterion_edits(client, app_id, items, revert_criteria)
     if items is not None:
         payload["acceptanceCriteria"] = items
     if subtract_deps:

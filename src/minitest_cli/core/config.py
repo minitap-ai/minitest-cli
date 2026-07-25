@@ -44,6 +44,10 @@ class Settings(BaseSettings):
         default=DEFAULT_CONFIG_DIR,
         description="Directory for CLI config and cache files (~/.minitest)",
     )
+    channel: str = Field(
+        default="cli",
+        description="X-Minitest-Channel header value sent on every API call (MINITEST_CHANNEL)",
+    )
     token: str | None = Field(
         default=None,
         description="API authentication token (MINITEST_TOKEN)",

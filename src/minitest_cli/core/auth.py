@@ -13,6 +13,7 @@ from typing import Any, Literal, TypedDict
 
 from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import (
+    refresh_lock,
     Credentials,
     clear_credentials,
     get_credentials_path,
@@ -85,11 +86,19 @@ def load_or_refresh_credentials(settings: Settings) -> Credentials | None:
         return None
     if not creds.is_expired:
         return creds
-    try:
-        return refresh_token(settings, creds)
-    except SessionRevokedError:
-        clear_credentials(settings)
-        raise
+    # Single-flight: Supabase rotates the refresh token on use, so two parallel
+    # CLI processes refreshing at once would race each other into a dead token.
+    with refresh_lock(settings):
+        creds = load_credentials(settings)
+        if creds is None:
+            return None
+        if not creds.is_expired:
+            return creds
+        try:
+            return refresh_token(settings, creds)
+        except SessionRevokedError:
+            clear_credentials(settings)
+            raise
 
 
 def load_token(settings: Settings) -> str:

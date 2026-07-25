@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
+import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from minitest_cli.core.config import Settings
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 TOKEN_FILE_NAME = "credentials.json"
+LOCK_FILE_NAME = "credentials.lock"
 CREDENTIALS_FILE_MODE = 0o600  # owner read/write only
 REFRESH_BUFFER_SECONDS = 300  # refresh when < 5 minutes remain
 
@@ -49,10 +57,26 @@ def load_credentials(settings: Settings) -> Credentials | None:
 
 
 def save_credentials(settings: Settings, credentials: Credentials) -> None:
-    """Persist credentials to disk with restricted permissions."""
+    """Persist credentials atomically with restricted permissions."""
     path = get_credentials_path(settings)
-    path.write_text(credentials.model_dump_json(indent=2))
-    path.chmod(CREDENTIALS_FILE_MODE)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, CREDENTIALS_FILE_MODE)
+    with os.fdopen(fd, "w") as handle:
+        handle.write(credentials.model_dump_json(indent=2))
+    os.replace(tmp_path, path)
+
+
+@contextmanager
+def refresh_lock(settings: Settings) -> Iterator[None]:
+    """Serialise token refresh across processes sharing this config dir."""
+    lock_path = settings.ensure_config_dir() / LOCK_FILE_NAME
+    fd = os.open(lock_path, os.O_WRONLY | os.O_CREAT, CREDENTIALS_FILE_MODE)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def clear_credentials(settings: Settings) -> None:

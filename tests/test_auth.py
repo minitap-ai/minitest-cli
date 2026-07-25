@@ -2,6 +2,7 @@
 
 import json
 import time
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -380,3 +381,41 @@ class TestDecodeJwtClaims:
 
     def test_returns_empty_dict_for_malformed_jwt(self):
         assert decode_jwt_claims("not.valid.base64!!!") == {}
+
+
+class TestSingleFlightRefresh:
+    def test_expired_creds_refresh_under_lock(self, tmp_path):
+        settings = Settings(config_dir=tmp_path)
+        save_credentials(settings, _make_credentials(expires_at=time.time() - 60))
+        fresh = _make_credentials(access_token="refreshed")
+        with patch("minitest_cli.core.auth.refresh_token", return_value=fresh) as mock_refresh:
+            result = load_or_refresh_credentials(settings)
+        assert result is fresh
+        mock_refresh.assert_called_once()
+
+    def test_skips_refresh_when_another_process_already_refreshed(self, tmp_path):
+        """The loser of the refresh race must re-read under the lock and use the
+        winner's fresh token instead of burning the rotated refresh token."""
+        settings = Settings(config_dir=tmp_path)
+        save_credentials(settings, _make_credentials(expires_at=time.time() - 60))
+
+        @contextmanager
+        def winner_already_refreshed(_settings):
+            save_credentials(settings, _make_credentials(access_token="winner-token"))
+            yield
+
+        with (
+            patch("minitest_cli.core.auth.refresh_lock", winner_already_refreshed),
+            patch("minitest_cli.core.auth.refresh_token") as mock_refresh,
+        ):
+            result = load_or_refresh_credentials(settings)
+        assert result is not None
+        assert result.access_token == "winner-token"
+        mock_refresh.assert_not_called()
+
+    def test_save_credentials_is_atomic_and_owner_only(self, tmp_path):
+        settings = Settings(config_dir=tmp_path)
+        save_credentials(settings, _make_credentials())
+        path = get_credentials_path(settings)
+        assert (path.stat().st_mode & 0o777) == 0o600
+        assert not list(tmp_path.glob(".credentials.json.tmp"))

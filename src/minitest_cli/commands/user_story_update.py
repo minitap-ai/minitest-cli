@@ -8,6 +8,7 @@ import typer
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.user_story_camera import resolve_camera_media_file_id
 from minitest_cli.commands.user_story_criteria import apply_current_story_fields
+from minitest_cli.commands.user_story_criterion_edits import RevertCriterion, SetCriterion
 from minitest_cli.commands.user_story_device_count import describe_device_count_change
 from minitest_cli.commands.user_story_helpers import base_path, handle_response_error
 from minitest_cli.commands.user_story_overrides import ClearOverride, SetOverride
@@ -77,6 +78,8 @@ async def patch_user_story(
     subtract_deps: bool,
     set_overrides: list[SetOverride],
     clear_overrides: list[ClearOverride],
+    set_criteria: list[SetCriterion] | None = None,
+    revert_criteria: list[RevertCriterion] | None = None,
 ) -> dict[str, Any]:
     """Resolve deferred fields against the live story, then PATCH the update."""
     async with ApiClient(settings) as client:
@@ -96,6 +99,9 @@ async def patch_user_story(
                 subtract_deps=subtract_deps,
                 set_overrides=set_overrides,
                 clear_overrides=clear_overrides,
+                set_criteria=set_criteria,
+                revert_criteria=revert_criteria,
+                app_id=app_id,
             )
         resp = await client.patch(path, json=payload)
         handle_response_error(resp)

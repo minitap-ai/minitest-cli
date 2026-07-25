@@ -1182,3 +1182,99 @@ class TestParseCameraMedia:
         from minitest_cli.commands.user_story_camera import parse_camera_media
 
         assert parse_camera_media(CAMERA_FILE_ID) == CAMERA_FILE_ID
+
+
+class TestIdentityPreservingCriterionEdits:
+    def test_set_criterion_rewords_only_target_keeping_ids(self, tmp_path):
+        """Rewording via --set-criterion must send {id, content} for the target
+        so the server versions the SAME criterion, and leave siblings intact —
+        unlike --criteria full-replace which severs identity on reworded text."""
+        result, payload = _run_update_capturing_payload(
+            tmp_path, ["--set-criterion", "crit-beta=beta reworded"]
+        )
+        assert result.exit_code == 0
+        assert payload is not None
+        sent = {c["id"]: c for c in payload["acceptanceCriteria"]}
+        assert sent["crit-beta"]["content"] == "beta reworded"
+        assert sent["crit-alpha"]["content"] == "alpha"
+        assert sent["crit-alpha"]["platformOverrides"] == {"ios": "alpha on iOS"}
+
+    def test_set_criterion_by_index(self, tmp_path):
+        result, payload = _run_update_capturing_payload(
+            tmp_path, ["--set-criterion", "2=beta reworded"]
+        )
+        assert result.exit_code == 0
+        assert payload is not None
+        sent = {c["id"]: c for c in payload["acceptanceCriteria"]}
+        assert sent["crit-beta"]["content"] == "beta reworded"
+
+    def test_set_criterion_unknown_id_errors(self, tmp_path):
+        result, payload = _run_update_capturing_payload(
+            tmp_path, ["--set-criterion", "crit-nope=text"]
+        )
+        assert result.exit_code == 1
+        assert payload is None
+
+    def test_set_criterion_conflicts_with_criteria(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        result = _run_with_context(
+            ["update", "story-1", "--criteria", "x", "--set-criterion", "crit-beta=y"],
+            settings,
+            json_mode=True,
+        )
+        assert result.exit_code == 1
+
+    def test_revert_criterion_sends_exact_version_text_and_marker(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        versions = [
+            {"id": "ver-2", "criterion_id": "crit-beta", "content": "beta"},
+            {"id": "ver-1", "criterion_id": "crit-beta", "content": "beta original"},
+        ]
+
+        def _get_side_effect(path, **kwargs):
+            if path.endswith("/versions"):
+                return _mock_response(200, versions)
+            return _mock_response(200, STORY_WITH_OVERRIDES)
+
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.get.side_effect = _get_side_effect
+            instance.patch.return_value = _mock_response(200, STORY_WITH_OVERRIDES)
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--revert-criterion", "crit-beta=ver-1"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        payload = instance.patch.call_args.kwargs["json"]
+        sent = {c["id"]: c for c in payload["acceptanceCriteria"]}
+        assert sent["crit-beta"]["content"] == "beta original"
+        assert sent["crit-beta"]["revertFromVersionId"] == "ver-1"
+        versions_call = [
+            c.args[0] for c in instance.get.call_args_list if c.args[0].endswith("/versions")
+        ]
+        assert versions_call == ["/api/v1/apps/app-123/criteria/crit-beta/versions"]
+
+    def test_revert_criterion_unknown_version_errors(self, tmp_path):
+        settings = _make_settings(tmp_path)
+
+        def _get_side_effect(path, **kwargs):
+            if path.endswith("/versions"):
+                return _mock_response(200, [])
+            return _mock_response(200, STORY_WITH_OVERRIDES)
+
+        with patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient:
+            instance = AsyncMock()
+            instance.get.side_effect = _get_side_effect
+            instance.patch.return_value = _mock_response(200, STORY_WITH_OVERRIDES)
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--revert-criterion", "crit-beta=ver-404"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 1
+        assert not instance.patch.called

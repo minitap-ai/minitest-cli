@@ -13,7 +13,6 @@ from minitest_cli.core.auth import load_token
 from minitest_cli.core.config import Settings
 
 CHANNEL_HEADER = "X-Minitest-Channel"
-CHANNEL_VALUE = "cli"
 DEFAULT_TIMEOUT = 30.0
 UPLOAD_TIMEOUT = 300.0  # 5 minutes for large file uploads
 
@@ -41,7 +40,7 @@ class AppsManagerClient:
             base_url=self._settings.apps_manager_url,
             headers={
                 "Authorization": f"Bearer {token}",
-                CHANNEL_HEADER: CHANNEL_VALUE,
+                CHANNEL_HEADER: self._settings.channel,
             },
             timeout=DEFAULT_TIMEOUT,
         )

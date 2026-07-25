@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 CHANNEL_HEADER = "X-Minitest-Channel"
-CHANNEL_VALUE = "cli"
 DEFAULT_TIMEOUT = 30.0
 
 EXIT_GENERAL_ERROR = 1
@@ -57,7 +56,7 @@ async def fetch_user_tenants(settings: Settings) -> list[TenantResponse]:
         base_url=settings.integrations_url,
         headers={
             "Authorization": f"Bearer {token}",
-            CHANNEL_HEADER: CHANNEL_VALUE,
+            CHANNEL_HEADER: settings.channel,
         },
         timeout=DEFAULT_TIMEOUT,
     ) as client:

@@ -1184,3 +1184,51 @@ class TestRunLaneFlagSurface:
         assert "--android-build" in output
         for forbidden in ("--target", "--web-url", "--browser", "--viewport"):
             assert forbidden not in output
+
+
+class TestRunFeedback:
+    def _invoke(self, tmp_path, args, *, resp):
+        settings = _make_settings(tmp_path, app_id="7d7bfae7-4b0e-4b7e-9a3e-000000000001")
+        client = AsyncMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        client.post = AsyncMock(return_value=resp)
+        with patch("minitest_cli.commands.run_feedback.ApiClient", return_value=client):
+            result = _run_with_context(args, settings, json_mode=True)
+        return result, client
+
+    def test_feedback_posts_to_the_issues_endpoint(self, tmp_path):
+        resp = MagicMock(spec=httpx.Response)
+        resp.status_code = 201
+        resp.json.return_value = {"id": "fb-1", "processingStatus": "pending"}
+        result_id = "0e4a4b4f-6f0e-4a3b-9e0a-000000000042"
+
+        result, client = self._invoke(
+            tmp_path,
+            ["feedback", result_id, "This is expected behavior, not a bug."],
+            resp=resp,
+        )
+
+        assert result.exit_code == 0
+        path = client.post.call_args.args[0]
+        assert path.endswith(f"/issues/{result_id}/feedback")
+        assert client.post.call_args.kwargs["json"] == {
+            "feedbackText": "This is expected behavior, not a bug."
+        }
+        assert json.loads(result.output)["id"] == "fb-1"
+
+    def test_feedback_rejects_non_uuid_result_id(self, tmp_path):
+        resp = MagicMock(spec=httpx.Response)
+        result, client = self._invoke(tmp_path, ["feedback", "not-a-uuid", "text"], resp=resp)
+        assert result.exit_code == 1
+        client.post.assert_not_awaited()
+
+    def test_feedback_unknown_result_exits_4(self, tmp_path):
+        resp = MagicMock(spec=httpx.Response)
+        resp.status_code = 404
+        resp.json.return_value = {"detail": "not found"}
+        resp.text = "not found"
+        result, _ = self._invoke(
+            tmp_path, ["feedback", "0e4a4b4f-6f0e-4a3b-9e0a-000000000042", "text"], resp=resp
+        )
+        assert result.exit_code == 4

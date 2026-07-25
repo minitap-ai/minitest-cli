@@ -28,6 +28,7 @@ from minitest_cli.commands.run_targets import (
     IosBuildOpt,
     WebOpt,
 )
+from minitest_cli.commands.run_feedback import feedback
 from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
@@ -192,3 +193,4 @@ def run_all(
 
 
 app.command(name="verdicts")(verdicts)
+app.command(name="feedback")(feedback)

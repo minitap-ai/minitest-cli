@@ -139,3 +139,31 @@ class TestVerdictProjection:
         assert projected.verdict == "warning"
         assert projected.passed == 3
         assert projected.skipped_by_cascade == 2
+
+
+class TestVerdictIdentifiers:
+    def test_projection_carries_result_and_criterion_identity(self):
+        """The run-overview triage loop keys failures on
+        story_run x criterion_version x platform and posts feedback by result
+        id — the projection must surface all of them."""
+        result = CriterionResult(
+            id="res-1",
+            story_run_id="run-1",
+            criterion_version_id="cv-9",
+            criterion_id="crit-9",
+            platform="ios",
+            status="failed",
+            success=False,
+            created_at=_NOW,
+        )
+        story = project_story(
+            _story(platforms=["ios"], results=[result]),
+            platform=None,
+            only_failed=False,
+            verbose=False,
+        )
+        assert story is not None
+        criterion = story.criteria[0]
+        assert criterion.result_id == "res-1"
+        assert criterion.criterion_id == "crit-9"
+        assert criterion.criterion_version_id == "cv-9"

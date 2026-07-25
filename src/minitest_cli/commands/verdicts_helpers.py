@@ -60,6 +60,9 @@ def _project_platform(platform_run: PlatformRun) -> VerdictStoryPlatform:
 
 def _project_criterion(result: CriterionResult, *, verbose: bool) -> VerdictCriterion:
     return VerdictCriterion(
+        result_id=result.id,
+        criterion_id=result.criterion_id,
+        criterion_version_id=result.criterion_version_id,
         platform=result.platform,
         status=result.status,
         criticality=result.criticality,

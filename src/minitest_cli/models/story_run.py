@@ -12,6 +12,7 @@ class CriterionResult(CamelModel):
     id: str
     story_run_id: str
     criterion_version_id: str
+    criterion_id: str | None = None
     platform: str
     # Populated only by servers that expose whether a platform override was evaluated.
     is_platform_override: bool | None = None
@@ -121,6 +122,9 @@ class VerdictStoryPlatform(CamelModel):
 class VerdictCriterion(CamelModel):
     """A single acceptance-criterion outcome in the verdict projection."""
 
+    result_id: str | None = None
+    criterion_id: str | None = None
+    criterion_version_id: str | None = None
     platform: str
     status: str | None = None
     criticality: str | None = None

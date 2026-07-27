@@ -6,6 +6,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.flow_types_helpers import resolve_flow_type
 from minitest_cli.commands.user_story_camera import (
     CAMERA_MEDIA_HELP,
     resolve_camera_media_file_id,
@@ -19,7 +20,6 @@ from minitest_cli.commands.user_story_helpers import (
     handle_response_error,
     is_json_mode,
     run_api_call,
-    validate_user_story_type,
 )
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.app_context import resolve_app_id
@@ -29,7 +29,10 @@ from minitest_cli.utils.output import output, print_error, print_info, print_suc
 
 def create_user_story(
     name: Annotated[str, typer.Option("--name", help="User-story name.")],
-    user_story_type: Annotated[str, typer.Option("--type", help="User-story type.")],
+    user_story_type: Annotated[
+        str,
+        typer.Option("--type", help="Built-in type or custom flow type name."),
+    ],
     description: Annotated[
         str | None, typer.Option("--description", help="User-story description.")
     ] = None,
@@ -64,9 +67,11 @@ def create_user_story(
     json_mode = is_json_mode()
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
-    validate_user_story_type(user_story_type, settings)
+    flow_type = resolve_flow_type(user_story_type, settings, app_id)
     camera_source = resolve_camera_source(camera_media)
-    payload: dict[str, Any] = {"name": name, "type": user_story_type}
+    payload: dict[str, Any] = {"name": name, "type": flow_type.value}
+    if flow_type.custom_type_id is not None:
+        payload["customUserStoryTypeId"] = flow_type.custom_type_id
     if description is not None:
         payload["description"] = description
     if criteria:

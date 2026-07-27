@@ -23,35 +23,6 @@ EXIT_NOT_FOUND = 4
 USER_STORY_TABLE_HEADERS = ["ID", "Name", "Type", "Description", "Acceptance Criteria", "Profiles"]
 
 
-def fetch_user_story_types(settings: Settings) -> list[str]:
-    """Fetch valid user-story types from the API."""
-    try:
-        resp = httpx.get(
-            f"{settings.api_url}/api/v1/user-story-types",
-            timeout=10,
-        )
-    except httpx.HTTPError as exc:
-        print_error(f"Failed to fetch user-story types: {exc}")
-        raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
-    if resp.status_code != 200:
-        print_error(f"Failed to fetch user-story types: HTTP {resp.status_code}")
-        raise typer.Exit(code=EXIT_NETWORK_ERROR)
-    data = resp.json()
-    if not isinstance(data, list) or not data:
-        print_error("Invalid response from user-story types endpoint.")
-        raise typer.Exit(code=EXIT_NETWORK_ERROR)
-    return data
-
-
-def validate_user_story_type(value: str, settings: Settings) -> str:
-    """Validate a user-story type value against types from the API."""
-    valid = fetch_user_story_types(settings)
-    if value not in valid:
-        print_error(f"Invalid user-story type '{value}'. Valid types: {', '.join(valid)}")
-        raise typer.Exit(code=1)
-    return value
-
-
 def get_settings() -> Settings:
     return typer.Context.settings  # type: ignore[attr-defined]
 

@@ -6,6 +6,7 @@ from typing import Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.flow_types_helpers import ResolvedFlowType
 from minitest_cli.commands.user_story_camera import resolve_camera_media_file_id
 from minitest_cli.commands.user_story_criteria import apply_current_story_fields
 from minitest_cli.commands.user_story_criterion_edits import RevertCriterion, SetCriterion
@@ -21,7 +22,7 @@ from minitest_cli.utils.output import print_error, print_info, print_success
 def build_update_payload(
     *,
     name: str | None,
-    user_story_type: str | None,
+    flow_type: ResolvedFlowType | None,
     description: str | None,
     depends_on: list[str] | None,
     profile: list[str] | None,
@@ -42,7 +43,8 @@ def build_update_payload(
 
     req = UpdateUserStoryRequest(
         name=name,
-        type=user_story_type,
+        type=flow_type.value if flow_type else None,
+        custom_user_story_type_id=flow_type.custom_type_id if flow_type else None,
         description=description,
         acceptance_criteria=None,
         depends_on=list(depends_on) if depends_on is not None else None,

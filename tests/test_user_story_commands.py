@@ -4,6 +4,8 @@ Validates business logic, error handling, and CLI parsing.
 """
 
 import json
+from contextlib import contextmanager
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -13,11 +15,21 @@ from typer.testing import CliRunner
 
 from minitest_cli.commands.user_story import app as user_story_app
 from minitest_cli.core.config import Settings
+from minitest_cli.models.flow_type import CustomFlowType
 from minitest_cli.models.user_story import CriterionVersionResponse
 
 runner = CliRunner()
 
 VALID_USER_STORY_TYPES = ["login", "registration", "checkout", "onboarding", "other"]
+
+CUSTOM_FLOW_TYPE = CustomFlowType(
+    id="cft-1",
+    tenant_id="tenant-1",
+    name="Payments",
+    icon="tag",
+    color="gray",
+    created_at=datetime(2026, 1, 1, tzinfo=UTC),
+)
 
 
 def _make_settings(tmp_path, **overrides):
@@ -52,6 +64,22 @@ def _run_with_context(args, settings, json_mode=False, app_flag=None):
     return result
 
 
+@contextmanager
+def _patch_flow_types(custom_types=()):
+    """Resolve ``--type`` against fixed built-in and custom types, never the network."""
+    with (
+        patch(
+            "minitest_cli.commands.flow_types_helpers.fetch_builtin_flow_types",
+            return_value=VALID_USER_STORY_TYPES,
+        ),
+        patch(
+            "minitest_cli.commands.flow_types_helpers.fetch_custom_flow_types",
+            return_value=list(custom_types),
+        ),
+    ):
+        yield
+
+
 def _mock_response(status_code=200, json_data=None):
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = status_code
@@ -73,10 +101,7 @@ SAMPLE_USER_STORY = {
 class TestCreateUserStory:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
-        with patch(
-            "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-            return_value=VALID_USER_STORY_TYPES,
-        ):
+        with _patch_flow_types():
             result = _run_with_context(
                 ["create", "--name", "Bad Story", "--type", "invalid_type"],
                 settings,
@@ -87,10 +112,7 @@ class TestCreateUserStory:
     def test_network_error_exits_3(self, tmp_path):
         settings = _make_settings(tmp_path)
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -108,10 +130,7 @@ class TestCreateUserStory:
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(201, {"id": "new-story", "name": "Story", "type": "login"})
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -130,10 +149,7 @@ class TestCreateUserStoryProfiles:
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -163,10 +179,7 @@ class TestCreateUserStoryProfiles:
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -257,10 +270,7 @@ class TestUpdateUserStoryProfiles:
 class TestListUserStories:
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
-        with patch(
-            "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-            return_value=VALID_USER_STORY_TYPES,
-        ):
+        with _patch_flow_types():
             result = _run_with_context(["list", "--type", "bad_type"], settings)
         assert result.exit_code != 0
         assert "bad_type" in result.output.lower() or "invalid" in result.output.lower()
@@ -283,6 +293,79 @@ class TestListUserStories:
         assert instance.get.call_count == 2
         data = json.loads(result.output)
         assert len(data) == 2
+
+
+class TestCustomFlowTypes:
+    """A custom flow type name maps onto the API's ``custom`` type + its type id."""
+
+    def test_create_sends_custom_type_id(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "custom"})
+        with (
+            _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]),
+            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.post.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["create", "--name", "Story", "--type", "payments"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0, result.output
+        payload = instance.post.call_args.kwargs["json"]
+        assert payload["type"] == "custom"
+        assert payload["customUserStoryTypeId"] == "cft-1"
+
+    def test_update_sends_custom_type_id(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        mock_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "custom"})
+        with (
+            _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]),
+            patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.patch.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(
+                ["update", "story-1", "--type", "Payments"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0, result.output
+        payload = instance.patch.call_args.kwargs["json"]
+        assert payload["type"] == "custom"
+        assert payload["customUserStoryTypeId"] == "cft-1"
+
+    def test_list_filters_on_custom_type_id(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        mock_resp = _mock_response(200, {"items": [], "total": 0, "page": 1, "pageSize": 20})
+        with (
+            _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]),
+            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
+        ):
+            instance = AsyncMock()
+            instance.get.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = _run_with_context(["list", "--type", "payments"], settings, json_mode=True)
+        assert result.exit_code == 0, result.output
+        params = instance.get.call_args.kwargs["params"]
+        assert params["custom_type_id"] == "cft-1"
+        assert "type" not in params
+
+    def test_unknown_type_lists_custom_names(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        with _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]):
+            result = _run_with_context(
+                ["create", "--name", "Story", "--type", "nope"],
+                settings,
+            )
+        assert result.exit_code == 1
+        assert "Payments" in result.output
 
 
 class TestGetUserStory:
@@ -457,10 +540,7 @@ class TestUpdateUserStory:
 
     def test_invalid_type_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
-        with patch(
-            "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-            return_value=VALID_USER_STORY_TYPES,
-        ):
+        with _patch_flow_types():
             result = _run_with_context(
                 ["update", "story-1", "--type", "nonsense"],
                 settings,
@@ -633,10 +713,7 @@ class TestCreateUserStoryDependsOn:
         post_resp = _mock_response(201, {"id": "story-new", "name": "Checkout", "type": "checkout"})
         patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -670,10 +747,7 @@ class TestCreateUserStoryDependsOn:
         settings = _make_settings(tmp_path)
         post_resp = _mock_response(201, {"id": "story-new", "name": "S", "type": "login"})
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -836,53 +910,6 @@ class TestUpdateDependsOn:
         assert "a, b, a" in result.output
 
 
-class TestFetchUserStoryTypes:
-    """Tests for the fetch_user_story_types helper."""
-
-    def test_returns_api_types_on_success(self, tmp_path):
-        from minitest_cli.commands.user_story_helpers import fetch_user_story_types
-
-        settings = _make_settings(tmp_path)
-        api_types = ["login", "registration", "checkout", "new_type"]
-        mock_resp = MagicMock(spec=httpx.Response)
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = api_types
-        with patch("minitest_cli.commands.user_story_helpers.httpx.get", return_value=mock_resp):
-            result = fetch_user_story_types(settings)
-        assert result == api_types
-
-    def test_network_error_exits_3(self, tmp_path):
-        from click.exceptions import Exit
-
-        from minitest_cli.commands.user_story_helpers import fetch_user_story_types
-
-        settings = _make_settings(tmp_path)
-        with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.httpx.get",
-                side_effect=httpx.ConnectError("fail"),
-            ),
-            pytest.raises(Exit) as exc_info,
-        ):
-            fetch_user_story_types(settings)
-        assert exc_info.value.exit_code == 3
-
-    def test_non_200_exits_3(self, tmp_path):
-        from click.exceptions import Exit
-
-        from minitest_cli.commands.user_story_helpers import fetch_user_story_types
-
-        settings = _make_settings(tmp_path)
-        mock_resp = MagicMock(spec=httpx.Response)
-        mock_resp.status_code = 500
-        with (
-            patch("minitest_cli.commands.user_story_helpers.httpx.get", return_value=mock_resp),
-            pytest.raises(Exit) as exc_info,
-        ):
-            fetch_user_story_types(settings)
-        assert exc_info.value.exit_code == 3
-
-
 class TestExtractBoundProfiles:
     """``extract_bound_profiles`` prefers the plural list and falls back to the
     legacy singular fields so the CLI still renders profiles against servers
@@ -920,10 +947,7 @@ class TestDeviceCountCreate:
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -1053,10 +1077,7 @@ class TestCameraMediaCreate:
         settings = _make_settings(tmp_path)
         post_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -1080,10 +1101,7 @@ class TestCameraMediaCreate:
         upload_resp = _mock_response(201, {"id": "file-x", "kind": "image"})
         post_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            patch(
-                "minitest_cli.commands.user_story_helpers.fetch_user_story_types",
-                return_value=VALID_USER_STORY_TYPES,
-            ),
+            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()

@@ -1,4 +1,4 @@
-"""Helpers for env-var commands: app/tenant resolution, HTTP, confirmation."""
+"""Helpers for env-var commands: app/tenant resolution, HTTP, masking."""
 
 import sys
 
@@ -106,19 +106,6 @@ def _extract_detail(resp: httpx.Response) -> str | None:
     if isinstance(body, dict):
         return body.get("detail") or body.get("message")
     return None
-
-
-def confirm_or_exit(yes: bool, action: str) -> None:
-    """Gate a mutating action behind explicit confirmation.
-
-    Passing ``--yes`` proceeds. Without it we refuse rather than prompt, so the
-    command stays safe to run non-interactively (agents/CI) — exit 1 naming the
-    flag that unblocks it.
-    """
-    if yes:
-        return
-    print_error(f"{action} requires confirmation. Re-run with --yes to proceed.")
-    raise typer.Exit(code=EXIT_GENERAL_ERROR)
 
 
 def diff_keys(

@@ -15,7 +15,6 @@ from rich.markup import escape
 
 from minitest_cli.commands.env_helpers import (
     MASK,
-    confirm_or_exit,
     delete_env_vars,
     diff_keys,
     fetch_env_vars,
@@ -24,6 +23,7 @@ from minitest_cli.commands.env_helpers import (
     resolve_app_and_tenant,
 )
 from minitest_cli.core.auth import require_auth
+from minitest_cli.utils.confirm import confirm_or_exit
 from minitest_cli.core.config import Settings
 from minitest_cli.utils.output import (
     print_error,

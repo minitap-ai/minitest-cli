@@ -82,6 +82,7 @@ class UpdateUserStoryRequest(CamelModel):
     name: str | None = None
     description: str | None = None
     type: str | None = None
+    custom_user_story_type_id: str | None = None
     acceptance_criteria: list[CriterionUpsertItem] | None = None
     depends_on: list[str] | None = None
     test_profile_ids: list[str] | None = None

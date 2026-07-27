@@ -55,7 +55,11 @@ anonymous profile (the "New user" persona is system-managed and immutable).
 Record each returned profile id.
 
 ## 4. Map the user journeys
-Run `minitest flow-types list` to see the valid scenario types. Read the app's
+Run `minitest flow-types list` to see the valid scenario types. When none of them
+fits a journey, create your own with
+`minitest flow-types create --name "<Flow type>" --usage-prompt "<agent context>"`
+(rename one later with `minitest flow-types update "<Flow type>" --name "<New>"`).
+Read the app's
 navigation, screens, and features and map ALL the main user paths the app
 genuinely warrants — every key journey, not just a sample. Cover the happy paths
 AND, especially, the paths that can BREAK: failure states, validation errors,

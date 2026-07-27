@@ -6,6 +6,7 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands import user_story_create, user_story_delete, user_story_modify
+from minitest_cli.commands.flow_types_helpers import resolve_flow_type
 from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_helpers import (
     USER_STORY_TABLE_HEADERS,
@@ -17,7 +18,6 @@ from minitest_cli.commands.user_story_helpers import (
     handle_response_error,
     is_json_mode,
     run_api_call,
-    validate_user_story_type,
 )
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.app_context import resolve_app_id
@@ -33,7 +33,8 @@ app.command(name="delete")(user_story_delete.delete_user_story)
 @app.command(name="list")
 def list_user_stories(
     user_story_type: Annotated[
-        str | None, typer.Option("--type", help="Filter by user-story type.")
+        str | None,
+        typer.Option("--type", help="Filter by built-in type or custom flow type name."),
     ] = None,
     page: Annotated[int, typer.Option("--page", min=1, help="Page number.")] = 1,
     page_size: Annotated[
@@ -49,14 +50,16 @@ def list_user_stories(
     json_mode = is_json_mode()
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
-    if user_story_type is not None:
-        validate_user_story_type(user_story_type, settings)
     if all_stories:
         page, page_size = 1, 100
 
     params: dict[str, Any] = {"page": page, "page_size": page_size}
     if user_story_type is not None:
-        params["type"] = user_story_type
+        flow_type = resolve_flow_type(user_story_type, settings, app_id)
+        if flow_type.custom_type_id is not None:
+            params["custom_type_id"] = flow_type.custom_type_id
+        else:
+            params["type"] = flow_type.value
 
     async def _run() -> Any:
         async with ApiClient(settings) as client:

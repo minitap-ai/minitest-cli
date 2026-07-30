@@ -11,6 +11,7 @@ from minitest_cli.commands import (
     auth,
     batch,
     build,
+    capabilities,
     env,
     flow_types,
     init,
@@ -37,6 +38,7 @@ app = typer.Typer(
 app.add_typer(init.app)
 app.add_typer(auth.app)
 app.add_typer(apps.app)
+app.add_typer(capabilities.app)
 app.add_typer(user_story.app)
 app.add_typer(user_story_bindings.app)
 app.add_typer(test_profile.app)

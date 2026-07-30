@@ -160,3 +160,6 @@ class TestFallbackPlaybookContent:
     def test_reuses_the_app_already_created_for_the_agent(self):
         assert "minitest apps list" in FALLBACK_PLAYBOOK
         assert "already been created" in FALLBACK_PLAYBOOK
+
+    def test_routes_the_agent_to_the_capability_envelope(self):
+        assert "minitest capabilities --platform" in FALLBACK_PLAYBOOK

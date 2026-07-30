@@ -21,6 +21,11 @@ they have the Minitest onboarding screen open in their browser.
    duplicate. Only if none matches, detect the platform from the repo
    (`.xcodeproj`/Swift → ios, Gradle/Kotlin → android, web frontend → web) and
    run `minitest apps create --name "<app>" --platform <platform> --json`.
+3. `minitest capabilities --platform <ios|android|web>`, once per platform the
+   app targets. A criterion that needs something the testing agent cannot
+   perform or observe on that platform fails as unprocessable, not because the
+   app is broken — so every criterion you write later must sit inside that
+   envelope.
 
 ## Then follow the suite-design methodology — do not improvise one
 

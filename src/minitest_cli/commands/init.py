@@ -5,7 +5,8 @@ import typer
 from rich.console import Console
 from rich.markdown import Markdown
 
-from minitest_cli.commands.init_playbook import PLAYBOOK
+from minitest_cli.commands.init_helpers import load_playbook
+from minitest_cli.core.config import get_settings
 from minitest_cli.utils.output import err_console, print_json
 
 app = typer.Typer(name="init", help="Print the onboarding plan for an AI coding agent.")
@@ -51,6 +52,9 @@ def init(
 ) -> None:
     """Print the Minitest onboarding playbook.
 
+    The playbook is fetched from Minitest so it stays in step with the suite-design
+    methodology it delegates to, falling back to the embedded copy when offline.
+
     In an agent or non-interactive context, prints the raw markdown playbook to
     stdout. In an interactive terminal, renders it nicely with a short intro.
     """
@@ -58,15 +62,16 @@ def init(
         return
 
     json_mode = bool(getattr(typer.Context, "json_mode", False))
+    playbook, source = load_playbook(get_settings())
 
     if json_mode:
-        print_json({"playbook": PLAYBOOK})
+        print_json({"playbook": playbook, "source": source})
         return
 
     if _is_agent_context(agent_flag=agent, json_mode=False):
-        sys.stdout.write(PLAYBOOK)
+        sys.stdout.write(playbook)
         return
 
     err_console.print(_HUMAN_INTRO)
-    Console().print(Markdown(PLAYBOOK))
+    Console().print(Markdown(playbook))
     err_console.print(_HUMAN_FOOTER)

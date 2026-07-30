@@ -3,16 +3,20 @@
 import json
 from unittest.mock import patch
 
+import httpx
 import pytest
 from typer.testing import CliRunner
 
 from minitest_cli.commands.init import _AGENT_ENV_VARS, _is_agent_context
-from minitest_cli.commands.init_playbook import PLAYBOOK
+from minitest_cli.commands.init_helpers import PLAYBOOK_PATH, load_playbook
+from minitest_cli.commands.init_playbook import FALLBACK_PLAYBOOK
+from minitest_cli.core.config import Settings
 from minitest_cli.main import app
 
 runner = CliRunner()
 
 _HUMAN_MARKER = "writes the onboarding plan"
+_SERVED = "# Served onboarding\n\nFollow the methodology.\n"
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +29,36 @@ def _no_update_check():
 def _clear_agent_env(monkeypatch):
     for var in _AGENT_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
+
+
+@pytest.fixture
+def _served_playbook():
+    with patch(
+        "minitest_cli.commands.init.load_playbook",
+        return_value=(_SERVED, "server"),
+    ):
+        yield
+
+
+class _FakeApiClient:
+    def __init__(self, response: httpx.Response | Exception) -> None:
+        self._response = response
+        self.requested_path: str | None = None
+
+    def __call__(self, *_args, **_kwargs) -> "_FakeApiClient":
+        return self
+
+    async def __aenter__(self) -> "_FakeApiClient":
+        return self
+
+    async def __aexit__(self, *_args) -> None:
+        return None
+
+    async def get(self, path: str) -> httpx.Response:
+        self.requested_path = path
+        if isinstance(self._response, Exception):
+            raise self._response
+        return self._response
 
 
 class TestAgentContextDetection:
@@ -52,72 +86,77 @@ class TestAgentContextDetection:
             assert _is_agent_context(agent_flag=False, json_mode=False) is True
 
 
+class TestPlaybookRetrieval:
+    """The served playbook wins; any failure degrades to the embedded copy."""
+
+    def test_served_playbook_is_used(self):
+        client = _FakeApiClient(httpx.Response(200, text=_SERVED))
+        with patch("minitest_cli.commands.init_helpers.ApiClient", client):
+            playbook, source = load_playbook(Settings())
+
+        assert (playbook, source) == (_SERVED, "server")
+        assert client.requested_path == PLAYBOOK_PATH
+
+    @pytest.mark.parametrize(
+        "response",
+        [
+            httpx.Response(401, text="unauthorized"),
+            httpx.Response(200, text="  \n"),
+            httpx.ConnectError("no route to host"),
+        ],
+        ids=["unauthenticated", "empty-body", "unreachable"],
+    )
+    def test_failures_fall_back_to_the_embedded_playbook(self, response):
+        # `init` runs before the agent has authenticated and possibly offline, so it
+        # must still print a usable playbook instead of erroring out.
+        with patch("minitest_cli.commands.init_helpers.ApiClient", _FakeApiClient(response)):
+            playbook, source = load_playbook(Settings())
+
+        assert (playbook, source) == (FALLBACK_PLAYBOOK, "embedded")
+
+
 class TestInitRendering:
     """`minitest init` emits the playbook in the right shape per context."""
 
-    def test_agent_context_prints_raw_playbook_only(self):
+    def test_agent_context_prints_raw_playbook_only(self, _served_playbook):
         with patch("minitest_cli.commands.init._is_agent_context", return_value=True):
             result = runner.invoke(app, ["init"])
 
         assert result.exit_code == 0
-        assert result.stdout == PLAYBOOK
+        assert result.stdout == _SERVED
 
-    def test_human_context_adds_intro_around_playbook(self):
+    def test_human_context_adds_intro_around_playbook(self, _served_playbook):
         with patch("minitest_cli.commands.init._is_agent_context", return_value=False):
             result = runner.invoke(app, ["init"])
 
         assert result.exit_code == 0
         assert _HUMAN_MARKER in result.output
-        assert "Minitest onboarding" in result.output
-        assert result.output != PLAYBOOK
+        assert "Served onboarding" in result.output
+        assert result.output != _SERVED
 
-    def test_json_mode_emits_playbook_as_json(self):
+    def test_json_mode_reports_the_playbook_and_its_source(self, _served_playbook):
         result = runner.invoke(app, ["--json", "init"])
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
-        assert payload["playbook"] == PLAYBOOK
+        assert json.loads(result.stdout) == {"playbook": _SERVED, "source": "server"}
 
 
-class TestPlaybookContent:
-    """The playbook must cover the full onboarding flow end-to-end."""
+class TestFallbackPlaybookContent:
+    """The embedded copy must delegate, not re-invent the methodology."""
 
-    def test_covers_every_onboarding_stage(self):
-        for command in (
-            "minitest auth login",
-            "minitest apps list",
-            "minitest apps create",
-            "minitest test-profile create",
-            "minitest flow-types list",
-            "minitest user-story create",
-            "minitest apps dependencies",
-        ):
-            assert command in PLAYBOOK
+    def test_delegates_to_the_suite_design_workflow(self):
+        assert "minitest-cli` skill" in FALLBACK_PLAYBOOK
+        assert "reference/test-suite-design.md" in FALLBACK_PLAYBOOK
+        assert "before reading any application code" in FALLBACK_PLAYBOOK
+        assert "hard stops" in FALLBACK_PLAYBOOK
 
     def test_stops_before_build_and_run(self):
-        # `minitest init` wires the suite, then hands off to the web app's
-        # "Run tests" button — it must NOT tell the agent to upload a build
-        # or start runs from the CLI.
-        assert "minitest build upload" not in PLAYBOOK
-        assert "minitest run all" not in PLAYBOOK
-        assert "minitest run start" not in PLAYBOOK
-        assert "Run tests" in PLAYBOOK
+        # `init` designs the suite, then hands off to the web app's "Run tests"
+        # button — it must NOT tell the agent to upload a build or start runs.
+        assert "minitest build upload" not in FALLBACK_PLAYBOOK
+        assert "minitest run" not in FALLBACK_PLAYBOOK
+        assert "Run tests" in FALLBACK_PLAYBOOK
 
-    def test_wires_dependencies_and_personas(self):
-        assert "--depends-on" in PLAYBOOK
-        assert "--profile" in PLAYBOOK
-        assert "--password-stdin" in PLAYBOOK
-
-    def test_covers_file_seeding(self):
-        assert "minitest test-file upload" in PLAYBOOK
-        assert "minitest user-story-binding set-files" in PLAYBOOK
-
-    def test_offline_wording_avoids_airplane_mode(self):
-        assert "Offline (wifi off)" in PLAYBOOK
-        assert 'never write "airplane mode"' in PLAYBOOK
-
-    def test_personas_default_to_qa_minitap_otp(self):
-        assert "@qa.minitap.ai" in PLAYBOOK
-        passwordless = PLAYBOOK.index("@qa.minitap.ai")
-        with_password = PLAYBOOK.index("--password-stdin")
-        assert passwordless < with_password
+    def test_reuses_the_app_already_created_for_the_agent(self):
+        assert "minitest apps list" in FALLBACK_PLAYBOOK
+        assert "already been created" in FALLBACK_PLAYBOOK

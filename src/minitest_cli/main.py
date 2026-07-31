@@ -17,6 +17,7 @@ from minitest_cli.commands import (
     init,
     maintenance,
     run,
+    screens,
     skill,
     test_file,
     test_profile,
@@ -48,6 +49,7 @@ app.add_typer(app_knowledge.app)
 app.add_typer(build.app)
 app.add_typer(env.app)
 app.add_typer(run.app)
+app.add_typer(screens.app)
 app.add_typer(maintenance.app)
 app.add_typer(batch.app)
 app.add_typer(skill.app)

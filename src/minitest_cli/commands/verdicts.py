@@ -17,6 +17,16 @@ def verdicts(
     only_failed: Annotated[
         bool, typer.Option("--only-failed", help="Drop fully-passing stories.")
     ] = False,
+    actionable: Annotated[
+        bool,
+        typer.Option(
+            "--actionable",
+            help=(
+                "Only criteria that failed or were unprocessable AND are "
+                "critical/warning. Drops cascade skips and passing leaves."
+            ),
+        ),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Include passing criteria and per-criterion evidence."),
@@ -38,6 +48,9 @@ def verdicts(
             platform=platform,
             only_failed=only_failed,
             verbose=verbose,
+            actionable=actionable,
         )
     )
-    print_json(result)
+    # Verbose-only fields are left unset rather than null so the default
+    # projection stays compact for readers that pay per token.
+    print_json(result.model_dump(mode="json", by_alias=True, exclude_none=True))

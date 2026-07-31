@@ -7,9 +7,9 @@ surfaces — passing criteria, evidence, cascade skips — actually fails.
 
 from datetime import datetime
 
-from minitest_cli.commands.verdicts_helpers import (
-    _project_target,
+from minitest_cli.commands.verdicts_projection import (
     project_story,
+    project_target,
 )
 from minitest_cli.models.batch import BatchCounters, BatchTargetView
 from minitest_cli.models.story_run import (
@@ -132,7 +132,7 @@ class TestVerdictProjection:
             ),
         )
 
-        projected = _project_target(target)
+        projected = project_target(target)
 
         assert projected.platform == "web"
         assert projected.build_id == "build-9"

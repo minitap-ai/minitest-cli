@@ -105,7 +105,12 @@ class VerdictTarget(CamelModel):
 
 
 class VerdictStoryPlatform(CamelModel):
-    """Per-platform outcome of one story within the verdict projection."""
+    """Per-platform outcome of one story within the verdict projection.
+
+    ``build_id`` / ``recording_path`` / ``session_paths`` are replay
+    artefacts that only the fix-kit pass needs, so they are populated
+    under ``--verbose`` only and omitted from the default projection.
+    """
 
     platform: str
     verdict: str | None = None
@@ -113,14 +118,18 @@ class VerdictStoryPlatform(CamelModel):
     skip_reason: str | None = None
     build_id: str | None = None
     recording_path: str | None = None
-    session_paths: list[str] = []
+    session_paths: list[str] | None = None
     criticals: int = 0
     warnings: int = 0
     skipped: int = 0
 
 
 class VerdictCriterion(CamelModel):
-    """A single acceptance-criterion outcome in the verdict projection."""
+    """A single acceptance-criterion outcome in the verdict projection.
+
+    ``confidence`` is deliberately ``--verbose``-only: triage must not use
+    it as a classification proxy, so the default projection omits it.
+    """
 
     result_id: str | None = None
     criterion_id: str | None = None
@@ -136,8 +145,14 @@ class VerdictCriterion(CamelModel):
 
 
 class VerdictStory(CamelModel):
-    """One story's verdict: per-platform outcomes plus actionable criteria."""
+    """One story's verdict: per-platform outcomes plus actionable criteria.
 
+    ``user_story_id`` is the stable scenario identity (the story-run id
+    changes every run), so downstream triage keys scenario-level issues
+    on it rather than re-deriving it from a separate listing call.
+    """
+
+    user_story_id: str | None = None
     user_story_name: str | None = None
     story_run_id: str
     platforms: list[VerdictStoryPlatform] = []

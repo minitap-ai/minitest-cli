@@ -26,6 +26,19 @@ uv add <package>                                   # Add new dependency (always 
 - `main.py` - Typer app entry point, global flags, command group registration
 - `tests/` - Unit tests
 
+## Deployment
+
+`minitest-cli` is a **public** CLI shipped to end users. Unlike `mobile-use-cli`, it is **not** continuously deployed: merging to `main` publishes nothing.
+
+A release is triggered by pushing a version tag, and only that:
+
+1. Bump `version` in `pyproject.toml`, then `uv sync` to refresh `uv.lock`
+2. Commit both, then `git tag vX.Y.Z && git push origin main && git push origin vX.Y.Z`
+
+The tag push runs `.github/workflows/release.yml`, which builds, publishes to public PyPI (trusted publishing, no token), creates the GitHub Release, and dispatches the Homebrew formula update to `minitap-ai/homebrew-tap`. The tag must match `pyproject.toml` exactly or CI fails.
+
+There is no dev/prod split and no version pin to flip — once the tag is pushed, every user gets it from PyPI, `uvx`, or Homebrew. Ask the user for explicit confirmation before tagging. Full detail and prerequisites: `RELEASE.md`.
+
 ## Coding Guidelines
 
 ### Imports

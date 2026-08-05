@@ -4,6 +4,7 @@ import sys
 import httpx
 import typer
 
+from minitest_cli.api.errors import format_network_error
 from minitest_cli.utils.output import err_console, print_error
 
 app = typer.Typer(name="skill", help="Retrieve the minitest CLI skill for AI agents.")
@@ -33,7 +34,7 @@ def skill(
     try:
         resp = httpx.get(SKILL_URL, timeout=15, follow_redirects=True)
     except httpx.HTTPError as exc:
-        print_error(f"Network error fetching skill: {exc}")
+        print_error(format_network_error(exc, action="fetching skill"))
         raise typer.Exit(EXIT_NETWORK_ERROR) from exc
 
     if resp.status_code != 200:

@@ -13,6 +13,7 @@ import httpx
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.api.errors import format_network_error
 from minitest_cli.core.auth import require_auth
 from minitest_cli.core.config import Settings
 from minitest_cli.utils.output import print_error, print_json
@@ -44,7 +45,7 @@ def _fetch(settings: Settings, path: str, platform: str | None) -> httpx.Respons
     try:
         resp = asyncio.run(_run())
     except httpx.HTTPError as exc:
-        print_error(f"Network error: {exc}")
+        print_error(format_network_error(exc))
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
     if resp.status_code >= 400:

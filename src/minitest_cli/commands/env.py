@@ -13,6 +13,7 @@ import httpx
 import typer
 from rich.markup import escape
 
+from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands.env_helpers import (
     MASK,
     delete_env_vars,
@@ -59,7 +60,7 @@ def _run[T](coro: Coroutine[Any, Any, T]) -> T:
     try:
         return asyncio.run(coro)
     except httpx.HTTPError as exc:
-        print_error(f"Network error: {exc}")
+        print_error(format_network_error(exc))
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
 

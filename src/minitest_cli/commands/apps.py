@@ -9,6 +9,7 @@ import typer
 
 from minitest_cli.api.apps_manager_client import AppsManagerClient  # noqa: F401  re-exported for tests
 from minitest_cli.api.client import ApiClient
+from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands import apps_dependencies
 from minitest_cli.commands.apps_helpers import create_app_request
 from minitest_cli.core.auth import require_auth
@@ -83,7 +84,7 @@ def list_apps() -> None:
     try:
         data = asyncio.run(_list())
     except httpx.HTTPError as exc:
-        print_error(f"Network error: {exc}")
+        print_error(format_network_error(exc))
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
     if json_mode:
@@ -182,7 +183,7 @@ def create_app(
     try:
         created = asyncio.run(_run())
     except httpx.HTTPError as exc:
-        print_error(f"Network error: {exc}")
+        print_error(format_network_error(exc))
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
     if json_mode:

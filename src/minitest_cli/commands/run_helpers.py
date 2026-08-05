@@ -9,6 +9,7 @@ import httpx
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.api.errors import format_network_error
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.config import Settings
 from minitest_cli.models.story_run import (
@@ -112,7 +113,7 @@ def run_api_call[T](coro: Coroutine[Any, Any, T]) -> T:
     try:
         return asyncio.run(coro)
     except httpx.HTTPError as exc:
-        print_error(f"Network error: {exc}")
+        print_error(format_network_error(exc))
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
 

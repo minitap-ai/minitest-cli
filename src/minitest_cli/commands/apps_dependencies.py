@@ -7,6 +7,7 @@ import httpx
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.api.errors import format_network_error
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.core.config import Settings
@@ -108,7 +109,7 @@ def dependencies(
     try:
         graph = asyncio.run(_fetch())
     except httpx.HTTPError as exc:
-        print_error(f"Network error: {exc}")
+        print_error(format_network_error(exc))
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
     nodes: list[dict[str, Any]] = graph.get("nodes", [])

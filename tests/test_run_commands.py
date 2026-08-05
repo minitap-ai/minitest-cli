@@ -623,6 +623,27 @@ class TestStartCommand:
 
         assert result.exit_code == 3
 
+    def test_start_read_timeout_warns_the_batch_may_already_exist(self, tmp_path) -> None:
+        """A read timeout means the POST landed; retrying blindly duplicates the batch.
+
+        This is the incident that made ten identical batches: the CLI reported a
+        bare ``Network error:`` for each timed-out create, so the caller kept
+        retrying a request the server had already accepted.
+        """
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        request = httpx.Request("POST", "https://testing.example/api/v1/apps/a/batches")
+        client.post = AsyncMock(side_effect=httpx.ReadTimeout("", request=request))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS],
+                settings,
+            )
+
+        assert result.exit_code == 3
+        assert "may well have been applied" in " ".join(result.output.split())
+
     def test_start_requires_auth(self, tmp_path) -> None:
         """Missing auth token exits with code 2."""
         settings = _make_settings(tmp_path, token=None)

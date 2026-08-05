@@ -12,6 +12,7 @@ import httpx
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands import flow_types_write
 from minitest_cli.commands.flow_types_helpers import (
     BUILTIN_TYPES_PATH,
@@ -64,7 +65,7 @@ def list_flow_types() -> None:
     try:
         flow_types = asyncio.run(_run())
     except httpx.HTTPError as exc:
-        print_error(f"Network error: {exc}")
+        print_error(format_network_error(exc))
         raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
 
     if json_mode:

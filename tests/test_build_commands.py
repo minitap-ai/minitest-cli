@@ -79,6 +79,11 @@ class TestDetectPlatform:
         f.touch()
         assert detect_platform(f) == "ios"
 
+    def test_apks_returns_android(self, tmp_path: Path) -> None:
+        f = tmp_path / "build.apks"
+        f.touch()
+        assert detect_platform(f) == "android"
+
     def test_unknown_extension_exits(self, tmp_path: Path) -> None:
         f = tmp_path / "build.zip"
         f.touch()
@@ -223,6 +228,44 @@ def _mock_list_client(resp: MagicMock) -> AsyncMock:
 
 
 class TestUploadCommand:
+    def test_upload_apks_preserves_multipart_filename_bytes_and_platform(
+        self, tmp_path: Path
+    ) -> None:
+        build_file = tmp_path / "bundle.apks"
+        build_bytes = b"PK\x03\x04\x00binary-apks\xff"
+        build_file.write_bytes(build_bytes)
+        settings = _make_settings(tmp_path)
+        client = _mock_upload_client(_mock_response(200, _UPLOAD_RESPONSE))
+        captured: dict[str, object] = {}
+
+        async def capture_upload(*args, **kwargs):
+            filename, stream, content_type = kwargs["files"]["file"]
+            captured.update(
+                filename=filename,
+                bytes=stream.read(),
+                content_type=content_type,
+                platform=kwargs["data"]["platform"],
+            )
+            return _mock_response(200, _UPLOAD_RESPONSE)
+
+        client.upload_file.side_effect = capture_upload
+        with patch("minitest_cli.commands.build.ApiClient", return_value=client):
+            result = _run_with_context(["upload", str(build_file)], settings, json_mode=True)
+
+        assert result.exit_code == 0
+        assert captured == {
+            "filename": "bundle.apks",
+            "bytes": build_bytes,
+            "content_type": "application/octet-stream",
+            "platform": "android",
+        }
+
+    def test_upload_help_lists_apks(self) -> None:
+        result = runner.invoke(build_app, ["upload", "--help"])
+
+        assert result.exit_code == 0
+        assert ".apk, .apks, or .ipa" in result.output
+
     def test_upload_auto_detects_platform_and_posts_to_correct_endpoint(
         self, tmp_path: Path
     ) -> None:

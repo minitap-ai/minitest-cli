@@ -66,6 +66,8 @@ minitest apps create --name "My Web App" --platform web --web-url https://exampl
 
 # Upload native builds when testing iOS/Android apps
 minitest --app <app-id> build upload ./app-release.apk
+# Android App Bundle archives (.apks) are also accepted
+minitest --app <app-id> build upload ./app-release.apks
 
 # Run tests
 minitest --app <app-id> run all --web

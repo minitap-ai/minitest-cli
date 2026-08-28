@@ -154,6 +154,39 @@ class TestHandleResponseError:
             handle_response_error(resp)
         assert exc_info.value.exit_code == 3
 
+    def test_422_split_apks_backend_unsupported_exits_5(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        resp = _mock_response(
+            422,
+            {
+                "detail": (
+                    "Split APK archives (.apks) are not yet supported on this "
+                    "execution backend. Upload a single-APK build instead, or "
+                    "split the archive and upload one .apk per architecture."
+                )
+            },
+        )
+        with pytest.raises(Exit) as exc_info:
+            handle_response_error(resp)
+        assert exc_info.value.exit_code == 5
+        combined = (capsys.readouterr().err or "") + (capsys.readouterr().out or "")
+        # The pretty renderer surfaces the server message and adds a
+        # bundletool-based fix hint.
+        assert "Split APK archive" in combined
+        assert "bundletool" in combined.lower() or "universal" in combined.lower()
+
+    def test_422_split_apks_backend_unsupported_regex_is_narrow(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A 422 that just happens to mention split APKs but not the marker
+        must fall through to the generic (exit 3) handler — so a future
+        server message drift keeps working, just less prettily."""
+        resp = _mock_response(422, {"detail": "some other .apks-related error"})
+        with pytest.raises(Exit) as exc_info:
+            handle_response_error(resp)
+        assert exc_info.value.exit_code == 3
+
 
 class TestFormatPaginationInfo:
     def test_with_total_shows_page_and_range(self) -> None:

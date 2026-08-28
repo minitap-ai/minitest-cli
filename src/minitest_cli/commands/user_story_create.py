@@ -61,8 +61,20 @@ def create_user_story(
     camera_media: Annotated[
         str | None, typer.Option("--camera-media", help=CAMERA_MEDIA_HELP)
     ] = None,
+    idempotency_key: Annotated[
+        str | None,
+        typer.Option(
+            "--idempotency-key",
+            help="Opaque 1-255 character key for idempotent creation retries.",
+        ),
+    ] = None,
 ) -> None:
     """Create a new user story."""
+    if idempotency_key is not None and not 1 <= len(idempotency_key) <= 255:
+        raise typer.BadParameter(
+            "must contain between 1 and 255 characters",
+            param_hint="--idempotency-key",
+        )
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -89,7 +101,10 @@ def create_user_story(
                 payload["camera_media_file_id"] = await resolve_camera_media_file_id(
                     client, app_id, camera_source
                 )
-            resp = await client.post(base_path(app_id), json=payload)
+            request_options: dict[str, Any] = {"json": payload}
+            if idempotency_key is not None:
+                request_options["headers"] = {"Idempotency-Key": idempotency_key}
+            resp = await client.post(base_path(app_id), **request_options)
             handle_response_error(resp)
             created = resp.json()
             if depends_on:

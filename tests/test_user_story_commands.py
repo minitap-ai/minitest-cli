@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 import typer
+from click import unstyle
 from typer.testing import CliRunner
 
 from minitest_cli.commands.user_story import app as user_story_app
@@ -87,6 +88,17 @@ def _mock_response(status_code=200, json_data=None):
     return resp
 
 
+@contextmanager
+def _patch_http_transport(handler):
+    async_client = httpx.AsyncClient
+    transport = httpx.MockTransport(handler)
+    with patch(
+        "minitest_cli.api.client.httpx.AsyncClient",
+        side_effect=lambda **kwargs: async_client(**kwargs, transport=transport),
+    ):
+        yield
+
+
 SAMPLE_USER_STORY = {
     "id": "story-1",
     "name": "Login Story",
@@ -142,6 +154,100 @@ class TestCreateUserStory:
                 settings,
             )
         assert result.exit_code == 0
+
+    def test_absent_idempotency_key_preserves_legacy_request_and_human_output(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        requests = []
+
+        def handler(request):
+            requests.append(request)
+            return httpx.Response(
+                201,
+                json={"id": "legacy-story", "name": "Story", "type": "login"},
+            )
+
+        with _patch_flow_types(), _patch_http_transport(handler):
+            result = _run_with_context(["create", "--name", "Story", "--type", "login"], settings)
+
+        assert result.exit_code == 0
+        assert "Idempotency-Key" not in requests[0].headers
+        assert "id: legacy-story" in result.stdout
+        assert "User story created: legacy-story" in result.stderr
+
+    def test_idempotency_replay_and_conflict_follow_server_contract(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        key = "Draft-Operation-AbC"
+        requests = []
+        stored_payload = None
+        created = {
+            "id": "stable-story-id",
+            "acceptanceCriteria": [
+                {
+                    "id": "stable-criterion-version-id",
+                    "criterionId": "stable-criterion-id",
+                    "content": "The user can sign in.",
+                    "createdAt": "2026-08-28T20:00:00Z",
+                }
+            ],
+        }
+
+        def handler(request):
+            nonlocal stored_payload
+            requests.append(request)
+            payload = json.loads(request.content)
+            if stored_payload is None:
+                stored_payload = payload
+                return httpx.Response(201, json=created)
+            if payload == stored_payload:
+                return httpx.Response(201, json=created)
+            return httpx.Response(
+                409,
+                json={"detail": "Idempotency key is already used for a different request."},
+            )
+
+        base_args = ["create", "--name", "Story", "--type", "login", "--idempotency-key", key]
+        with _patch_flow_types(), _patch_http_transport(handler):
+            first = _run_with_context(base_args, settings, json_mode=True)
+            replay = _run_with_context(base_args, settings, json_mode=True)
+            conflict = _run_with_context(
+                [
+                    "create",
+                    "--name",
+                    "Different story",
+                    "--type",
+                    "login",
+                    "--idempotency-key",
+                    key,
+                ],
+                settings,
+                json_mode=True,
+            )
+
+        assert first.exit_code == replay.exit_code == 0
+        first_output = json.loads(first.stdout)
+        replay_output = json.loads(replay.stdout)
+        assert first_output == replay_output == created
+        assert replay_output["id"] == first_output["id"] == "stable-story-id"
+        assert replay_output["acceptanceCriteria"][0]["criterionId"] == "stable-criterion-id"
+        assert replay_output["acceptanceCriteria"][0]["id"] == "stable-criterion-version-id"
+        assert [request.headers["Idempotency-Key"] for request in requests] == [key, key, key]
+        assert conflict.exit_code == 3
+        assert conflict.stdout == ""
+        assert "already used for a different request" in conflict.stderr
+
+    @pytest.mark.parametrize("key", ["", "x" * 256])
+    def test_invalid_idempotency_key_is_rejected_locally(self, tmp_path, key):
+        settings = _make_settings(tmp_path)
+        with _patch_flow_types():
+            result = _run_with_context(
+                ["create", "--name", "Story", "--type", "login", "--idempotency-key", key],
+                settings,
+            )
+
+        assert result.exit_code == 2
+        plain_output = unstyle(result.output)
+        assert "Invalid value for --idempotency-key" in plain_output
+        assert "between 1 and 255" in plain_output
 
 
 class TestCreateUserStoryProfiles:

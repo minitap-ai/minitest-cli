@@ -106,6 +106,7 @@ minitest --app <app-id> run all --ios-build <ios-build-id> --android-build <andr
 | `minitest auth`  | Authentication management |
 | `minitest apps`  | App management            |
 | `minitest user-story` | User-story operations |
+| `minitest df`    | Draft features — branches of the test suite |
 | `minitest flow-types` | List flow types, create/rename/delete custom ones |
 | `minitest build` | Native iOS/Android build management |
 | `minitest run`   | Test execution for mobile and web lanes |

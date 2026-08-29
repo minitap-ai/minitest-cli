@@ -141,6 +141,15 @@ class TestCreate:
         assert result.exit_code == 0
         assert client.post.await_args.kwargs["json"] == {"title": "Checkout"}
 
+    def test_create_renders_an_absent_merge_timestamp_without_leaking_none(self, tmp_path):
+        """ "mergedAt: None" is a Python word reaching the terminal, not an answer."""
+        client = _mock_client(post=_mock_response(201, _FEATURE))
+        with patch("minitest_cli.commands.draft_feature.ApiClient", return_value=client):
+            result = _run(["create", "--title", "Checkout"], _make_settings(tmp_path))
+        assert result.exit_code == 0
+        assert "mergedAt: -" in _stdout(result)
+        assert "None" not in _stdout(result)
+
     def test_create_prints_the_new_id(self, tmp_path):
         client = _mock_client(post=_mock_response(201, _FEATURE))
         with patch("minitest_cli.commands.draft_feature.ApiClient", return_value=client):
@@ -183,7 +192,33 @@ class TestShow:
         with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
             result = _run(["show", _FEATURE_UUID], _make_settings(tmp_path))
         assert result.exit_code == 0
-        assert "mainRev 7" in _stdout(result)
+        assert "mainRev: 7" in _stdout(result)
+
+    def test_show_diff_keeps_main_rev_out_of_the_table_title(self, tmp_path):
+        """rich wraps a title to the table width, splitting it mid-value.
+
+        The changeset table is three narrow columns, so a title carrying the
+        cursor rendered as "Changeset - mainRev \\n 7, 1 op(s)" - and mainRev is
+        the one token the user has to copy verbatim into the next apply.
+        """
+        client = _mock_client(get=_mock_response(200, self._CHANGESET))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(["show", _FEATURE_UUID], _make_settings(tmp_path))
+        assert result.exit_code == 0
+        title = next(line for line in result.stdout.splitlines() if "Changeset" in line)
+        assert "mainRev" not in title
+        assert "mainRev: 7" in _stdout(result)
+
+    def test_show_auth_failure_does_not_look_like_a_transport_failure(self, tmp_path):
+        codes = {}
+        for label, response in (
+            ("unauthorized", _mock_response(401, {"detail": "Invalid or expired token"})),
+            ("transport", _mock_response(503, {"detail": "upstream unavailable"})),
+        ):
+            client = _mock_client(get=response)
+            with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+                codes[label] = _run(["show", _FEATURE_UUID], _make_settings(tmp_path)).exit_code
+        assert codes == {"unauthorized": 1, "transport": 3}
 
     def test_show_rejects_a_non_uuid_id_before_calling_the_api(self, tmp_path):
         client = _mock_client()
@@ -234,7 +269,70 @@ class TestApply:
         stdout = _stdout(result)
         assert "tmp-1" in stdout
         assert "s9" in stdout
-        assert "mainRev 7" in stdout
+        assert "mainRev: 7" in stdout
+
+    def test_apply_keeps_main_rev_out_of_the_table_title(self, tmp_path):
+        """Same trap as `df show`: rich wraps a narrow table's title mid-value.
+
+        The created-stories table is two short columns, so a title carrying the
+        cursor renders as "Applied - mainRev \\n 7, ..." - and mainRev is the one
+        token the caller has to copy verbatim into the next changeset.
+        """
+        path = self._write_changeset(tmp_path, json.dumps(self._BODY))
+        client = _mock_client(post=_mock_response(200, self._RESULT))
+        with patch("minitest_cli.commands.draft_feature_apply.ApiClient", return_value=client):
+            result = _run(
+                ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
+            )
+        assert result.exit_code == 0
+        title = next(line for line in result.stdout.splitlines() if "Applied" in line)
+        assert "mainRev" not in title
+        assert "mainRev: 7" in _stdout(result)
+
+    def test_apply_auth_failure_does_not_look_like_a_transport_failure(self, tmp_path):
+        """A caller that retries blind on 3 would loop forever on a rejected key.
+
+        Rejected credentials are not retryable, so they must not share the exit
+        code that tells a script to try the same request again.
+        """
+        path = self._write_changeset(tmp_path, json.dumps(self._BODY))
+        codes = {}
+        for label, response in (
+            ("unauthorized", _mock_response(401, {"detail": "Invalid or expired token"})),
+            ("forbidden", _mock_response(403, {"detail": "Not your tenant"})),
+            ("transport", _mock_response(503, {"detail": "upstream unavailable"})),
+        ):
+            client = _mock_client(post=response)
+            with patch("minitest_cli.commands.draft_feature_apply.ApiClient", return_value=client):
+                codes[label] = _run(
+                    ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
+                ).exit_code
+        assert codes == {"unauthorized": 1, "forbidden": 1, "transport": 3}
+
+    def test_apply_auth_failure_names_the_cause_and_surfaces_the_server_message(self, tmp_path):
+        path = self._write_changeset(tmp_path, json.dumps(self._BODY))
+        client = _mock_client(post=_mock_response(401, {"detail": "Invalid or expired token"}))
+        with patch("minitest_cli.commands.draft_feature_apply.ApiClient", return_value=client):
+            result = _run(
+                ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
+            )
+        assert result.exit_code == 1
+        assert "Authentication failed (401)" in _text(result)
+        assert "Invalid or expired token" in _text(result)
+
+    def test_apply_non_utf8_changeset_file_reports_a_readable_error(self, tmp_path):
+        """UnicodeDecodeError is a ValueError, so an OSError-only guard lets it escape."""
+        path = tmp_path / "changeset.json"
+        path.write_bytes(b'{"expectedMainRev": 7, "note": "caf\xe9"}')
+        client = _mock_client()
+        with patch("minitest_cli.commands.draft_feature_apply.ApiClient", return_value=client):
+            result = _run(
+                ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
+            )
+        assert result.exit_code == 1
+        assert "Could not read changeset file" in _text(result)
+        assert not isinstance(result.exception, UnicodeDecodeError)
+        client.post.assert_not_awaited()
 
     def test_apply_missing_file_reports_a_readable_error(self, tmp_path):
         client = _mock_client()
@@ -277,8 +375,37 @@ class TestApply:
             result = _run(
                 ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
             )
-        assert result.exit_code == 3
+        assert result.exit_code == 6
         assert "main suite moved to rev 5 since rev 3" in _text(result)
+
+    def test_apply_conflict_does_not_look_like_a_transport_failure(self, tmp_path):
+        """A caller that retries blind on 3 would loop forever on a stale read.
+
+        The two are told apart by exit code alone, because that is all a script
+        checks: 409 asks for a re-read and one retry, 5xx asks for a plain retry.
+        """
+        path = self._write_changeset(tmp_path, json.dumps(self._BODY))
+        codes = {}
+        for label, response in (
+            ("conflict", _mock_response(409, {"detail": "main suite moved"})),
+            ("transport", _mock_response(503, {"detail": "upstream unavailable"})),
+        ):
+            client = _mock_client(post=response)
+            with patch("minitest_cli.commands.draft_feature_apply.ApiClient", return_value=client):
+                codes[label] = _run(
+                    ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
+                ).exit_code
+        assert codes == {"conflict": 6, "transport": 3}
+
+    def test_apply_conflict_tells_the_caller_how_to_recover(self, tmp_path):
+        path = self._write_changeset(tmp_path, json.dumps(self._BODY))
+        client = _mock_client(post=_mock_response(409, {"detail": "main suite moved"}))
+        with patch("minitest_cli.commands.draft_feature_apply.ApiClient", return_value=client):
+            result = _run(
+                ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
+            )
+        assert result.exit_code == 6
+        assert "df show --view diff" in _text(result)
 
 
 class TestDelete:

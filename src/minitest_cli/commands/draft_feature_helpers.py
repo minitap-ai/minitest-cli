@@ -8,11 +8,13 @@ import httpx
 import typer
 
 from minitest_cli.models.draft_feature import DraftFeatureResponse
-from minitest_cli.utils.output import print_error
+from minitest_cli.utils.output import print_error, print_info
 
 EXIT_GENERAL_ERROR = 1
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
+# 5 is taken by build-invalid (see commands/_response_errors.py).
+EXIT_CONFLICT = 6
 
 DRAFT_FEATURE_TABLE_HEADERS = ["ID", "Title", "Status", "Rebase", "Description"]
 CHANGESET_TABLE_HEADERS = ["#", "Op", "Payload"]
@@ -36,10 +38,29 @@ def extract_detail(resp: httpx.Response) -> str | None:
 
 
 def handle_response_error(resp: httpx.Response, *, resource: str = "Draft feature") -> None:
+    """Map an error response to the exit code that tells the caller what to do next.
+
+    A 409 gets its own code because the recovery is specific and bounded: re-read
+    the branch, rebuild the changeset on the mainRev it hands back, and apply
+    once more. Folded into the network code, it looks like a transport blip, and
+    a caller that retries blind on transport blips retries a staleness conflict
+    forever with the same stale body. A 401/403 is split off the network code for
+    the same reason, and maps to the general-error code the other command helpers
+    already use for rejected credentials.
+    """
     if resp.status_code == 404:
         detail = extract_detail(resp)
         print_error(detail or f"{resource} not found.")
         raise typer.Exit(code=EXIT_NOT_FOUND)
+    if resp.status_code in (401, 403):
+        detail = extract_detail(resp) or "credentials rejected."
+        print_error(f"Authentication failed ({resp.status_code}): {detail}")
+        raise typer.Exit(code=EXIT_GENERAL_ERROR)
+    if resp.status_code == 409:
+        detail = extract_detail(resp)
+        print_error(detail or f"{resource} changed since it was read.")
+        print_info("Re-run `df show --view diff`, rebuild against the mainRev it returns, retry.")
+        raise typer.Exit(code=EXIT_CONFLICT)
     if resp.status_code >= 400:
         detail = extract_detail(resp)
         print_error(detail or f"API error: {resp.status_code}")
@@ -65,7 +86,9 @@ def read_changeset_file(path: Path) -> dict[str, Any]:
     """Load an apply request body from disk, refusing anything the API cannot accept."""
     try:
         payload = json.loads(path.read_text())
-    except OSError as exc:
+    # UnicodeDecodeError is a ValueError, not an OSError: dropped from this tuple,
+    # a non-UTF-8 changeset file crashes with a traceback instead of exiting 1.
+    except (OSError, UnicodeDecodeError) as exc:
         print_error(f"Could not read changeset file '{path}': {exc}")
         raise typer.Exit(code=EXIT_GENERAL_ERROR) from exc
     except json.JSONDecodeError as exc:

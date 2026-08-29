@@ -29,6 +29,16 @@ def _to_jsonable(data: Any) -> Any:
 err_console = Console(stderr=True)
 
 
+def _display(value: Any) -> str:
+    """Render one value for a human reader.
+
+    ``None`` is a Python word, not an answer. Rendered raw it reads as a string
+    the server sent ("mergedAt: None"), so an absent optional shows as a dash
+    instead — the same in a table cell and in a key/value line.
+    """
+    return "-" if value is None else str(value)
+
+
 def print_json(data: Any) -> None:
     """Print a JSON-serialisable object to stdout (camelCase for Pydantic models)."""
     print(json.dumps(_to_jsonable(data), indent=2, default=str))  # noqa: T201
@@ -84,10 +94,10 @@ def output(data: Any, *, json_mode: bool, headers: list[str] | None = None) -> N
 
     if isinstance(data, list) and data and isinstance(data[0], dict):
         keys = headers or list(data[0].keys())
-        rows = [[str(item.get(k, "")) for k in keys] for item in data]
+        rows = [[_display(item.get(k)) for k in keys] for item in data]
         print_table(keys, rows)
     elif isinstance(data, dict):
         for key, value in data.items():
-            print(f"{key}: {value}", file=sys.stdout)  # noqa: T201
+            print(f"{key}: {_display(value)}", file=sys.stdout)  # noqa: T201
     else:
         print(data, file=sys.stdout)  # noqa: T201

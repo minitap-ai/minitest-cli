@@ -136,13 +136,15 @@ minitest maintenance apply --review
 
 ## Exit Codes
 
-| Code | Meaning              |
-| ---- | -------------------- |
-| 0    | Success              |
-| 1    | General error        |
-| 2    | Authentication error |
-| 3    | Network / API error  |
-| 4    | Resource not found   |
+| Code | Meaning                                            |
+| ---- | -------------------------------------------------- |
+| 0    | Success                                            |
+| 1    | General error                                      |
+| 2    | Authentication error                               |
+| 3    | Network / API error                                |
+| 4    | Resource not found                                 |
+| 5    | Build rejected as invalid                          |
+| 6    | Conflict — re-read, rebuild, retry once            |
 
 ## Using the Dev Environment
 

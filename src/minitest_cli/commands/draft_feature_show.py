@@ -73,11 +73,10 @@ def _print_changeset(changeset: DraftFeatureChangesetResponse, *, json_mode: boo
     print_info(f"{feature.title} — {feature.status.value}, rebase {feature.rebase_state.value}")
     print_info("Hand mainRev back as expectedMainRev when applying, or the apply is refused.")
     rows = [format_changeset_op_row(i, op) for i, op in enumerate(changeset.ops, start=1)]
-    print_table(
-        CHANGESET_TABLE_HEADERS,
-        rows,
-        title=f"Changeset — mainRev {changeset.main_rev}, {len(rows)} op(s)",
-    )
+    # Put mainRev back in the title and rich wraps it to the narrow table's width,
+    # splitting the token the caller must copy verbatim ("mainRev \n 4").
+    print_table(CHANGESET_TABLE_HEADERS, rows, title=f"Changeset — {len(rows)} op(s)")
+    output({"mainRev": changeset.main_rev}, json_mode=False)
 
 
 def _print_effective_suite(suite: EffectiveSuiteResponse, *, json_mode: bool) -> None:

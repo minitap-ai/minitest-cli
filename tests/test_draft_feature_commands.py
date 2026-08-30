@@ -228,6 +228,165 @@ class TestShow:
         client.get.assert_not_awaited()
 
 
+class TestShowConflicts:
+    """`df show --view conflicts` is what T7 specifies as the resolver's input.
+
+    The payload below is the shape ``draft_feature_conflicts`` really emits (see
+    the testing-service integration suite): ``fields`` names keys of a flat story
+    tuple, and ``base`` / ``main`` / ``branch`` carry that tuple with its inner
+    keys in the apply vocabulary — which is why they are passed through rather
+    than camelCased with the envelope.
+    """
+
+    _REPORT = {
+        "draftFeatureId": _FEATURE_UUID,
+        "rebaseState": "conflicts",
+        "rebasedToMainRev": 2,
+        "mainRev": 4,
+        "conflicts": [
+            {
+                "kind": "story_field_edit_edit",
+                "reason": "both sides changed the same story fields",
+                "storyId": "3ff0cb0e-f8d4-46e0-b079-7e3dbeb023fc",
+                "slotId": "036f3984-0de9-44ba-ad50-090e146a73fd",
+                "criterionId": None,
+                "baseCriterionId": None,
+                "fields": ["test_profile_ids", "name"],
+                "path": [],
+                "base": {"name": "as pinned", "test_profile_ids": [], "device_count": None},
+                "main": {
+                    "name": "as pinned",
+                    "test_profile_ids": ["890408de-83ac-4d7e-a3ab-a310d603f02f"],
+                    "device_count": None,
+                },
+                "branch": {
+                    "name": "renamed on the branch",
+                    "test_profile_ids": [],
+                    "device_count": None,
+                },
+            },
+            {
+                "kind": "override_over_deleted_main",
+                "reason": "main deleted a story the branch edits",
+                "storyId": "11111111-1111-1111-1111-111111111111",
+                "slotId": None,
+                "criterionId": None,
+                "baseCriterionId": None,
+                "fields": [],
+                "path": [],
+                "base": {"name": "gone from main"},
+                "main": None,
+                "branch": {"name": "kept on the branch"},
+            },
+        ],
+    }
+
+    def test_conflicts_reads_the_conflicts_endpoint(self, tmp_path):
+        client = _mock_client(get=_mock_response(200, self._REPORT))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(
+                ["show", _FEATURE_UUID, "--view", "conflicts"],
+                _make_settings(tmp_path),
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        assert client.get.await_args.args[0] == f"{_BASE}/{_FEATURE_UUID}/conflicts"
+
+    def test_json_hands_back_the_server_structure_unchanged(self, tmp_path):
+        """An agent resolves by copying a side into an op, so nothing may be reshaped.
+
+        Asserting equality with the whole server payload — not a field of it —
+        is what catches a model that drops a key, camelCases an inner one, or
+        turns an absent side into an empty object.
+        """
+        client = _mock_client(get=_mock_response(200, self._REPORT))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(
+                ["show", _FEATURE_UUID, "--view", "conflicts"],
+                _make_settings(tmp_path),
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        assert json.loads(result.stdout) == self._REPORT
+
+    def test_a_copied_main_value_is_appliable_as_a_story_edit(self, tmp_path):
+        """The recipe the command documents, executed against its own output.
+
+        `df apply` sends the file through unchanged, so what this pins is that
+        `--json` yields the keys that recipe reads: the disputed key names, and a
+        `main` carrying a value for each of them.
+        """
+        client = _mock_client(get=_mock_response(200, self._REPORT))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(
+                ["show", _FEATURE_UUID, "--view", "conflicts"],
+                _make_settings(tmp_path),
+                json_mode=True,
+            )
+        report = json.loads(result.stdout)
+        conflict = report["conflicts"][0]
+        resolution = {
+            "expectedMainRev": report["mainRev"],
+            "ops": [
+                {
+                    "op": "story.edit",
+                    "storyId": conflict["storyId"],
+                    "fields": {key: conflict["main"][key] for key in conflict["fields"]},
+                }
+            ],
+        }
+        assert resolution["expectedMainRev"] == 4
+        assert resolution["ops"][0]["fields"] == {
+            "test_profile_ids": ["890408de-83ac-4d7e-a3ab-a310d603f02f"],
+            "name": "as pinned",
+        }
+
+    def test_conflicts_keeps_main_rev_out_of_the_table_titles(self, tmp_path):
+        """Same wrap hazard as the changeset view, and the same token at stake."""
+        client = _mock_client(get=_mock_response(200, self._REPORT))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(["show", _FEATURE_UUID, "--view", "conflicts"], _make_settings(tmp_path))
+        assert result.exit_code == 0
+        titles = [
+            line for line in result.stdout.splitlines() if "Conflicts" in line or "sides" in line
+        ]
+        assert titles
+        assert all("mainRev" not in title for title in titles)
+        assert "mainRev: 4" in _stdout(result)
+
+    def test_a_side_with_no_version_is_not_rendered_as_a_null_value(self, tmp_path):
+        """ "main deleted it" and "main set it to null" need different resolutions."""
+        client = _mock_client(get=_mock_response(200, self._REPORT))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(["show", _FEATURE_UUID, "--view", "conflicts"], _make_settings(tmp_path))
+        assert result.exit_code == 0
+        assert "(no version)" in _stdout(result)
+
+    def test_every_disputed_key_and_side_reaches_stdout(self, tmp_path):
+        client = _mock_client(get=_mock_response(200, self._REPORT))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(["show", _FEATURE_UUID, "--view", "conflicts"], _make_settings(tmp_path))
+        out = _stdout(result)
+        assert "test_profile_ids" in out
+        assert "story_field_edit_edit" in out
+        assert "renamed on the branch" in out
+
+    def test_an_empty_report_still_publishes_the_cursor(self, tmp_path):
+        """A branch with nothing in dispute is the normal case, and mainRev is the next step."""
+        empty = {**self._REPORT, "rebaseState": "in_sync", "conflicts": []}
+        client = _mock_client(get=_mock_response(200, empty))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(["show", _FEATURE_UUID, "--view", "conflicts"], _make_settings(tmp_path))
+        assert result.exit_code == 0
+        assert "mainRev: 4" in _stdout(result)
+
+    def test_conflicts_maps_a_missing_branch_to_the_not_found_code(self, tmp_path):
+        client = _mock_client(get=_mock_response(404, {"detail": "Draft feature not found"}))
+        with patch("minitest_cli.commands.draft_feature_show.ApiClient", return_value=client):
+            result = _run(["show", _FEATURE_UUID, "--view", "conflicts"], _make_settings(tmp_path))
+        assert result.exit_code == 4
+
+
 class TestApply:
     _RESULT = {
         "draftFeatureId": _FEATURE_UUID,

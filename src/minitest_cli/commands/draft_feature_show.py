@@ -1,4 +1,4 @@
-"""`minitest df show` — read a branch as a diff against main, or as the suite it would run."""
+"""`minitest df show` — read a branch as a diff, as the suite it would run, or as its conflicts."""
 
 from enum import StrEnum
 from typing import Annotated
@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.draft_feature_conflicts import print_conflicts
 from minitest_cli.commands.draft_feature_helpers import (
     CHANGESET_TABLE_HEADERS,
     EFFECTIVE_EDGE_HEADERS,
@@ -17,6 +18,7 @@ from minitest_cli.commands.draft_feature_helpers import (
 from minitest_cli.commands.run_helpers import ensure_uuid, resolve_app, run_api_call
 from minitest_cli.models.draft_feature import (
     DraftFeatureChangesetResponse,
+    DraftFeatureConflictsResponse,
     EffectiveSuiteResponse,
 )
 from minitest_cli.utils.output import output, print_info, print_table
@@ -25,6 +27,7 @@ from minitest_cli.utils.output import output, print_info, print_table
 class ChangesetView(StrEnum):
     diff = "diff"
     effective = "effective"
+    conflicts = "conflicts"
 
 
 def register(app: typer.Typer) -> None:
@@ -35,14 +38,28 @@ def register(app: typer.Typer) -> None:
             ChangesetView,
             typer.Option(
                 "--view",
-                help="diff: what the branch changes. effective: the suite it would run.",
+                help=(
+                    "diff: what the branch changes. effective: the suite it would run. "
+                    "conflicts: what a rebase could not settle."
+                ),
             ),
         ] = ChangesetView.diff,
     ) -> None:
-        """Show a branch as a changeset against main, or as its effective suite."""
+        """Show a branch as a changeset, as its effective suite, or as its conflicts."""
         settings, app_id, json_mode = resolve_app()
         ensure_uuid(draft_feature_id, kind="draft feature id")
         feature_path = f"{base_path(app_id)}/{draft_feature_id}"
+
+        if view is ChangesetView.conflicts:
+
+            async def _conflicts() -> DraftFeatureConflictsResponse:
+                async with ApiClient(settings) as client:
+                    resp = await client.get(f"{feature_path}/conflicts")
+                    handle_response_error(resp)
+                    return DraftFeatureConflictsResponse.model_validate(resp.json())
+
+            print_conflicts(run_api_call(_conflicts()), json_mode=json_mode)
+            return
 
         if view is ChangesetView.effective:
 

@@ -1,10 +1,11 @@
-"""Commands for reading app findings and their fix prompts."""
+"""Commands for reading app findings, their fix prompts, and closing them."""
 
 from enum import StrEnum
 from typing import Annotated
 
 import typer
 
+from minitest_cli.commands.issues_fix import fix
 from minitest_cli.commands.issues_service import collect_issues
 from minitest_cli.commands.run_helpers import ensure_uuid, resolve_app, run_api_call
 from minitest_cli.utils.output import print_error, print_json
@@ -21,7 +22,10 @@ class IssueCriticality(StrEnum):
     warning = "warning"
 
 
-app = typer.Typer(name="issues", help="Read app findings and fix prompts.", no_args_is_help=True)
+app = typer.Typer(
+    name="issues", help="Read app findings, fix prompts, and mark them fixed.", no_args_is_help=True
+)
+app.command()(fix)
 
 
 @app.command("list")

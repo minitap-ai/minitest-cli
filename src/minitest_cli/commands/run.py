@@ -22,6 +22,7 @@ from minitest_cli.commands.run_helpers import (
     RUN_TABLE_HEADERS,
     TERMINAL_STATUSES,
 )
+from minitest_cli.commands.run_commit import from_commit
 from minitest_cli.commands.run_targets import (
     AndroidBuildOpt,
     build_targets,
@@ -192,5 +193,6 @@ def run_all(
     )
 
 
+app.command(name="from-commit")(from_commit)
 app.command(name="verdicts")(verdicts)
 app.command(name="feedback")(feedback)

@@ -52,7 +52,7 @@ def get_app_flag() -> str | None:
 
 
 def resolve_app() -> tuple[Settings, str, bool]:
-    """Return (settings, app_id, json_mode) — exits on auth/app failure."""
+    """Return (settings, app_id, json_mode), exiting on auth/app failure."""
     from minitest_cli.core.auth import require_auth
 
     settings = get_settings()
@@ -114,13 +114,13 @@ def run_api_call[T](coro: Coroutine[object, object, T]) -> T:
 # Formatting
 # ---------------------------------------------------------------------------
 
-BUILD_TABLE_HEADERS = ["ID", "Platform", "Filename", "Size", "Created"]
+BUILD_TABLE_HEADERS = ["ID", "Platform", "Status", "Commit", "Filename", "Size", "Created"]
 
 
 def format_file_size(size_bytes: int | float | None) -> str:
     """Format bytes into a human-readable string."""
     if size_bytes is None:
-        return "—"
+        return "-"
     size = float(size_bytes)
     for unit in ("B", "KB", "MB", "GB"):
         if size < 1024:
@@ -133,8 +133,10 @@ def format_build_row(build: BuildResponse) -> list[str]:
     """Format a single BuildResponse as a table row."""
     return [
         build.id,
-        build.platform,
-        build.original_name,
+        build.platform or build.kind or "-",
+        build.status or "-",
+        (build.commit_sha or "")[:7] or "-",
+        build.original_name or "-",
         format_file_size(build.size_bytes),
         build.created_at.strftime("%Y-%m-%d %H:%M"),
     ]
@@ -145,7 +147,7 @@ def format_pagination_info(data: BuildListResponse) -> tuple[str, str]:
     total_pages = math.ceil(data.total / data.page_size)
     start = (data.page - 1) * data.page_size + 1
     end = min(data.page * data.page_size, data.total)
-    title = f"Builds — page {data.page} of {total_pages}, showing {start}–{end} of {data.total}"
+    title = f"Builds: page {data.page} of {total_pages}, showing {start}-{end} of {data.total}"
 
     tip = ""
     if data.page < total_pages:

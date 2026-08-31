@@ -19,6 +19,7 @@ from minitest_cli.models.batch import (
     UserStoryTypeBreakdownEntry,
 )
 from minitest_cli.models.build import BuildListResponse, BuildResponse
+from minitest_cli.models.commit_build import TriggerBuildResponse, TriggeredBuild
 from minitest_cli.models.story_run import (
     CriterionResult,
     PlatformRun,
@@ -50,6 +51,8 @@ __all__ = [
     "BatchTarget",
     "BatchTargetView",
     "BuildListResponse",
+    "TriggerBuildResponse",
+    "TriggeredBuild",
     "BuildResponse",
     "CamelModel",
     "CreateBatchRequest",

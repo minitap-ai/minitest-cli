@@ -1,7 +1,7 @@
 """Build management commands: upload, list."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -19,6 +19,8 @@ from minitest_cli.commands.build_helpers import (
     run_api_call,
     upload_status_message,
 )
+from minitest_cli.commands.build_commit import from_commit
+from minitest_cli.commands.build_fix_prompts import print_fix_prompts, redacted_payload
 from minitest_cli.models import BuildListResponse, BuildResponse
 from minitest_cli.utils.output import (
     err_console,
@@ -93,6 +95,13 @@ def list_builds(
         Platform | None,
         typer.Option(help="Filter by platform."),
     ] = None,
+    status: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--status", help="Filter by build status. Repeatable. Defaults to completed only."
+        ),
+    ] = None,
+    kind: Annotated[str | None, typer.Option(help="Filter by build kind (native or web).")] = None,
     all_pages: Annotated[bool, typer.Option("--all", help="Fetch all results.")] = False,
 ) -> None:
     """List builds for the active app."""
@@ -103,9 +112,13 @@ def list_builds(
         page, page_size = 1, 100
 
     async def _run() -> BuildListResponse:
-        params: dict[str, str | int] = {"page": page, "page_size": page_size}
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
         if platform_value is not None:
             params["platform"] = platform_value
+        if kind is not None:
+            params["kind"] = kind
+        if status:
+            params["status"] = status
 
         async with ApiClient(settings) as client:
             resp = await client.get(f"{base_path(app_id)}/builds", params=params)
@@ -115,7 +128,7 @@ def list_builds(
     result = run_api_call(_run())
 
     if json_mode:
-        output(result.model_dump(mode="json", by_alias=True), json_mode=True)
+        output(redacted_payload(result), json_mode=True)
         return
 
     if not result.items:
@@ -127,3 +140,7 @@ def list_builds(
     print_table(BUILD_TABLE_HEADERS, rows, title=title)
     if tip:
         print_info(tip)
+    print_fix_prompts(result.items)
+
+
+app.command(name="from-commit")(from_commit)

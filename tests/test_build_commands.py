@@ -93,7 +93,7 @@ class TestDetectPlatform:
 
 class TestFormatFileSize:
     def test_none_returns_dash(self) -> None:
-        assert format_file_size(None) == "—"
+        assert format_file_size(None) == "-"
 
 
 class TestFormatBuildRow:
@@ -103,6 +103,8 @@ class TestFormatBuildRow:
                 "id": "b1",
                 "appId": "app-1",
                 "platform": "android",
+                "status": "completed",
+                "commitSha": "2c589b1b370be5397f6d8774940c989e9110a625",
                 "storagePath": "/builds/b1.apk",
                 "originalName": "app.apk",
                 "sizeBytes": 1024,
@@ -112,9 +114,11 @@ class TestFormatBuildRow:
         row = format_build_row(build)
         assert row[0] == "b1"
         assert row[1] == "android"
-        assert row[2] == "app.apk"
-        assert row[3] == "1.0 KB"
-        assert "2025-01-01" in row[4]
+        assert row[2] == "completed"
+        assert row[3] == "2c589b1"
+        assert row[4] == "app.apk"
+        assert row[5] == "1.0 KB"
+        assert "2025-01-01" in row[6]
 
 
 class TestHandleResponseError:
@@ -193,7 +197,7 @@ class TestFormatPaginationInfo:
         data = BuildListResponse(items=[], total=50, page=1, page_size=20)
         title, tip = format_pagination_info(data)
         assert "page 1 of 3" in title
-        assert "1–20 of 50" in title
+        assert "1-20 of 50" in title
         assert "--page 2" in tip
 
     def test_last_page_no_next_tip(self) -> None:

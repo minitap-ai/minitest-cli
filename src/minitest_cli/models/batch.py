@@ -83,6 +83,7 @@ class CreateBatchRequest(CamelModel):
 
     user_story_ids: list[str] | None = None
     targets: list[BatchTarget] | None = None
+    platforms: list[str] | None = None
     commit_sha: str | None = None
     tag_name: str | None = None
 

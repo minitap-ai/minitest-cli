@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from minitest_cli.models.base import CamelModel
+from minitest_cli.models.build import BuildContext
 from minitest_cli.models.story_run import StoryRunResponse
 from minitest_cli.models.targets import BatchTarget
 
@@ -58,6 +59,7 @@ class BatchTargetView(CamelModel):
     viewport: str | None = None
     label: str
     counters: BatchCounters = BatchCounters()
+    build_context: BuildContext | None = None
 
 
 class GitHubContextResponse(CamelModel):

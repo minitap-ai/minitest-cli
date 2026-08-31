@@ -16,6 +16,7 @@ from minitest_cli.commands import (
     env,
     flow_types,
     init,
+    issues,
     maintenance,
     run,
     skill,
@@ -35,7 +36,6 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
-# Register command groups
 app.add_typer(init.app)
 app.add_typer(auth.app)
 app.add_typer(apps.app)
@@ -50,6 +50,7 @@ app.add_typer(app_knowledge.app)
 app.add_typer(build.app)
 app.add_typer(env.app)
 app.add_typer(run.app)
+app.add_typer(issues.app)
 app.add_typer(maintenance.app)
 app.add_typer(batch.app)
 app.add_typer(skill.app)

@@ -160,37 +160,6 @@ class TestIssueScopes:
         assert result.exit_code == 1
         assert "Choose only one scope" in result.stderr
 
-    def test_a_batch_id_passed_as_a_run_names_the_mistake(self):
-        """The webapp shows a run at /test/runs/<batch-id>, so this is the
-        mistake anybody copying that URL makes."""
-        with _api_server() as api_url:
-            result = CliRunner(env={"MINITEST_API_URL": api_url, "MINITEST_TOKEN": "token"}).invoke(
-                cli, ["--app", APP_ID, "issues", "list", "--run", BATCH_ID]
-            )
-
-        assert result.exit_code == 4
-        # Rich wraps the message, so compare on collapsed whitespace.
-        said = " ".join(result.stderr.split())
-        assert f"{BATCH_ID} is a batch id, not a story-run id" in said
-        assert f"--batch {BATCH_ID}" in said
-
-    def test_an_id_that_is_nothing_still_reads_as_not_found(self):
-        with _api_server() as api_url:
-            result = CliRunner(env={"MINITEST_API_URL": api_url, "MINITEST_TOKEN": "token"}).invoke(
-                cli,
-                [
-                    "--app",
-                    APP_ID,
-                    "issues",
-                    "list",
-                    "--run",
-                    "ffffffff-ffff-ffff-ffff-ffffffffffff",
-                ],
-            )
-
-        assert result.exit_code == 4
-        assert "is a batch id" not in result.stderr
-
 
 class TestBuildProjection:
     def test_build_uses_exact_provenance_tiers(self):

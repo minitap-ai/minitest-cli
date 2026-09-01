@@ -2,10 +2,8 @@
 
 import asyncio
 import httpx
-import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands._response_errors import EXIT_NOT_FOUND
 from minitest_cli.commands.run_helpers import handle_response_error
 from minitest_cli.models.app_failure import (
     AppFailure,
@@ -13,7 +11,6 @@ from minitest_cli.models.app_failure import (
     AppFailureListResponse,
 )
 from minitest_cli.models.batch import BatchListResponse, BatchResponse
-from minitest_cli.utils.output import err_console, print_error
 
 PAGE_SIZE = 100
 MAX_PAGES = 50
@@ -105,27 +102,9 @@ async def fetch_latest_batch(client: ApiClient, app_id: str) -> BatchResponse | 
 
 async def fetch_story_run_batch_id(client: ApiClient, app_id: str, story_run_id: str) -> str | None:
     resp = await client.get(f"/api/v1/apps/{app_id}/story-runs/{story_run_id}")
-    if resp.status_code == httpx.codes.NOT_FOUND:
-        await _reject_batch_id_passed_as_run(client, app_id, story_run_id)
     handle_response_error(resp, resource="Run")
     batch_id = resp.json().get("batchId")
     return str(batch_id) if batch_id else None
-
-
-async def _reject_batch_id_passed_as_run(client: ApiClient, app_id: str, given_id: str) -> None:
-    """Name the mistake when ``--run`` was handed a batch id.
-
-    The webapp shows a run at ``/test/runs/<id>``, but that id is the *batch*.
-    Anybody who copies the URL — a person or an agent reading it — reaches for
-    ``--run`` and gets "not found", which says nothing about what to do next.
-    Checking costs one request on a path that has already failed.
-    """
-    if await fetch_optional_batch(client, app_id, given_id) is None:
-        return
-    print_error(f"Run not found: {given_id} is a batch id, not a story-run id.")
-    err_console.print("  [dim]The webapp path[/dim] /test/runs/<id> [dim]carries a batch id.[/dim]")
-    err_console.print(f"  [yellow]Try:[/yellow] [bold]--batch {given_id}[/bold]")
-    raise typer.Exit(code=EXIT_NOT_FOUND)
 
 
 async def fetch_batch_ids(client: ApiClient, app_id: str) -> list[str]:

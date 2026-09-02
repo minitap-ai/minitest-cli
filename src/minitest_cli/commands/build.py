@@ -8,6 +8,8 @@ import typer
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.build_helpers import (
     BUILD_TABLE_HEADERS,
+    BuildKindFilter,
+    BuildStatusFilter,
     Platform,
     base_path,
     detect_platform,
@@ -96,12 +98,12 @@ def list_builds(
         typer.Option(help="Filter by platform."),
     ] = None,
     status: Annotated[
-        list[str] | None,
+        list[BuildStatusFilter] | None,
         typer.Option(
             "--status", help="Filter by build status. Repeatable. Defaults to completed only."
         ),
     ] = None,
-    kind: Annotated[str | None, typer.Option(help="Filter by build kind (native or web).")] = None,
+    kind: Annotated[BuildKindFilter | None, typer.Option(help="Filter by build kind.")] = None,
     all_pages: Annotated[bool, typer.Option("--all", help="Fetch all results.")] = False,
 ) -> None:
     """List builds for the active app."""
@@ -116,9 +118,9 @@ def list_builds(
         if platform_value is not None:
             params["platform"] = platform_value
         if kind is not None:
-            params["kind"] = kind
+            params["kind"] = kind.value
         if status:
-            params["status"] = status
+            params["status"] = [s.value for s in status]
 
         async with ApiClient(settings) as client:
             resp = await client.get(f"{base_path(app_id)}/builds", params=params)

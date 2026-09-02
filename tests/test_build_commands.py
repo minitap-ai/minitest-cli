@@ -554,3 +554,39 @@ class TestListBuildsCommand:
         params = client.get.call_args[1]["params"]
         assert params["page"] == 1
         assert params["page_size"] == 100
+
+    def test_list_status_and_kind_forwarded_as_values(self, tmp_path: Path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_list_client(_mock_response(200, _LIST_DATA))
+
+        with patch("minitest_cli.commands.build.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["list", "--status", "pending", "--status", "completed", "--kind", "web"],
+                settings,
+                json_mode=True,
+            )
+
+        assert result.exit_code == 0
+        params = client.get.call_args[1]["params"]
+        assert params["status"] == ["pending", "completed"]
+        assert params["kind"] == "web"
+
+    def test_list_invalid_status_rejected_client_side(self, tmp_path: Path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_list_client(_mock_response(200, _LIST_DATA))
+
+        with patch("minitest_cli.commands.build.ApiClient", return_value=client):
+            result = _run_with_context(["list", "--status", "running"], settings)
+
+        assert result.exit_code != 0
+        client.get.assert_not_called()
+
+    def test_list_invalid_kind_rejected_client_side(self, tmp_path: Path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_list_client(_mock_response(200, _LIST_DATA))
+
+        with patch("minitest_cli.commands.build.ApiClient", return_value=client):
+            result = _run_with_context(["list", "--kind", "bogus"], settings)
+
+        assert result.exit_code != 0
+        client.get.assert_not_called()

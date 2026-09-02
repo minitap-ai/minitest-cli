@@ -10,6 +10,7 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.api.errors import format_network_error
+from minitest_cli.commands._response_errors import format_validation_field_errors
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.config import Settings
 from minitest_cli.models.story_run import (
@@ -84,7 +85,8 @@ def extract_detail(resp: httpx.Response) -> str | None:
     try:
         body = resp.json()
         if isinstance(body, dict):
-            return body.get("detail") or body.get("message")
+            field_errors = format_validation_field_errors(body)
+            return field_errors or body.get("detail") or body.get("message")
     except Exception:  # noqa: BLE001
         pass
     return None

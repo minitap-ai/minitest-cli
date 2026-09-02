@@ -6,6 +6,13 @@ from minitest_cli.models.app import (
     AppResponse,
     TenantResponse,
 )
+from minitest_cli.models.app_screen import (
+    ScreenContext,
+    ScreenEdge,
+    ScreenMapResponse,
+    ScreenNode,
+    ScreenPrecondition,
+)
 from minitest_cli.models.base import CamelModel
 from minitest_cli.models.batch import (
     BatchCounters,
@@ -62,6 +69,11 @@ __all__ = [
     "CriterionVersionResponse",
     "GitHubContextResponse",
     "PlatformRun",
+    "ScreenContext",
+    "ScreenEdge",
+    "ScreenMapResponse",
+    "ScreenNode",
+    "ScreenPrecondition",
     "StoryRunListResponse",
     "StoryRunResponse",
     "TenantResponse",

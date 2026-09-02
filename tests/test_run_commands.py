@@ -328,6 +328,26 @@ class TestExtractDetail:
         resp.json.side_effect = ValueError("bad json")
         assert extract_detail(resp) is None
 
+    def test_stock_fastapi_validation_body_renders_field_errors(self) -> None:
+        resp = _mock_response(
+            422,
+            {"detail": [{"loc": ["query", "status", 0], "msg": "Input should be 'pending'"}]},
+        )
+        assert extract_detail(resp) == "status.0: Input should be 'pending'"
+
+    def test_minitap_observability_validation_body_renders_field_errors(self) -> None:
+        resp = _mock_response(
+            422,
+            {
+                "error": "validation_error",
+                "message": "Request validation failed",
+                "details": {
+                    "errors": [{"field": "query.status.0", "message": "Input should be 'pending'"}]
+                },
+            },
+        )
+        assert extract_detail(resp) == "status.0: Input should be 'pending'"
+
 
 class TestHandleResponseError:
     def test_404_exits_4(self) -> None:

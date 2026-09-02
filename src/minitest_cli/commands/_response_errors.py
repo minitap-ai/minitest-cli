@@ -24,11 +24,63 @@ BUILD_INVALID_ERROR_CODE = "build_invalid"
 # rollout: both).
 _SPLIT_APKS_BACKEND_UNSUPPORTED_MARKER = "not yet supported on this execution backend"
 
+# Generic FastAPI ``loc`` prefixes that add noise to a field path (they're
+# implied by "this is a validation error" and repeat across every field).
+_LOC_PREFIXES_TO_DROP = {"body", "query", "path"}
+
+
+def format_validation_field_errors(body: object) -> str | None:
+    """Render a validation-error body as ``field: message`` lines.
+
+    Handles both the stock FastAPI shape (``detail`` as a list of
+    ``{"loc": [...], "msg": ...}`` dicts) and the shared
+    ``minitap_observability`` exception-handler shape (``details.errors`` as a
+    list of ``{"field": ..., "message": ...}`` dicts) — the latter puts only a
+    generic ``"Request validation failed"`` in the top-level ``message``, so
+    without this the CLI would otherwise discard the actually useful part.
+    Returns ``None`` if ``body`` isn't a validation-error envelope of either shape.
+    """
+    if not isinstance(body, dict):
+        return None
+    raw_errors = _extract_raw_field_errors(body)
+    if not raw_errors:
+        return None
+    return "; ".join(_format_field_error(loc, msg) for loc, msg in raw_errors)
+
+
+def _extract_raw_field_errors(body: dict) -> list[tuple[list[str], str]] | None:
+    detail = body.get("detail")
+    if isinstance(detail, list) and detail:
+        return [
+            ([str(p) for p in e.get("loc", [])], str(e.get("msg", "")))
+            for e in detail
+            if isinstance(e, dict)
+        ]
+    details = body.get("details")
+    if isinstance(details, dict):
+        nested = details.get("errors")
+        if isinstance(nested, list) and nested:
+            return [
+                (str(e.get("field", "")).split("."), str(e.get("message", "")))
+                for e in nested
+                if isinstance(e, dict)
+            ]
+    return None
+
+
+def _format_field_error(loc: list[str], msg: str) -> str:
+    field = ".".join(part for part in loc if part and part not in _LOC_PREFIXES_TO_DROP)
+    return f"{field}: {msg}" if field else msg
+
 
 def extract_detail(resp: httpx.Response) -> str:
     """Extract a human-readable error detail from an API response."""
     try:
         body = resp.json()
+        if isinstance(body, dict):
+            field_errors = format_validation_field_errors(body)
+            if field_errors is not None:
+                return field_errors
         return str(body.get("detail", body.get("message", resp.text)))
     except Exception:  # noqa: BLE001
         return resp.text

@@ -79,6 +79,22 @@ PLATFORM_EXTENSIONS: dict[str, Platform] = {
 }
 
 
+class BuildStatusFilter(StrEnum):
+    """Statuses a build can have server-side. There is no "running" status —
+    in-progress builds are tracked via the ``/builds/{id}/heartbeat`` endpoint.
+    """
+
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class BuildKindFilter(StrEnum):
+    native = "native"
+    web = "web"
+
+
 def detect_platform(file_path: Path) -> str:
     """Auto-detect platform from file extension."""
     suffix = file_path.suffix.lower()

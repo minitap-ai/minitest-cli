@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 import httpx
@@ -17,7 +18,7 @@ from minitest_cli.utils.output import print_error
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
 
-PROFILE_TABLE_HEADERS = ["ID", "Name", "Username", "Scope", "Default", "Updated At"]
+PROFILE_TABLE_HEADERS = ["ID", "Name", "Username", "Phone", "Scope", "Default", "Updated At"]
 
 
 def app_base_path(app_id: str) -> str:
@@ -53,10 +54,22 @@ def format_profile_row(profile: dict[str, Any]) -> list[str]:
         str(profile.get("id", "")),
         profile.get("name", ""),
         profile.get("username") or "",
+        profile.get("phoneNumber") or profile.get("phone_number") or "",
         profile_scope(profile),
         "★" if is_default_profile(profile) else "",
         profile.get("updatedAt") or profile.get("updated_at") or "",
     ]
+
+
+def read_stdin_secret(
+    value: str | None, use_stdin: bool, *, value_flag: str, stdin_flag: str
+) -> str | None:
+    if use_stdin:
+        if value is not None:
+            print_error(f"Use either {value_flag} or {stdin_flag}, not both.")
+            raise typer.Exit(code=1)
+        return sys.stdin.read().rstrip("\r\n")
+    return value
 
 
 __all__ = [
@@ -71,5 +84,6 @@ __all__ = [
     "get_settings",
     "handle_profile_response",
     "is_json_mode",
+    "read_stdin_secret",
     "run_api_call",
 ]

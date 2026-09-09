@@ -226,6 +226,30 @@ class TestUpdate:
             )
         assert result.exit_code == 1
 
+    def test_update_clears_username_phone_and_about(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        resp = _mock_response(200, _PROFILE)
+        client = _mock_client(patch_=resp)
+        with patch("minitest_cli.commands.test_profile_update.ApiClient", return_value=client):
+            result = _run(
+                ["update", "p-111", "--clear-username", "--clear-phone-number", "--clear-about"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        body = client.patch.await_args.kwargs["json"]
+        assert body == {"username": None, "phone_number": None, "about": None}
+
+    def test_update_username_and_clear_username_rejected(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        with patch("minitest_cli.commands.test_profile_update.ApiClient", return_value=client):
+            result = _run(
+                ["update", "p-111", "--username", "driver@qa.minitap.ai", "--clear-username"],
+                settings,
+            )
+        assert result.exit_code == 1
+
 
 class TestDelete:
     def test_delete_requires_force(self, tmp_path):

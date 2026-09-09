@@ -136,13 +136,53 @@ class TestCreate:
             )
         assert result.exit_code == 1
 
+    def test_create_with_phone_and_otp(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        resp = _mock_response(201, _PROFILE)
+        client = _mock_client(post=resp)
+        with patch("minitest_cli.commands.test_profile.ApiClient", return_value=client):
+            result = _run(
+                [
+                    "create",
+                    "--name",
+                    "Customer A",
+                    "--phone-number",
+                    "+14155551234",
+                    "--static-otp-code",
+                    "123456",
+                ],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        body = client.post.await_args.kwargs["json"]
+        assert body["phone_number"] == "+14155551234"
+        assert body["static_otp_code"] == "123456"
+
+    def test_static_otp_code_and_stdin_mutex(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        with patch("minitest_cli.commands.test_profile.ApiClient", return_value=client):
+            result = _run(
+                [
+                    "create",
+                    "--name",
+                    "X",
+                    "--static-otp-code",
+                    "123456",
+                    "--static-otp-code-stdin",
+                ],
+                settings,
+            )
+        assert result.exit_code == 1
+
 
 class TestUpdate:
     def test_update_clear_password(self, tmp_path):
         settings = _make_settings(tmp_path)
         resp = _mock_response(200, _PROFILE)
         client = _mock_client(patch_=resp)
-        with patch("minitest_cli.commands.test_profile.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.test_profile_update.ApiClient", return_value=client):
             result = _run(
                 ["update", "p-111", "--clear-password"],
                 settings,
@@ -155,9 +195,33 @@ class TestUpdate:
     def test_update_clear_and_password_rejected(self, tmp_path):
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        with patch("minitest_cli.commands.test_profile.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.test_profile_update.ApiClient", return_value=client):
             result = _run(
                 ["update", "p-111", "--password", "x", "--clear-password"],
+                settings,
+            )
+        assert result.exit_code == 1
+
+    def test_update_phone_and_clear_static_otp_code(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        resp = _mock_response(200, _PROFILE)
+        client = _mock_client(patch_=resp)
+        with patch("minitest_cli.commands.test_profile_update.ApiClient", return_value=client):
+            result = _run(
+                ["update", "p-111", "--phone-number", "+14155551234", "--clear-static-otp-code"],
+                settings,
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        body = client.patch.await_args.kwargs["json"]
+        assert body == {"phone_number": "+14155551234", "static_otp_code": None}
+
+    def test_update_static_otp_code_and_clear_rejected(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        with patch("minitest_cli.commands.test_profile_update.ApiClient", return_value=client):
+            result = _run(
+                ["update", "p-111", "--static-otp-code", "x", "--clear-static-otp-code"],
                 settings,
             )
         assert result.exit_code == 1

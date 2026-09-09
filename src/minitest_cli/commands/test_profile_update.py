@@ -24,6 +24,10 @@ def register(app: typer.Typer) -> None:
         profile_id: Annotated[str, typer.Argument(help="Test profile ID.")],
         name: Annotated[str | None, typer.Option("--name", help="New profile name.")] = None,
         username: Annotated[str | None, typer.Option("--username", help="New username.")] = None,
+        clear_username: Annotated[
+            bool,
+            typer.Option("--clear-username", help="Remove the stored username."),
+        ] = False,
         password: Annotated[
             str | None, typer.Option("--password", help="New password (overrides existing).")
         ] = None,
@@ -39,6 +43,10 @@ def register(app: typer.Typer) -> None:
             str | None,
             typer.Option("--phone-number", help="New E.164 phone number (e.g. +14155551234)."),
         ] = None,
+        clear_phone_number: Annotated[
+            bool,
+            typer.Option("--clear-phone-number", help="Remove the stored phone number."),
+        ] = False,
         static_otp_code: Annotated[
             str | None,
             typer.Option("--static-otp-code", help="New static OTP code (overrides existing)."),
@@ -53,9 +61,11 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option("--clear-static-otp-code", help="Remove the stored static OTP code."),
         ] = False,
-        about: Annotated[
-            str | None, typer.Option("--about", help="New about text (pass '' to clear).")
-        ] = None,
+        about: Annotated[str | None, typer.Option("--about", help="New about text.")] = None,
+        clear_about: Annotated[
+            bool,
+            typer.Option("--clear-about", help="Remove the stored about text."),
+        ] = False,
     ) -> None:
         settings = get_settings()
         json_mode = is_json_mode()
@@ -65,40 +75,37 @@ def register(app: typer.Typer) -> None:
         pwd = read_stdin_secret(
             password, password_stdin, value_flag="--password", stdin_flag="--password-stdin"
         )
-        if pwd is not None and clear_password:
-            print_error("Use either --password/--password-stdin or --clear-password, not both.")
-            raise typer.Exit(code=1)
-
         otp = read_stdin_secret(
             static_otp_code,
             static_otp_code_stdin,
             value_flag="--static-otp-code",
             stdin_flag="--static-otp-code-stdin",
         )
-        if otp is not None and clear_static_otp_code:
-            print_error(
-                "Use either --static-otp-code/--static-otp-code-stdin or "
-                "--clear-static-otp-code, not both."
-            )
-            raise typer.Exit(code=1)
 
         body: dict[str, Any] = {}
         if name is not None:
             body["name"] = name
-        if username is not None:
-            body["username"] = username
-        if pwd is not None:
-            body["password"] = pwd
-        elif clear_password:
-            body["password"] = None
-        if phone_number is not None:
-            body["phone_number"] = phone_number
-        if otp is not None:
-            body["static_otp_code"] = otp
-        elif clear_static_otp_code:
-            body["static_otp_code"] = None
-        if about is not None:
-            body["about"] = about
+        for key, value, clear, value_flag in (
+            ("username", username, clear_username, "--username"),
+            ("password", pwd, clear_password, "--password/--password-stdin"),
+            ("phone_number", phone_number, clear_phone_number, "--phone-number"),
+            (
+                "static_otp_code",
+                otp,
+                clear_static_otp_code,
+                "--static-otp-code/--static-otp-code-stdin",
+            ),
+            ("about", about, clear_about, "--about"),
+        ):
+            if value is not None and clear:
+                print_error(
+                    f"Use either {value_flag} or --clear-{key.replace('_', '-')}, not both."
+                )
+                raise typer.Exit(code=1)
+            if value is not None:
+                body[key] = value
+            elif clear:
+                body[key] = None
 
         if not body:
             print_error("Provide at least one field to update.")

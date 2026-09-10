@@ -4,6 +4,7 @@ from typing import Any
 
 from minitest_cli.models import BuildListResponse, BuildResponse
 from minitest_cli.utils.output import err_console
+from minitest_cli.utils.prompt_safety import wrap_untrusted
 
 SURFACEABLE_ERROR_CLASSES = ("code", "user_action")
 FAILED_STATUS = "failed"
@@ -60,10 +61,16 @@ def print_fix_prompts(builds: list[BuildResponse]) -> None:
         err_console.print(f"[bold red]Build {build.id} failed[/bold red]")
         guidance = build_guidance(build)
         text = guidance["text"]
+        source = guidance["source"]
         if not text:
             err_console.print(f"  [dim]{NO_GUIDANCE_NOTICE}[/dim]")
             continue
-        if build.error_summary and guidance["source"] not in ("summary", "withheld"):
-            err_console.print(f"  [dim]Summary:[/dim] {build.error_summary}")
-        label = SOURCE_LABELS.get(guidance["source"] or "", "Notice")
+        # "withheld" is our own static notice (WITHHELD_NOTICE), not build-derived
+        # text, so it needs no untrusted-data framing.
+        if source != "withheld":
+            text = wrap_untrusted(text, "automated build-failure guidance")
+        if build.error_summary and source not in ("summary", "withheld"):
+            summary = wrap_untrusted(build.error_summary, "automated build-failure summary")
+            err_console.print(f"  [dim]Summary:[/dim] {summary}")
+        label = SOURCE_LABELS.get(source or "", "Notice")
         err_console.print(f"  [yellow]{label}:[/yellow] {text}")

@@ -24,6 +24,7 @@ from minitest_cli.utils.output import (
     print_json,
     print_success,
 )
+from minitest_cli.utils.prompt_safety import wrap_untrusted
 
 app = typer.Typer(name="app-knowledge", help="Read and update an app's AppKnowledge.")
 
@@ -70,7 +71,7 @@ def get_app_knowledge(
     if not content:
         print_info("No AppKnowledge content set for this app.")
         return
-    print(content)  # noqa: T201
+    print(wrap_untrusted(content, "customer-authored AppKnowledge content"))  # noqa: T201
 
 
 @app.command(name="update")

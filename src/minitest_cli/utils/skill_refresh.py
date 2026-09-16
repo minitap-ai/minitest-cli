@@ -30,6 +30,7 @@ SKILL_INSTALL_CMD = [
     "minitap-ai/agent-skills",
     "--skill",
     "minitest-cli",
+    "-y",
 ]
 SKILL_UPDATE_CMD = ["npx", "skills", "update", "minitest-cli", "-y"]
 

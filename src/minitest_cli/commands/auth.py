@@ -23,7 +23,7 @@ app = typer.Typer(name="auth", help="Authentication management.")
 app.add_typer(api_key_app, name="api-key")
 
 SKILL_NAME = "minitest-cli"
-SKILL_INSTALL_ARGS = ["skills", "add", "minitap-ai/agent-skills", "--skill", "minitest-cli"]
+SKILL_INSTALL_ARGS = ["skills", "add", "minitap-ai/agent-skills", "--skill", "minitest-cli", "-y"]
 SKILL_INSTALL_DISPLAY = "npx " + " ".join(SKILL_INSTALL_ARGS)
 
 

@@ -58,6 +58,9 @@ minitest auth login
 # List your apps
 minitest apps list
 
+# Inspect one app's full configuration
+minitest apps get <app-id>
+
 # Create a new app on your tenant
 minitest apps create --name "My Mobile App" --platform ios --platform android
 
@@ -104,7 +107,7 @@ minitest --app <app-id> run all --ios-build <ios-build-id> --android-build <andr
 | Command          | Description               |
 | ---------------- | ------------------------- |
 | `minitest auth`  | Authentication management |
-| `minitest apps`  | App management            |
+| `minitest apps`  | List, inspect, and create apps |
 | `minitest user-story` | User-story operations |
 | `minitest df`    | Draft features — branches of the test suite |
 | `minitest flow-types` | List flow types, create/rename/delete custom ones |

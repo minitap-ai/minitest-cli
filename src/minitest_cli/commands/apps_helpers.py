@@ -33,7 +33,7 @@ def extract_backend_detail(resp: httpx.Response) -> str:
     return resp.text or f"HTTP {resp.status_code}"
 
 
-def handle_create_response_error(resp: httpx.Response) -> None:
+def handle_apps_manager_response_error(resp: httpx.Response) -> None:
     """Map a non-2xx apps-manager response to an exit code with a clean message."""
     if resp.status_code < 400:
         return
@@ -97,5 +97,18 @@ async def create_app_request(
         if icon_handle is not None:
             icon_handle.close()
 
-    handle_create_response_error(resp)
+    handle_apps_manager_response_error(resp)
+    return AppDetailResponse.model_validate(resp.json())
+
+
+async def get_app_request(
+    settings: Settings,
+    *,
+    tenant_id: str,
+    app_id: str,
+) -> AppDetailResponse:
+    async with AppsManagerClient(settings) as client:
+        resp = await client.get(f"/api/v1/tenants/{tenant_id}/apps/{app_id}")
+
+    handle_apps_manager_response_error(resp)
     return AppDetailResponse.model_validate(resp.json())

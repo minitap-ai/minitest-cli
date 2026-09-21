@@ -1,4 +1,4 @@
-"""Tests for minitest_cli.commands.apps — CLI commands list and create."""
+"""Tests for minitest_cli.commands.apps — CLI commands list, get, and create."""
 
 import json
 from datetime import UTC, datetime
@@ -197,6 +197,103 @@ class TestListApps:
         assert result.exit_code == 0
         assert "Legacy" in result.output
         assert "—" in result.output
+
+
+class TestGetApp:
+    def test_json_output_fetches_full_record_from_apps_manager(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        list_client = _mock_client(_mock_response(200, _APPS_DATA))
+        detail_client = _mock_client(_mock_response(200, _APP_RECORD))
+
+        with (
+            patch("minitest_cli.commands.env_helpers.ApiClient", return_value=list_client),
+            patch(
+                "minitest_cli.commands.apps_helpers.AppsManagerClient",
+                return_value=detail_client,
+            ),
+        ):
+            result = _run_with_context(["get", "aaa-111"], settings, json_mode=True)
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["id"] == "app-xyz"
+        assert payload["tenantId"] == "t-1"
+        assert payload["description"] == "A demo"
+        list_client.get.assert_called_once_with("/api/v1/apps")
+        detail_client.get.assert_called_once_with("/api/v1/tenants/t-1/apps/aaa-111")
+
+    def test_human_output_prints_app_details(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        list_client = _mock_client(_mock_response(200, _APPS_DATA))
+        detail_client = _mock_client(_mock_response(200, _APP_RECORD))
+
+        with (
+            patch("minitest_cli.commands.env_helpers.ApiClient", return_value=list_client),
+            patch(
+                "minitest_cli.commands.apps_helpers.AppsManagerClient",
+                return_value=detail_client,
+            ),
+        ):
+            result = _run_with_context(["get", "aaa-111"], settings)
+
+        assert result.exit_code == 0, result.output
+        assert "name: Foo" in result.output
+        assert "tenantId: t-1" in result.output
+        assert "description: A demo" in result.output
+
+    def test_unknown_app_exits_not_found_without_calling_apps_manager(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        list_client = _mock_client(_mock_response(200, _APPS_DATA))
+        detail_client = MagicMock()
+
+        with (
+            patch("minitest_cli.commands.env_helpers.ApiClient", return_value=list_client),
+            patch(
+                "minitest_cli.commands.apps_helpers.AppsManagerClient",
+                return_value=detail_client,
+            ),
+        ):
+            result = _run_with_context(["get", "missing"], settings)
+
+        assert result.exit_code == 4
+        assert "App not found" in result.output
+        detail_client.assert_not_called()
+
+    def test_apps_manager_not_found_exits_not_found(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        list_client = _mock_client(_mock_response(200, _APPS_DATA))
+        detail_client = _mock_client(_mock_response(404, {"detail": "App not found"}))
+
+        with (
+            patch("minitest_cli.commands.env_helpers.ApiClient", return_value=list_client),
+            patch(
+                "minitest_cli.commands.apps_helpers.AppsManagerClient",
+                return_value=detail_client,
+            ),
+        ):
+            result = _run_with_context(["get", "aaa-111"], settings)
+
+        assert result.exit_code == 4
+        assert "App not found" in result.output
+
+    def test_network_error_exits_network_error(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        list_client = _mock_client(_mock_response(200, _APPS_DATA))
+        detail_client = AsyncMock()
+        detail_client.__aenter__ = AsyncMock(return_value=detail_client)
+        detail_client.__aexit__ = AsyncMock(return_value=False)
+        detail_client.get = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
+
+        with (
+            patch("minitest_cli.commands.env_helpers.ApiClient", return_value=list_client),
+            patch(
+                "minitest_cli.commands.apps_helpers.AppsManagerClient",
+                return_value=detail_client,
+            ),
+        ):
+            result = _run_with_context(["get", "aaa-111"], settings)
+
+        assert result.exit_code == 3
 
 
 # ---------------------------------------------------------------------------

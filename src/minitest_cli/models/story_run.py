@@ -33,7 +33,9 @@ class PlatformRun(CamelModel):
     Every previously-flat ``ios_*`` / ``android_*`` field on
     :class:`StoryRunResponse` now lives here, one row per platform that
     was in scope for the run. ``execution_state`` is the lifecycle axis
-    (pending/running/completed/failed/blocked/skipped); ``verdict`` is
+    (pending/running/evaluating/completed/failed/blocked/skipped);
+    ``evaluating`` is a platform that finished executing and is waiting
+    for its verdict. ``verdict`` is
     the criticality-aware outcome populated once the platform reaches a
     non-skipped terminal state. ``cancellation_requested_at`` is
     stamped when a user requested cancellation on this platform; UI

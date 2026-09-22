@@ -27,7 +27,9 @@ def _derive_run_status(run: StoryRunResponse) -> str:
     Mirrors the heuristic used by the cockpit / webapp: any platform
     with a stamped ``cancellation_requested_at`` short-circuits to
     ``cancelled``; otherwise we pick the worst platform state in
-    lifecycle order (running > pending/blocked > failed > completed).
+    lifecycle order (running > pending/blocked > evaluating > failed >
+    completed). ``evaluating`` is a platform that finished executing and
+    is waiting for its verdict, so it outranks every terminal state.
     """
     if any(p.cancellation_requested_at is not None for p in run.platforms):
         return "cancelled"
@@ -38,6 +40,8 @@ def _derive_run_status(run: StoryRunResponse) -> str:
         return "running"
     if "pending" in states or "blocked" in states:
         return "pending"
+    if "evaluating" in states:
+        return "evaluating"
     if "failed" in states:
         return "failed"
     if all(s in _TERMINAL_EXEC_STATES for s in states) and any(s == "completed" for s in states):

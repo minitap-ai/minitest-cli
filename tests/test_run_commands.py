@@ -11,6 +11,7 @@ from click.exceptions import Exit
 from typer.testing import CliRunner
 
 from minitest_cli.commands.run import app as run_app
+from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
     display_run_result,
     extract_detail,
@@ -1273,3 +1274,65 @@ class TestRunFeedback:
             tmp_path, ["feedback", "0e4a4b4f-6f0e-4a3b-9e0a-000000000042", "text"], resp=resp
         )
         assert result.exit_code == 4
+
+
+_EVALUATING_RUN = {
+    **_PENDING_RUN,
+    "platforms": [
+        {**p, "executionState": "evaluating", "finishedAt": "2025-06-01T10:05:00Z"}
+        for p in _PENDING_RUN["platforms"]
+    ],
+}
+
+
+class TestEvaluatingRunStatus:
+    def test_evaluating_lane_derives_evaluating(self) -> None:
+        run = StoryRunResponse.model_validate(_EVALUATING_RUN)
+        assert _derive_run_status(run) == "evaluating"
+
+    def test_evaluating_outranks_a_failed_sibling(self) -> None:
+        run = StoryRunResponse.model_validate(
+            {
+                **_EVALUATING_RUN,
+                "platforms": [
+                    _EVALUATING_RUN["platforms"][0],
+                    {**_EVALUATING_RUN["platforms"][1], "executionState": "failed"},
+                ],
+            }
+        )
+        assert _derive_run_status(run) == "evaluating"
+
+    def test_pending_sibling_still_wins(self) -> None:
+        run = StoryRunResponse.model_validate(
+            {
+                **_EVALUATING_RUN,
+                "platforms": [
+                    _EVALUATING_RUN["platforms"][0],
+                    _PENDING_RUN["platforms"][1],
+                ],
+            }
+        )
+        assert _derive_run_status(run) == "pending"
+
+    def test_status_with_watch_polls_through_evaluating(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.get = AsyncMock(
+            side_effect=[
+                _mock_response(200, _EVALUATING_RUN),
+                _mock_response(200, _EVALUATING_RUN),
+                _mock_response(200, _COMPLETED_RUN),
+            ]
+        )
+
+        with (
+            patch("minitest_cli.commands.run.ApiClient", return_value=client),
+            patch("minitest_cli.commands.run_helpers.asyncio.sleep", new_callable=AsyncMock),
+            patch("minitest_cli.commands.run_helpers.err_console"),
+        ):
+            result = _run_with_context(["status", _RUN_UUID, "--watch"], settings, json_mode=True)
+
+        assert result.exit_code == 0
+        assert client.get.call_count == 3
+        data = json.loads(result.output)
+        assert all(p["executionState"] == "completed" for p in data["platforms"])

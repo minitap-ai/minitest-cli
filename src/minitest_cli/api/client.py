@@ -8,6 +8,8 @@ from minitest_cli.core.auth import load_token
 from minitest_cli.core.config import Settings
 
 CHANNEL_HEADER = "X-Minitest-Channel"
+CLIENT_HEADER = "X-Minitap-Client"
+CLIENT_NAME = "minitest-cli"
 DEFAULT_TIMEOUT = 30.0
 UPLOAD_TIMEOUT = 300.0  # 5 minutes for large file uploads
 # Creating a batch can block on server-side maintenance before it answers, and the
@@ -36,6 +38,7 @@ class ApiClient:
             headers={
                 "Authorization": f"Bearer {token}",
                 CHANNEL_HEADER: self._settings.channel,
+                CLIENT_HEADER: CLIENT_NAME,
             },
             timeout=DEFAULT_TIMEOUT,
         )

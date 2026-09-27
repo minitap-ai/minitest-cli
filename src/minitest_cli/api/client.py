@@ -8,6 +8,8 @@ from minitest_cli.core.auth import load_token
 from minitest_cli.core.config import Settings
 
 CHANNEL_HEADER = "X-Minitest-Channel"
+CONVERSATION_ID_HEADER = "X-Minitest-Conversation-Id"
+CAUSE_HEADER = "X-Minitest-Cause"
 DEFAULT_TIMEOUT = 30.0
 UPLOAD_TIMEOUT = 300.0  # 5 minutes for large file uploads
 # Creating a batch can block on server-side maintenance before it answers, and the
@@ -31,12 +33,17 @@ class ApiClient:
 
     async def __aenter__(self) -> "ApiClient":
         token = self._token_override or load_token(self._settings)
+        headers: dict[str, str] = {
+            "Authorization": f"Bearer {token}",
+            CHANNEL_HEADER: self._settings.channel,
+        }
+        if self._settings.conversation_id is not None:
+            headers[CONVERSATION_ID_HEADER] = self._settings.conversation_id
+        if self._settings.cause is not None:
+            headers[CAUSE_HEADER] = self._settings.cause
         self._client = httpx.AsyncClient(
             base_url=self._settings.api_url,
-            headers={
-                "Authorization": f"Bearer {token}",
-                CHANNEL_HEADER: self._settings.channel,
-            },
+            headers=headers,
             timeout=DEFAULT_TIMEOUT,
         )
         return self

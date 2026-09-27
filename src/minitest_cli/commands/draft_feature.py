@@ -4,6 +4,7 @@ A draft feature is a branch of the app's test suite — it holds a delta against
 main rather than a copy of it, so `show` is the only way to see what it changes.
 """
 
+import json
 from typing import Annotated
 
 import typer
@@ -66,12 +67,18 @@ def create_draft_feature(
         str | None,
         typer.Option("--description", help="What product change the branch describes."),
     ] = None,
+    source_refs: Annotated[
+        str | None,
+        typer.Option("--source-refs", help="JSON array of provenance refs (passed as sourceRefs)."),
+    ] = None,
 ) -> None:
     """Open a branch off the app's main suite."""
     settings, app_id, json_mode = resolve_app()
     body: dict[str, object] = {"title": title}
     if description is not None:
         body["description"] = description
+    if source_refs is not None:
+        body["sourceRefs"] = json.loads(source_refs)
 
     async def _create() -> DraftFeatureResponse:
         async with ApiClient(settings) as client:

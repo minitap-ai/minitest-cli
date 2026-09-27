@@ -48,6 +48,14 @@ class Settings(BaseSettings):
         default="cli",
         description="X-Minitest-Channel header value sent on every API call (MINITEST_CHANNEL)",
     )
+    conversation_id: str | None = Field(
+        default=None,
+        description="X-Minitest-Conversation-Id header value (MINITEST_CONVERSATION_ID)",
+    )
+    cause: str | None = Field(
+        default=None,
+        description="X-Minitest-Cause header value sent on every API call (MINITEST_CAUSE)",
+    )
     token: str | None = Field(
         default=None,
         description="API authentication token (MINITEST_TOKEN)",

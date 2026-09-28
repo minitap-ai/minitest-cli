@@ -4,6 +4,14 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands import test_profile_default, test_profile_list, test_profile_update
+from minitest_cli.commands.test_profile_card import (
+    CardCvcOption,
+    CardExpiryOption,
+    CardHolderNameOption,
+    CardNumberOption,
+    CardPostalCodeOption,
+    card_fields,
+)
 from minitest_cli.commands.test_profile_helpers import (
     app_base_path,
     get_app_flag,
@@ -65,6 +73,11 @@ def create_profile(
     about: Annotated[
         str | None, typer.Option("--about", help="Free-text notes about the account.")
     ] = None,
+    test_card_number: CardNumberOption = None,
+    test_card_expiry: CardExpiryOption = None,
+    test_card_cvc: CardCvcOption = None,
+    test_card_holder_name: CardHolderNameOption = None,
+    test_card_postal_code: CardPostalCodeOption = None,
 ) -> None:
     settings = get_settings()
     json_mode = is_json_mode()
@@ -91,6 +104,15 @@ def create_profile(
         body["static_otp_code"] = otp
     if about is not None:
         body["about"] = about
+    card = card_fields(
+        test_card_number,
+        test_card_expiry,
+        test_card_cvc,
+        test_card_holder_name,
+        test_card_postal_code,
+    )
+    if card:
+        body["test_card"] = card
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:

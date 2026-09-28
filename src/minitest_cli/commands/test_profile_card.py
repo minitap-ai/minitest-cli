@@ -10,7 +10,8 @@ CardNumberOption = Annotated[
     ),
 ]
 CardExpiryOption = Annotated[
-    str | None, typer.Option("--test-card-expiry", help="Test card expiry, month and year (e.g. 1/34).")
+    str | None,
+    typer.Option("--test-card-expiry", help="Test card expiry, month and year (e.g. 1/34)."),
 ]
 CardCvcOption = Annotated[
     str | None, typer.Option("--test-card-cvc", help="Test card 3 or 4 digit security code.")

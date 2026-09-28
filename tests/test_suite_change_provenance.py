@@ -35,8 +35,7 @@ class TestProvenanceHeaders:
     """X-Minitest-Conversation-Id and X-Minitest-Cause are sent on every request."""
 
     def test_headers_present_when_env_vars_set(self, tmp_path):
-        """Both provenance headers appear when MINITEST_CONVERSATION_ID and MINITEST_CAUSE are set.
-        """
+        """Both provenance headers appear when their env vars are set."""
         received: dict[str, str] = {}
 
         def handler(request: httpx.Request) -> httpx.Response:

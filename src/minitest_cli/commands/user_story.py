@@ -5,7 +5,12 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands import user_story_create, user_story_delete, user_story_modify
+from minitest_cli.commands import (
+    user_story_create,
+    user_story_delete,
+    user_story_modify,
+    user_story_setup_commit,
+)
 from minitest_cli.commands.flow_types_helpers import resolve_flow_type
 from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_helpers import (
@@ -28,6 +33,8 @@ app = typer.Typer(name="user-story", help="User-story operations.")
 app.command(name="create")(user_story_create.create_user_story)
 app.command(name="update")(user_story_modify.update_user_story)
 app.command(name="delete")(user_story_delete.delete_user_story)
+app.command(name="allow-setup-commit")(user_story_setup_commit.allow_setup_commit)
+app.command(name="revoke-setup-commit")(user_story_setup_commit.revoke_setup_commit)
 
 
 @app.command(name="list")
@@ -136,4 +143,7 @@ def get_user_story(
         effective = effective_device_count(data)
         if effective > 1:
             print_info(f"Devices per run: {effective}")
+        permission = data.get("setupCommitPermission")
+        if isinstance(permission, dict):
+            print_info(f"Setup commit allowed: {permission.get('customerQuote')}")
     output(data, json_mode=json_mode)

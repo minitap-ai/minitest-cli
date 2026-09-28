@@ -3,6 +3,15 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.test_profile_card import (
+    CardCvcOption,
+    CardExpiryOption,
+    CardHolderNameOption,
+    CardNumberOption,
+    CardPostalCodeOption,
+    card_fields,
+    merged_card,
+)
 from minitest_cli.commands.test_profile_helpers import (
     app_base_path,
     get_app_flag,
@@ -66,6 +75,15 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option("--clear-about", help="Remove the stored about text."),
         ] = False,
+        test_card_number: CardNumberOption = None,
+        test_card_expiry: CardExpiryOption = None,
+        test_card_cvc: CardCvcOption = None,
+        test_card_holder_name: CardHolderNameOption = None,
+        test_card_postal_code: CardPostalCodeOption = None,
+        clear_test_card: Annotated[
+            bool,
+            typer.Option("--clear-test-card", help="Remove the stored test card."),
+        ] = False,
     ) -> None:
         settings = get_settings()
         json_mode = is_json_mode()
@@ -107,13 +125,31 @@ def register(app: typer.Typer) -> None:
             elif clear:
                 body[key] = None
 
-        if not body:
+        card = card_fields(
+            test_card_number,
+            test_card_expiry,
+            test_card_cvc,
+            test_card_holder_name,
+            test_card_postal_code,
+        )
+        if card and clear_test_card:
+            print_error("Use either --test-card-* options or --clear-test-card, not both.")
+            raise typer.Exit(code=1)
+        if clear_test_card:
+            body["test_card"] = None
+
+        if not body and not card:
             print_error("Provide at least one field to update.")
             raise typer.Exit(code=1)
 
         async def _run() -> dict[str, Any]:
             async with ApiClient(settings) as client:
-                resp = await client.patch(f"{app_base_path(app_id)}/{profile_id}", json=body)
+                path = f"{app_base_path(app_id)}/{profile_id}"
+                if card:
+                    current = await client.get(path)
+                    handle_profile_response(current)
+                    body["test_card"] = merged_card(current.json().get("testCard"), card)
+                resp = await client.patch(path, json=body)
                 handle_profile_response(resp)
                 return resp.json()
 

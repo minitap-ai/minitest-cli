@@ -43,9 +43,8 @@ def card_fields(
     return {key: value for key, value in given.items() if value is not None}
 
 
-def merged_card(stored: Any, changes: dict[str, str]) -> dict[str, str]:
+def merged_card(stored: dict[str, Any] | None, changes: dict[str, str]) -> dict[str, str]:
     """The stored card with ``changes`` applied, since the API replaces a card whole."""
-    current = {
-        _API_KEYS.get(key, key): value for key, value in (stored or {}).items() if value is not None
-    }
+    items: dict[str, Any] = stored or {}
+    current = {_API_KEYS.get(key, key): str(value) for key, value in items.items() if value}
     return {**current, **changes}

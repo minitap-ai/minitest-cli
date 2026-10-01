@@ -7,6 +7,7 @@ import typer
 from minitest_cli import __version__
 from minitest_cli.commands import (
     app_knowledge,
+    app_skill,
     apps,
     auth,
     batch,
@@ -48,6 +49,7 @@ app.add_typer(test_profile.app)
 app.add_typer(test_file.app)
 app.add_typer(flow_types.app)
 app.add_typer(app_knowledge.app)
+app.add_typer(app_skill.app)
 app.add_typer(screens.app)
 app.add_typer(build.app)
 app.add_typer(env.app)

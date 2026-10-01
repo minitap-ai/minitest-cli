@@ -184,6 +184,18 @@ def test_propose_sends_the_reason_with_the_change(tmp_path):
     [
         (404, {"message": "Skills are not enabled for this workspace."}, 4, "not enabled"),
         (401, {"message": "Invalid API key"}, 1, "Authentication failed (401)"),
+        (
+            422,
+            {
+                "error": "validation_error",
+                "message": "Request validation failed",
+                "details": {
+                    "errors": [{"field": "body.name", "message": "String should match pattern"}]
+                },
+            },
+            1,
+            "name: String should match pattern",
+        ),
     ],
 )
 def test_backend_refusals_map_to_documented_exit_codes(tmp_path, status, body, exit_code, message):

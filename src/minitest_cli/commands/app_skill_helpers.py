@@ -9,8 +9,8 @@ import httpx
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands._response_errors import extract_detail
 from minitest_cli.commands.user_story_helpers import (
-    extract_detail,
     get_app_flag,
     get_settings,
     is_json_mode,
@@ -55,7 +55,9 @@ def handle_skill_response(resp: httpx.Response) -> None:
         _print_linked(_linked_scenarios(resp))
         raise typer.Exit(code=EXIT_LINKED)
     print_error(detail)
-    raise typer.Exit(code=EXIT_NOT_FOUND if resp.status_code == 404 else EXIT_NETWORK_ERROR)
+    if resp.status_code == 404:
+        raise typer.Exit(code=EXIT_NOT_FOUND)
+    raise typer.Exit(code=EXIT_NETWORK_ERROR if resp.status_code >= 500 else EXIT_GENERAL_ERROR)
 
 
 def _linked_scenarios(resp: httpx.Response) -> list[dict[str, Any]]:

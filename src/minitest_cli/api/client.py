@@ -83,6 +83,9 @@ class ApiClient:
         """Send a DELETE request."""
         return await self._ensure_client().delete(path, **kwargs)
 
+    async def request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        return await self._ensure_client().request(method, path, **kwargs)
+
     async def upload_file(
         self,
         path: str,

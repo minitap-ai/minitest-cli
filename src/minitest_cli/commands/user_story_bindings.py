@@ -3,6 +3,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.app_skill_helpers import handle_skill_response
 from minitest_cli.commands.user_story_helpers import (
     base_path,
     get_app_flag,
@@ -15,7 +16,9 @@ from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
 
-app = typer.Typer(name="user-story-binding", help="Bind test profiles or files to user stories.")
+app = typer.Typer(
+    name="user-story-binding", help="Bind test profiles, files or skills to user stories."
+)
 
 _FILE_BINDING_HEADERS = ["ID", "Name", "Kind"]
 
@@ -125,6 +128,41 @@ def set_files(
         return
     rows = [_binding_row(f) for f in items]
     print_table(_FILE_BINDING_HEADERS, rows, title=f"Files bound to {user_story_id} ({len(items)})")
+
+
+@app.command(name="set-skills")
+def set_skills(
+    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    skill_names: Annotated[
+        list[str] | None,
+        typer.Option("--skill", help="Skill name Mini loads before starting (repeatable)."),
+    ] = None,
+    clear: Annotated[bool, typer.Option("--clear", help="Unlink every skill.")] = False,
+) -> None:
+    settings = get_settings()
+    json_mode = is_json_mode()
+    require_auth(settings)
+    app_id = resolve_app_id(settings, get_app_flag())
+
+    if clear == bool(skill_names):
+        print_error("Provide at least one --skill <name> or --clear.")
+        raise typer.Exit(code=1)
+
+    async def _run() -> dict[str, Any]:
+        async with ApiClient(settings) as client:
+            resp = await client.put(
+                f"{base_path(app_id)}/{user_story_id}/skills",
+                json={"skillNames": list(skill_names or [])},
+            )
+            handle_skill_response(resp)
+            return resp.json()
+
+    data = run_api_call(_run())
+    if json_mode:
+        output(data, json_mode=True)
+        return
+    names = ", ".join(s["name"] for s in data.get("skills", []))
+    print_success(f"Skills linked to {user_story_id}: {names or 'none'}.")
 
 
 @app.command(name="list-files")

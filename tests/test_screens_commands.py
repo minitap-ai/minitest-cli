@@ -1,400 +1,444 @@
-"""Tests for minitest_cli.commands.screens — the exploration screen map."""
+"""Tests for ``minitest screens`` over the screen-tree API.
 
+Every command runs a real httpx request cycle against a recorded
+``GET /api/v1/apps/{app_id}/screen-tree`` response (``fixtures/screen_tree.json``):
+an android tree rooted at a notification prompt, with tree edges, cross-links,
+signed-out and ``swiper`` walks, pending/blocked/skipped elements, a transition
+into a screen with no row, and a detached screen; plus a two-screen ios tree.
+"""
+
+import copy
 import json
+from collections.abc import Callable
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import patch
 
 import httpx
 import typer
+from click.testing import Result
 from typer.testing import CliRunner
 
 from minitest_cli.commands.screens import app as screens_app
-from minitest_cli.commands.screens_format import frontier_hint, reach_label
-from minitest_cli.commands.screens_helpers import dangling_edges
-from minitest_cli.core.config import Settings
-from minitest_cli.models import ScreenMapResponse
+from tests._commit_transport import cli_context, make_settings, routed
 
 runner = CliRunner()
 
-
-def _make_settings(tmp_path: Path, **overrides: object) -> Settings:
-    defaults: dict[str, object] = {
-        "config_dir": tmp_path,
-        "token": "test-token",
-        "supabase_url": "https://test.supabase.co",
-        "supabase_publishable_key": "test-publishable-key",
-        "app_id": "app-123",
-    }
-    defaults.update(overrides)
-    return Settings(**defaults)  # type: ignore[arg-type]
+FIXTURE: dict[str, Any] = json.loads(
+    (Path(__file__).parent / "fixtures" / "screen_tree.json").read_text()
+)
+APP_ID = "a0d9820f-5136-4f70-b46b-e5966f56bfb5"
+TREE_PATH = f"/api/v1/apps/{APP_ID}/screen-tree"
 
 
-def _run_with_context(
+def _serve(payload: dict[str, Any], seen: list[httpx.Request] | None = None) -> Callable:
+    """Answer like testing-service: honour ``?platform=`` server-side."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if seen is not None:
+            seen.append(request)
+        if request.url.path != TREE_PATH:
+            return httpx.Response(404, json={"detail": "Not found"})
+        platform = request.url.params.get("platform")
+        trees = [t for t in payload["trees"] if platform is None or t["platform"] == platform]
+        return httpx.Response(200, json={**payload, "trees": trees})
+
+    return handler
+
+
+def _invoke(
+    tmp_path: Path,
     args: list[str],
-    settings: Settings,
-    json_mode: bool = False,
-    app_flag: str | None = None,
-):
-    patches = [
-        patch.object(typer.Context, "settings", settings, create=True),
-        patch.object(typer.Context, "json_mode", json_mode, create=True),
-        patch.object(typer.Context, "app_flag", app_flag, create=True),
-    ]
-    for p in patches:
-        p.start()
-    try:
-        return runner.invoke(screens_app, args)
-    finally:
-        for p in patches:
-            p.stop()
-
-
-def _mock_response(status_code: int = 200, json_data: object = None) -> MagicMock:
-    resp = MagicMock(spec=httpx.Response)
-    resp.status_code = status_code
-    resp.json.return_value = json_data
-    resp.text = json.dumps(json_data) if json_data else ""
-    return resp
-
-
-def _mock_client(resp: MagicMock) -> AsyncMock:
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=resp)
-    client.__aenter__ = AsyncMock(return_value=client)
-    client.__aexit__ = AsyncMock(return_value=False)
-    return client
-
-
-def _node(
-    key: str,
-    name: str,
-    depth: int,
     *,
-    platform: str = "ios",
-    area: str | None = "onboarding",
-    blocked: str | None = None,
-    outgoing: list[dict] | None = None,
-) -> dict:
-    return {
-        "id": f"id-{key}",
-        "platform": platform,
-        "screenKey": key,
-        "displayName": name,
-        "depth": depth,
-        "area": area,
-        "discoveredAt": "2026-09-02T06:52:00Z",
-        "firstReachedAt": "2026-09-02T06:52:00Z",
-        "blockedReason": blocked,
-        "gatedBy": None,
-        "screenshotPath": None,
-        "screenshotUrl": None,
-        # NOTE: snake_case inside a camelCase envelope. That is the real wire
-        # shape — testing-service embeds the DB models verbatim here.
-        "outgoing": outgoing or [],
-        "context": {
-            "requires_auth": False,
-            "persona_ref": None,
-            "preconditions": [],
-            "reachable_via": "walk",
-            "deeplink_uri": None,
-            "cheaply_reachable": True,
-            "cheaply_reachable_reason": None,
-        },
-    }
+    json_mode: bool = False,
+    handler: Callable | None = None,
+) -> Result:
+    settings = make_settings(tmp_path)
+    with routed(handler or _serve(FIXTURE)), cli_context(settings, json_mode=json_mode):
+        return runner.invoke(screens_app, args, env={"COLUMNS": "200"})
 
 
-def _edge(action: str, to: str | None, *, parked: bool = False, reason: str | None = None) -> dict:
-    return {
-        "action": action,
-        "to_screen_key": to,
-        "onward_observed": parked,
-        "parked": parked,
-        "parked_reason": reason,
-        "parked_kind": "not_navigation" if parked else None,
-        "last_verified_at": None,
-        "consecutive_failures": 0,
-    }
+def _row(output: str, screen: str) -> list[str]:
+    for line in output.splitlines():
+        cells = [c.strip() for c in line.split("│")[1:-1]]
+        if len(cells) > 1 and cells[1] == screen:
+            return cells
+    raise AssertionError(f"no table row for {screen!r} in:\n{output}")
 
 
-_MAP = {
-    "appId": "app-123",
-    "platform": None,
-    "screenCount": 3,
-    "screens": [
-        _node(
-            "welcome",
-            "Welcome",
-            0,
-            outgoing=[
-                _edge("tap 'Continue'", "settings"),
-                _edge("tap 'Log in'", None, parked=True, reason="login wall"),
-            ],
-        ),
-        _node("settings", "Settings", 1, area="settings"),
-        _node("locked", "Locked area", 2, area=None, blocked="needs a paid plan"),
-    ],
-}
-
-_EMPTY_MAP = {"appId": "app-123", "platform": None, "screenCount": 0, "screens": []}
+def _line(output: str, needle: str) -> str:
+    matches = [line for line in output.splitlines() if needle in line]
+    assert len(matches) == 1, f"expected one line with {needle!r}, got {matches}"
+    return matches[0]
 
 
-class TestListScreensCommand:
-    def test_list_hits_correct_endpoint(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list"], _make_settings(tmp_path), json_mode=True)
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" │├└─"))
+
+
+class TestScreenTreeRequest:
+    def test_list_calls_screen_tree_without_platform(self, tmp_path: Path) -> None:
+        seen: list[httpx.Request] = []
+        result = _invoke(tmp_path, ["list"], json_mode=True, handler=_serve(FIXTURE, seen))
 
         assert result.exit_code == 0
-        assert client.get.call_args[0][0] == "/api/v1/apps/app-123/screens"
+        assert [r.url.path for r in seen] == [TREE_PATH]
+        assert "platform" not in seen[0].url.params
 
-    def test_list_platform_filter_sent_as_param(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(
-                ["list", "--platform", "ios"], _make_settings(tmp_path), json_mode=True
-            )
+    def test_platform_is_sent_and_selects_that_tree(self, tmp_path: Path) -> None:
+        seen: list[httpx.Request] = []
+        result = _invoke(tmp_path, ["list", "--platform", "ios"], handler=_serve(FIXTURE, seen))
 
         assert result.exit_code == 0
-        assert client.get.call_args[1]["params"]["platform"] == "ios"
+        assert seen[0].url.params["platform"] == "ios"
+        assert "Screens (ios)" in result.output
+        assert "Screens (android)" not in result.output
 
-    def test_list_omits_platform_param_when_unset(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            _run_with_context(["list"], _make_settings(tmp_path), json_mode=True)
+    def test_platform_is_filtered_client_side_too(self, tmp_path: Path) -> None:
+        def ignores_platform(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=FIXTURE)
 
-        assert client.get.call_args[1]["params"] == {}
+        result = _invoke(
+            tmp_path, ["list", "--platform", "android"], json_mode=True, handler=ignores_platform
+        )
 
-    def test_list_human_mode_renders_every_screen_name(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list"], _make_settings(tmp_path))
+        assert [t["platform"] for t in json.loads(result.output)["trees"]] == ["android"]
 
-        assert result.exit_code == 0
-        for name in ("Welcome", "Settings", "Locked area"):
-            assert name in result.output
+    def test_404_exits_4(self, tmp_path: Path) -> None:
+        result = _invoke(
+            tmp_path,
+            ["list"],
+            handler=lambda _: httpx.Response(404, json={"detail": "App not found"}),
+        )
 
-    def test_list_area_filter_narrows_output(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(
-                ["list", "--area", "settings"], _make_settings(tmp_path), json_mode=True
-            )
+        assert result.exit_code == 4
 
-        data = json.loads(result.output)
-        assert [s["displayName"] for s in data["screens"]] == ["Settings"]
-        # The count must agree with the screens beside it, not the server total.
-        assert data["screenCount"] == 1
+    def test_network_error_exits_3(self, tmp_path: Path) -> None:
+        def refuse(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused", request=request)
 
-    def test_list_blocked_filter_keeps_only_blocked(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(
-                ["list", "--blocked"], _make_settings(tmp_path), json_mode=True
-            )
+        result = _invoke(tmp_path, ["list"], handler=refuse)
 
-        data = json.loads(result.output)
-        assert [s["displayName"] for s in data["screens"]] == ["Locked area"]
+        assert result.exit_code == 3
 
-    def test_list_tree_mode_renders_edge_actions(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list", "--tree"], _make_settings(tmp_path))
+    def test_requires_auth(self, tmp_path: Path) -> None:
+        with patch("minitest_cli.core.auth.require_auth", side_effect=typer.Exit(code=2)):
+            result = _invoke(tmp_path, ["list"])
+
+        assert result.exit_code == 2
+
+
+class TestListTable:
+    def test_rows_show_depth_parent_element_and_counts(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--platform", "android"])
 
         assert result.exit_code == 0
-        assert "tap 'Continue'" in result.output
-        assert "parked" in result.output
+        assert _row(result.output, "Notification permission") == [
+            "0", "Notification permission", "onboarding", "—", "2", "0", "0", "0",
+        ]  # fmt: skip
+        assert _row(result.output, "Sign in")[3] == "(auto)"
+        assert _row(result.output, "Google sign-in consent") == [
+            "2", "Google sign-in consent", "auth", "LOG IN WITH GOOGLE", "1", "0", "1", "0",
+        ]  # fmt: skip
+        assert _row(result.output, "Listing detail") == [
+            "3", "Listing detail", "main", "Listing card", "1", "0", "0", "1",
+        ]  # fmt: skip
+        assert _row(result.output, "Legacy orphan") == [
+            "—", "Legacy orphan", "—", "—", "0", "1", "0", "0",
+        ]  # fmt: skip
 
-    def test_list_empty_map_explains_no_crawl_has_run(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _EMPTY_MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list"], _make_settings(tmp_path))
+    def test_rows_follow_server_order(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--platform", "android"])
+
+        names = [s["displayName"] for s in FIXTURE["trees"][0]["screens"]]
+        positions = [result.output.index(f"│ {name} ") for name in names]
+        assert positions == sorted(positions)
+
+    def test_footer_reports_totals_and_detached(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--platform", "android"])
+
+        assert (
+            "Totals: 8 screen(s) · 12 explored · 4 pending · 2 blocked · 2 skipped · 1 detached"
+            in result.output
+        )
+        assert "root: Notification permission" in result.output
+
+    def test_every_tree_is_listed_one_after_another(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list"])
+
+        android = result.output.index("Screens (android) — 8 screen(s)")
+        ios = result.output.index("Screens (ios) — 2 screen(s), root: Welcome")
+        assert android < ios
+        assert "Totals: 2 screen(s) · 1 explored · 1 pending" in result.output[ios:]
+
+    def test_blocked_keeps_screens_with_a_blocked_transition(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--blocked"])
+
+        assert result.exit_code == 0
+        assert "Screens (android) — 2 of 8 screen(s)" in result.output
+        assert _row(result.output, "Google sign-in consent")[6] == "1"
+        assert _row(result.output, "Phone verification")[6] == "1"
+        assert "│ Home " not in result.output
+        assert "Screens (ios)" not in result.output
+        assert "Totals: 2 screen(s) · 1 explored · 1 pending · 2 blocked · 0 skipped" in (
+            result.output
+        )
+
+    def test_area_filter_is_case_insensitive(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--area", "MAIN"])
+
+        assert "Screens (android) — 2 of 8 screen(s)" in result.output
+        assert _row(result.output, "Home")[3] == "Skip"
+        assert _row(result.output, "Listing detail")[0] == "3"
+
+    def test_empty_tree_explains_no_crawl_has_run(self, tmp_path: Path) -> None:
+        empty = {"appId": FIXTURE["appId"], "trees": []}
+        result = _invoke(tmp_path, ["list"], handler=_serve(empty))
 
         assert result.exit_code == 0
         assert "until a crawl has run" in result.output
 
-    def test_list_filtered_to_empty_does_not_claim_no_crawl(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list", "--area", "nope"], _make_settings(tmp_path))
+    def test_filtered_to_nothing_does_not_claim_no_crawl(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--area", "checkout"])
 
         assert result.exit_code == 0
-        assert "3 screen(s) mapped" in result.output
+        assert "10 screen(s) mapped, but none match --area checkout." in result.output
         assert "until a crawl has run" not in result.output
 
-    def test_list_404_exits_4(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(404, {"detail": "App not found"}))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list"], _make_settings(tmp_path))
 
-        assert result.exit_code == 4
-
-    def test_list_network_error_exits_3(self, tmp_path: Path) -> None:
-        client = AsyncMock()
-        client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
-        client.__aenter__ = AsyncMock(return_value=client)
-        client.__aexit__ = AsyncMock(return_value=False)
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list"], _make_settings(tmp_path))
-
-        assert result.exit_code == 3
-
-    def test_list_requires_auth(self, tmp_path: Path) -> None:
-        settings = _make_settings(tmp_path, token=None)
-        with patch("minitest_cli.core.auth.require_auth", side_effect=typer.Exit(code=2)):
-            result = _run_with_context(["list"], settings)
-
-        assert result.exit_code == 2
-
-    def test_list_uses_app_flag_over_settings(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            _run_with_context(
-                ["list"],
-                _make_settings(tmp_path, app_id=None),
-                json_mode=True,
-                app_flag="other-app",
-            )
-
-        assert client.get.call_args[0][0] == "/api/v1/apps/other-app/screens"
-
-
-class TestGetScreenCommand:
-    def test_get_matches_by_display_name_case_insensitively(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["get", "wELCome"], _make_settings(tmp_path))
+class TestListTree:
+    def test_children_hang_off_tree_edges_labelled_by_element(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--tree", "--platform", "android"])
+        out = result.output
 
         assert result.exit_code == 0
-        assert "Welcome" in result.output
+        root = _line(out, "Notification permission (onboarding)")
+        sign_in = _line(out, "(auto) → Sign in (auth)")
+        home = _line(out, "Skip → Home (main)")
+        listing = _line(out, "Listing card as swiper → Listing detail (main)")
+        assert _indent(root) < _indent(sign_in) < _indent(home) < _indent(listing)
+        assert "LOG IN WITH GOOGLE → Google sign-in consent (auth) 1 blocked" in out
+        assert "Continue with phone → Phone verification (auth) 1 pending 1 blocked" in out
 
-    def test_get_matches_by_screen_key(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(
-                ["get", "settings"], _make_settings(tmp_path), json_mode=True
-            )
+    def test_account_is_shown_only_when_signed_in(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--tree", "--platform", "android"])
+
+        assert "Skip as" not in _line(result.output, "→ Home (main)")
+        assert "Profile as swiper → Profile (account)" in result.output
+
+    def test_cross_links_are_marked_once_and_not_expanded(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--tree", "--platform", "android"])
+        out = result.output
+
+        assert out.count("↪ Home (also via Back as swiper)") == 1
+        assert out.count("↪ Home (also via Skip as swiper)") == 1
+        assert out.count("↪ Sign in (also via Allow)") == 1
+        assert out.count("↪ Sign in (also via Cancel)") == 1
+        assert out.count("↪ Sign in (also via Log out as swiper)") == 1
+        assert out.count("Listing detail (main)") == 1
+        back = _line(out, "also via Back")
+        assert _indent(back) > _indent(_line(out, "→ Listing detail (main)"))
+
+    def test_cross_link_to_a_screen_without_a_row_is_flagged(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--tree", "--platform", "android"])
+
+        assert "↪ help center (also via Help as swiper, no screen row)" in result.output
+
+    def test_detached_screens_are_listed_last(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--tree", "--platform", "android"])
+        lines = result.output.splitlines()
+
+        detached = lines.index(_line(result.output, "Detached (not reachable from the root)"))
+        assert "Legacy orphan 1 pending" in lines[detached + 1]
+        assert lines[detached + 2].startswith("Totals: 8 screen(s)")
+
+    def test_tree_without_root_lists_every_screen_as_detached(self, tmp_path: Path) -> None:
+        payload = copy.deepcopy(FIXTURE)
+        ios = payload["trees"][1]
+        ios["rootScreenKey"] = None
+        ios["detachedScreenKeys"] = ["welcome", "sign in"]
+        for screen in ios["screens"]:
+            screen.update(depth=None, parentTransitionId=None, childTransitionIds=[])
+        for transition in ios["transitions"]:
+            transition["isTreeEdge"] = False
+
+        result = _invoke(tmp_path, ["list", "--tree", "--platform", "ios"], handler=_serve(payload))
+
+        assert "root: none recorded" in result.output
+        assert "No root recorded yet" in result.output
+        assert "2 detached" in result.output
+
+    def test_filtered_tree_keeps_the_path_from_the_root(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--tree", "--blocked"])
+        out = result.output
+
+        assert "Notification permission (onboarding)" in out
+        assert "(auto) → Sign in (auth)" in out
+        assert "LOG IN WITH GOOGLE → Google sign-in consent" in out
+        assert "→ Home (main)" not in out
+        assert "Listing detail" not in out
+        assert "Legacy orphan" not in out
+        assert "Screens (ios)" not in out
+
+
+class TestListJson:
+    def test_unfiltered_json_is_the_tree_response_verbatim(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list"], json_mode=True)
 
         assert result.exit_code == 0
-        assert json.loads(result.output)["screenKey"] == "settings"
+        assert json.loads(result.output) == FIXTURE
 
-    def test_get_unknown_screen_exits_4(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["get", "nope"], _make_settings(tmp_path))
+    def test_context_stays_snake_case(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list"], json_mode=True)
 
-        assert result.exit_code == 4
+        home = json.loads(result.output)["trees"][0]["screens"][4]
+        assert home["screenKey"] == "home"
+        assert home["context"]["requires_auth"] is True
+        assert home["context"]["deeplink_uri"] == "tinder://home"
+        assert "requiresAuth" not in home["context"]
 
-    def test_get_reports_every_platform_match(self, tmp_path: Path) -> None:
-        both = {
-            **_MAP,
-            "screenCount": 2,
-            "screens": [
-                _node("welcome", "Welcome", 0, platform="ios"),
-                _node("welcome", "Welcome", 0, platform="android"),
-            ],
-        }
-        client = _mock_client(_mock_response(200, both))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["get", "welcome"], _make_settings(tmp_path))
+    def test_unknown_fields_are_tolerated(self, tmp_path: Path) -> None:
+        payload = copy.deepcopy(FIXTURE)
+        payload["trees"][0]["somethingNew"] = 1
+        payload["trees"][0]["transitions"][0]["consecutiveFailures"] = 2
+
+        result = _invoke(tmp_path, ["list"], json_mode=True, handler=_serve(payload))
 
         assert result.exit_code == 0
-        assert "2 screens match" in result.output
+        assert json.loads(result.output)["trees"][0]["transitions"][0]["id"] == "t01"
 
-    def test_get_renders_blocked_reason(self, tmp_path: Path) -> None:
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["get", "Locked area"], _make_settings(tmp_path))
-
-        assert "needs a paid plan" in result.output
-
-
-class TestWireShape:
-    """Guards the camelCase-envelope / snake_case-nested seam.
-
-    ``outgoing`` and ``context`` are embedded DB models with no alias
-    generator, so they arrive snake_case inside a camelCase envelope. Making
-    them ``CamelModel`` would still *parse* (``populate_by_name`` accepts the
-    field name), which is what makes the mistake easy to ship unnoticed — but
-    ``--json`` would then emit ``toScreenKey`` where the API emits
-    ``to_screen_key``. So the binding assertion is on the emitted keys.
-    """
-
-    def test_snake_case_edges_and_context_parse(self) -> None:
-        parsed = ScreenMapResponse.model_validate(_MAP)
-        welcome = parsed.screens[0]
-
-        assert len(welcome.outgoing) == 2
-        assert welcome.outgoing[0].to_screen_key == "settings"
-        assert welcome.outgoing[1].parked is True
-        assert welcome.outgoing[1].parked_reason == "login wall"
-        assert welcome.context is not None
-        assert welcome.context.reachable_via == "walk"
-        assert welcome.context.cheaply_reachable is True
-
-    def test_json_output_keeps_nested_keys_snake_case(self, tmp_path: Path) -> None:
-        """--json must round-trip the API's shape, not re-case the nested models."""
-        client = _mock_client(_mock_response(200, _MAP))
-        with patch("minitest_cli.commands.screens_helpers.ApiClient", return_value=client):
-            result = _run_with_context(["list"], _make_settings(tmp_path), json_mode=True)
+    def test_filtered_json_narrows_screens_transitions_and_counts(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["list", "--blocked"], json_mode=True)
 
         data = json.loads(result.output)
-        edge = data["screens"][0]["outgoing"][0]
-        context = data["screens"][0]["context"]
+        assert [t["platform"] for t in data["trees"]] == ["android"]
+        tree = data["trees"][0]
+        assert [s["screenKey"] for s in tree["screens"]] == [
+            "google sign-in consent",
+            "phone verification",
+        ]
+        assert tree["counts"] == {
+            "explored": 1,
+            "pending": 1,
+            "blocked": 2,
+            "skipped": 0,
+            "screens": 2,
+        }
+        assert sorted(t["id"] for t in tree["transitions"]) == [
+            "t03", "t04", "t07", "t08", "t09", "t10",
+        ]  # fmt: skip
+        assert tree["detachedScreenKeys"] == []
+        assert tree["rootScreenKey"] == "notification permission"
 
-        # Envelope stays camelCase...
-        assert "screenKey" in data["screens"][0]
-        assert "displayName" in data["screens"][0]
-        # ...while the embedded DB models stay snake_case, as the API serves them.
-        assert "to_screen_key" in edge
-        assert "toScreenKey" not in edge
-        assert "parked_reason" in edge
-        assert "requires_auth" in context
-        assert "requiresAuth" not in context
+    def test_filtered_json_keeps_detached_screens_that_match(self, tmp_path: Path) -> None:
+        payload = copy.deepcopy(FIXTURE)
+        payload["trees"][0]["screens"][-1]["area"] = "main"
 
-    def test_unknown_fields_are_tolerated(self) -> None:
-        payload = json.loads(json.dumps(_MAP))
-        payload["screens"][0]["somethingNew"] = "x"
-        payload["screens"][0]["outgoing"][0]["new_edge_field"] = 1
+        result = _invoke(
+            tmp_path, ["list", "--area", "main"], json_mode=True, handler=_serve(payload)
+        )
 
-        parsed = ScreenMapResponse.model_validate(payload)
-        assert parsed.screens[0].outgoing[0].action == "tap 'Continue'"
+        tree = json.loads(result.output)["trees"][0]
+        assert tree["detachedScreenKeys"] == ["legacy orphan"]
+        assert tree["counts"]["screens"] == 3
 
 
-class TestFrontierReporting:
-    def test_dangling_edges_are_detected(self) -> None:
-        parsed = ScreenMapResponse.model_validate(_MAP)
-        # 'welcome' -> 'settings' resolves; nothing else is followed.
-        assert dangling_edges(parsed.screens) == []
+class TestGetScreen:
+    def test_get_renders_identity_context_and_links(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["get", "Sign in", "--platform", "android"])
+        out = result.output
 
-        broken = json.loads(json.dumps(_MAP))
-        broken["screens"][0]["outgoing"][0]["to_screen_key"] = "ghost"
-        dangling = dangling_edges(ScreenMapResponse.model_validate(broken).screens)
-        assert len(dangling) == 1
-        assert dangling[0][1].to_screen_key == "ghost"
+        assert result.exit_code == 0
+        assert "Sign in  (android)" in out
+        assert "Key           : sign in" in out
+        assert "Depth         : 1" in out
+        assert "Area          : auth" in out
+        assert "Notes         : Phone-first auth; Google and Apple SSO sit below the fold." in out
+        assert "Screenshot    : https://storage.example/signed/android/sign-in.png" in out
+        assert "Reachable via : walk" in out
+        assert "Notification permission via (auto) (signed out) (parent)" in out
+        assert "Notification permission via Allow (signed out)" in out
+        assert "Google sign-in consent via Cancel (signed out)" in out
+        assert "Profile via Log out (swiper)" in out
+        assert "LOG IN WITH GOOGLE → Google sign-in consent (signed out)" in out
+        assert "Skip → Home (signed out)" in out
 
-    def test_hint_reports_parked_blocked_and_dangling(self) -> None:
-        parsed = ScreenMapResponse.model_validate(_MAP)
-        hint = frontier_hint(parsed.screens, parsed.screens)
+    def test_get_lists_elements_pending_first_explored_last(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["get", "sign in", "--platform", "android"])
+        out = result.output
 
-        assert "1 parked edge(s)" in hint
-        assert "1 blocked screen(s)" in hint
+        pending = _line(out, "Trouble logging in?")
+        assert "pending" in pending and "signed out" in pending
+        explored = [line for line in out.splitlines() if "│ explored" in line]
+        assert out.index(pending) < out.index(explored[0])
+        skips = [line for line in explored if "│ Skip " in line]
+        assert [("signed out" in s, "swiper" in s, "→ Home" in s) for s in skips] == [
+            (True, False, True),
+            (False, True, True),
+        ]
 
-    def test_hint_does_not_blame_filtering_for_dangling(self) -> None:
-        parsed = ScreenMapResponse.model_validate(_MAP)
-        # Show only 'Welcome'; its destination is filtered out but not missing.
-        hint = frontier_hint(parsed.screens[:1], parsed.screens)
+    def test_get_shows_blocked_and_skipped_reasons_with_account(self, tmp_path: Path) -> None:
+        consent = _invoke(tmp_path, ["get", "google sign-in consent"]).output
+        blocked = _line(consent, "Choose an account")
+        assert "blocked" in blocked
+        assert "Google account picker needs a real device account" in blocked
+        assert "gated by ask 5b0c9a51-6d8e-4f7a-9d61-2f3c1e0a7b44" in blocked
 
-        assert "no row in the map" not in hint
+        listing = _invoke(tmp_path, ["get", "Listing detail"]).output
+        skipped = _line(listing, "Book now")
+        assert "skipped" in skipped and "payment" in skipped and "swiper" in skipped
+        assert "Home via Listing card (swiper) (parent)" in listing
+        assert "None — no screen is placed under this one." in listing
 
-    def test_reach_label_flags_auth_and_cost(self) -> None:
-        payload = json.loads(json.dumps(_MAP))
-        ctx = payload["screens"][0]["context"]
-        ctx["requires_auth"] = True
-        ctx["persona_ref"] = "parent"
-        ctx["cheaply_reachable"] = False
-        ctx["cheaply_reachable_reason"] = "server-side state"
+    def test_get_root_and_detached_screens(self, tmp_path: Path) -> None:
+        root = _invoke(tmp_path, ["get", "Notification permission"]).output
+        assert "Nothing — this is the root." in root
+        assert "Cheap to reach: no — needs a fresh install to show again" in root
 
-        node = ScreenMapResponse.model_validate(payload).screens[0]
-        label = reach_label(node)
-        assert "auth:parent" in label
-        assert "costly" in label
+        orphan = _invoke(tmp_path, ["get", "legacy orphan"]).output
+        assert "Depth         : — (detached: not reachable from the root)" in orphan
+        assert "Nothing — no explored transition leads here." in orphan
+        assert "No context recorded for this screen." in orphan
+
+    def test_get_reports_every_platform_match(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["get", "SIGN IN"])
+
+        assert result.exit_code == 0
+        assert "2 screens match 'SIGN IN' (android, ios). Use --platform to narrow." in (
+            result.output
+        )
+        assert "Sign in  (android)" in result.output
+        assert "Sign in  (ios)" in result.output
+
+    def test_get_unknown_screen_exits_4(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["get", "checkout"])
+
+        assert result.exit_code == 4
+        assert "No mapped screen matches 'checkout'" in result.output
+
+    def test_get_json_narrows_each_tree_to_the_screen(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["get", "home"], json_mode=True)
+
+        data = json.loads(result.output)
+        assert data["appId"] == FIXTURE["appId"]
+        [tree] = data["trees"]
+        assert [s["screenKey"] for s in tree["screens"]] == ["home"]
+        assert sorted(t["id"] for t in tree["transitions"]) == [
+            "t05", "t11", "t12", "t13", "t15", "t19",
+        ]  # fmt: skip
+        assert tree["counts"] == {
+            "explored": 2,
+            "pending": 1,
+            "blocked": 0,
+            "skipped": 0,
+            "screens": 1,
+        }
+
+    def test_get_json_with_two_platform_matches_keeps_both_trees(self, tmp_path: Path) -> None:
+        result = _invoke(tmp_path, ["get", "sign in"], json_mode=True)
+
+        trees = json.loads(result.output)["trees"]
+        assert [(t["platform"], [s["screenKey"] for s in t["screens"]]) for t in trees] == [
+            ("android", ["sign in"]),
+            ("ios", ["sign in"]),
+        ]

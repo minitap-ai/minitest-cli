@@ -1,71 +1,131 @@
 """Human-readable rendering for ``minitest screens get``."""
 
-from minitest_cli.models import ScreenNode
-from minitest_cli.utils.output import err_console, print_info, print_table
+from rich.console import Console
+from rich.markup import escape
+from rich.table import Table
 
-_EDGE_HEADERS = ["Action", "Leads to", "State"]
+from minitest_cli.commands.screens_helpers import TreeIndex, account_label, element_label
+from minitest_cli.models import ScreenContext, ScreenTransition, TreeScreen
+
+_STATUS_ORDER = ["pending", "blocked", "skipped", "explored"]
+_STATUS_STYLE = {"pending": "yellow", "blocked": "red", "skipped": "dim", "explored": "green"}
 
 
-def _context_lines(node: ScreenNode) -> list[str]:
-    ctx = node.context
+def _context_lines(ctx: ScreenContext | None) -> list[str]:
     if ctx is None:
         return ["  [dim]No context recorded for this screen.[/dim]"]
 
-    lines = [f"  Reachable via : {ctx.reachable_via or '—'}"]
+    lines = [f"  Reachable via : {escape(ctx.reachable_via or '—')}"]
     if ctx.deeplink_uri:
-        lines.append(f"  Deeplink      : {ctx.deeplink_uri}")
+        lines.append(f"  Deeplink      : {escape(ctx.deeplink_uri)}")
     lines.append(f"  Requires auth : {'yes' if ctx.requires_auth else 'no'}")
     if ctx.requires_auth:
-        lines.append(f"  As persona    : {ctx.persona_ref or '[red]unspecified[/red]'}")
+        lines.append(
+            f"  As persona    : {escape(ctx.persona_ref or '') or '[red]unspecified[/red]'}"
+        )
     if ctx.cheaply_reachable:
         lines.append("  Cheap to reach: yes")
     else:
-        lines.append(f"  Cheap to reach: [yellow]no[/yellow] — {ctx.cheaply_reachable_reason}")
+        reason = escape(ctx.cheaply_reachable_reason or "")
+        lines.append(f"  Cheap to reach: [yellow]no[/yellow] — {reason}")
     if ctx.preconditions:
         rendered = ", ".join(f"{p.kind}({p.ref})" if p.ref else p.kind for p in ctx.preconditions)
-        lines.append(f"  Preconditions : {rendered}")
+        lines.append(f"  Preconditions : {escape(rendered)}")
     else:
         lines.append("  Preconditions : none needed")
     return lines
 
 
-def _edge_rows(node: ScreenNode) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for edge in node.outgoing:
-        if edge.parked:
-            state = f"parked ({edge.parked_kind or 'unclassified'}): {edge.parked_reason}"
-            destination = "— not entered"
-        else:
-            state = "followed"
-            if edge.consecutive_failures:
-                state = f"followed, {edge.consecutive_failures} consecutive failure(s)"
-            destination = edge.to_screen_key or "?"
-        rows.append([edge.action, destination, state])
-    return rows
+def _identity_lines(screen: TreeScreen) -> list[str]:
+    depth = "— (detached: not reachable from the root)" if screen.depth is None else screen.depth
+    lines = [
+        f"  Key           : {escape(screen.screen_key)}",
+        f"  Depth         : {depth}",
+        f"  Area          : {escape(screen.area or '—')}",
+    ]
+    if screen.first_reached_at:
+        lines.append(f"  First reached : {screen.first_reached_at:%Y-%m-%d %H:%M}")
+    if screen.notes:
+        lines.append(f"  Notes         : {escape(screen.notes)}")
+    if screen.screenshot_url:
+        lines.append(f"  Screenshot    : {escape(screen.screenshot_url)}")
+    elif screen.screenshot_path:
+        lines.append(f"  Screenshot    : [dim]{escape(screen.screenshot_path)} (unsigned)[/dim]")
+    return lines
 
 
-def render_screen(node: ScreenNode) -> None:
-    """Print one screen: what it is, how to stand on it, and where it leads."""
-    err_console.print(f"[bold]{node.display_name}[/bold]  [dim]({node.platform})[/dim]")
-    err_console.print(f"  Key           : {node.screen_key}")
-    err_console.print(f"  Depth         : {node.depth}")
-    err_console.print(f"  Area          : {node.area or '—'}")
-    err_console.print(f"  First reached : {node.first_reached_at:%Y-%m-%d %H:%M}")
-    if node.blocked_reason:
-        err_console.print(f"  [red]Blocked[/red]       : {node.blocked_reason}")
-        if node.gated_by:
-            err_console.print(f"  Gated by ask  : {node.gated_by}")
-    if node.screenshot_url:
-        err_console.print(f"  Screenshot    : {node.screenshot_url}")
-    elif node.screenshot_path:
-        err_console.print(f"  Screenshot    : [dim]{node.screenshot_path} (unsigned)[/dim]")
+def _walk_line(label: str, t: ScreenTransition) -> str:
+    return f"  {label} [dim]({escape(account_label(t))})[/dim]"
 
-    err_console.print("\n[bold]Context[/bold] — what it takes to stand here")
-    for line in _context_lines(node):
-        err_console.print(line)
 
-    rows = _edge_rows(node)
-    if not rows:
-        print_info("\nNo outgoing edges recorded — the crawl saw no way onward from here.")
+def _reached_from_lines(index: TreeIndex, screen: TreeScreen) -> list[str]:
+    lines: list[str] = []
+    for t in index.pick(screen.incoming_transition_ids):
+        via = f"{escape(index.name(t.from_screen_key))} via {escape(element_label(t))}"
+        parent = " [green](parent)[/green]" if t.id == screen.parent_transition_id else ""
+        lines.append(_walk_line(via, t) + parent)
+    if lines:
+        return lines
+    if screen.depth == 0:
+        return ["  [dim]Nothing — this is the root.[/dim]"]
+    return ["  [dim]Nothing — no explored transition leads here.[/dim]"]
+
+
+def _children_lines(index: TreeIndex, screen: TreeScreen) -> list[str]:
+    lines = [
+        _walk_line(f"{escape(element_label(t))} → {escape(index.name(t.to_screen_key))}", t)
+        for t in index.pick(screen.child_transition_ids)
+    ]
+    return lines or ["  [dim]None — no screen is placed under this one.[/dim]"]
+
+
+def _detail(index: TreeIndex, t: ScreenTransition) -> str:
+    if t.status == "explored":
+        return f"→ {escape(index.name(t.to_screen_key))}"
+    detail = escape(t.reason or "")
+    if t.gated_by:
+        detail += f" [dim](gated by ask {escape(t.gated_by)})[/dim]"
+    return detail
+
+
+def _elements_table(index: TreeIndex, screen: TreeScreen) -> Table:
+    outgoing = index.pick(screen.outgoing_transition_ids)
+    rank = {status: i for i, status in enumerate(_STATUS_ORDER)}
+    outgoing.sort(key=lambda t: rank.get(t.status, len(rank)))
+
+    table = Table(title=f"Elements on {escape(screen.display_name)}", header_style="bold")
+    for header in ("Status", "Element", "Kind", "Account", "Detail"):
+        table.add_column(header)
+    for t in outgoing:
+        style = _STATUS_STYLE.get(t.status, "")
+        table.add_row(
+            f"[{style}]{escape(t.status)}[/{style}]" if style else escape(t.status),
+            escape(element_label(t)),
+            escape(t.element_kind),
+            escape(account_label(t)),
+            _detail(index, t),
+        )
+    return table
+
+
+def render_screen(index: TreeIndex, screen: TreeScreen) -> None:
+    """Print one screen: identity, how to stand on it, how it is reached, what it leads to."""
+    console = Console()
+    platform = escape(index.tree.platform)
+    console.print(f"[bold]{escape(screen.display_name)}[/bold]  [dim]({platform})[/dim]")
+    for section, lines in (
+        ("", _identity_lines(screen)),
+        ("Context — what it takes to stand here", _context_lines(screen.context)),
+        ("Reached from", _reached_from_lines(index, screen)),
+        ("Children", _children_lines(index, screen)),
+    ):
+        if section:
+            console.print(f"\n[bold]{section}[/bold]")
+        for line in lines:
+            console.print(line)
+
+    if not screen.outgoing_transition_ids:
+        console.print("\n[dim]No elements recorded on this screen.[/dim]")
         return
-    print_table(_EDGE_HEADERS, rows, title=f"Outgoing from {node.display_name}")
+    console.print()
+    console.print(_elements_table(index, screen))

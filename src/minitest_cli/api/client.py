@@ -61,6 +61,11 @@ class ApiClient:
         if self._client is None:
             msg = "ApiClient must be used as an async context manager"
             raise RuntimeError(msg)
+        # A polling client can outlive its OAuth access token. Resolve auth before
+        # sending, so the existing expiry buffer and refresh lock stay effective.
+        # Do not retry responses: writes such as batch creation are not idempotent.
+        token = self._token_override or load_token(self._settings)
+        self._client.headers["Authorization"] = f"Bearer {token}"
         return self._client
 
     async def get(self, path: str, **kwargs: Any) -> httpx.Response:

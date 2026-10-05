@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from minitest_cli.models.base import CamelModel
+from minitest_cli.models.recording import DeviceRecording, SegmentMap
 
 
 class CriterionResult(CamelModel):
@@ -24,6 +25,10 @@ class CriterionResult(CamelModel):
     confidence: int | None = None
     result_summary: str | None = None
     content: str | None = None
+    srp_id: str | None = None
+    device_indexes: list[int] = [1]
+    observed_from: datetime | None = None
+    observed_until: datetime | None = None
     created_at: datetime
 
 
@@ -43,6 +48,7 @@ class PlatformRun(CamelModel):
     """
 
     platform: str
+    srp_id: str | None = None
     batch_target_id: str | None = None
     browser: str | None = None
     viewport: str | None = None
@@ -50,6 +56,10 @@ class PlatformRun(CamelModel):
     build_id: UUID | None = None
     recording_path: str | None = None
     recording_url: str | None = None
+    recording_started_at: datetime | None = None
+    segment_map: SegmentMap | None = None
+    agent_action_trace: dict | None = None
+    device_recordings: list[DeviceRecording] = []
     session_paths: list[str] = []
     error_message: str | None = None
     skip_reason: str | None = None

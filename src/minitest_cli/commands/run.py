@@ -30,6 +30,7 @@ from minitest_cli.commands.run_targets import (
     WebOpt,
 )
 from minitest_cli.commands.run_feedback import feedback
+from minitest_cli.commands.run_recording import register_recording_commands
 from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
@@ -196,3 +197,4 @@ def run_all(
 app.command(name="from-commit")(from_commit)
 app.command(name="verdicts")(verdicts)
 app.command(name="feedback")(feedback)
+register_recording_commands(app)

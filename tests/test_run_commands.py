@@ -1124,11 +1124,18 @@ class TestListRunsCommand:
 # derived run status to ``cancelled`` while keeping the Android child
 # untouched (matches BE behaviour — a cancel request fans out to every
 # in-scope platform child but the wire shape is one stamp per row).
-_CANCELLED_RUN = {
+_CANCELLABLE_RUN = {
     **_PENDING_RUN,
     "platforms": [
-        {**_PENDING_RUN["platforms"][0], "cancellationRequestedAt": "2025-06-01T10:00:30Z"},
-        {**_PENDING_RUN["platforms"][1], "cancellationRequestedAt": "2025-06-01T10:00:30Z"},
+        {**_PENDING_RUN["platforms"][0], "srpId": "d1111111-1111-1111-1111-111111111111"},
+        {**_PENDING_RUN["platforms"][1], "srpId": "d2222222-2222-2222-2222-222222222222"},
+    ],
+}
+_CANCELLED_RUN = {
+    **_CANCELLABLE_RUN,
+    "platforms": [
+        {**target, "cancellationRequestedAt": "2025-06-01T10:00:30Z"}
+        for target in _CANCELLABLE_RUN["platforms"]
     ],
 }
 
@@ -1137,18 +1144,27 @@ class TestCancelRunCommand:
     def test_cancel_posts_to_cancel_endpoint(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
         client = _mock_client()
+        client.get = AsyncMock(
+            side_effect=[_mock_response(200, _CANCELLABLE_RUN), _mock_response(200, _CANCELLED_RUN)]
+        )
         client.post = AsyncMock(return_value=_mock_response(200, _CANCELLED_RUN))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(["cancel", _RUN_UUID], settings)
 
         assert result.exit_code == 0
-        assert client.post.call_args[0][0] == f"/api/v1/apps/app-123/story-runs/{_RUN_UUID}/cancel"
+        assert [call.args[0] for call in client.post.call_args_list] == [
+            f"/api/v1/apps/app-123/story-run-platforms/{target['srpId']}/cancel"
+            for target in _CANCELLABLE_RUN["platforms"]
+        ]
         assert _RUN_UUID in result.output
 
     def test_cancel_json_output(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
         client = _mock_client()
+        client.get = AsyncMock(
+            side_effect=[_mock_response(200, _CANCELLABLE_RUN), _mock_response(200, _CANCELLED_RUN)]
+        )
         client.post = AsyncMock(return_value=_mock_response(200, _CANCELLED_RUN))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
@@ -1172,7 +1188,7 @@ class TestCancelRunCommand:
     def test_cancel_not_found_exits_4(self, tmp_path) -> None:
         settings = _make_settings(tmp_path)
         client = _mock_client()
-        client.post = AsyncMock(return_value=_mock_response(404, {"detail": "Run not found"}))
+        client.get = AsyncMock(return_value=_mock_response(404, {"detail": "Run not found"}))
 
         with patch("minitest_cli.commands.run.ApiClient", return_value=client):
             result = _run_with_context(

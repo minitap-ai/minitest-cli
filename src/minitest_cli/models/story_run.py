@@ -43,6 +43,7 @@ class PlatformRun(CamelModel):
     """
 
     platform: str
+    srp_id: str | None = None
     batch_target_id: str | None = None
     browser: str | None = None
     viewport: str | None = None

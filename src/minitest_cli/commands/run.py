@@ -30,6 +30,7 @@ from minitest_cli.commands.run_targets import (
     WebOpt,
 )
 from minitest_cli.commands.run_feedback import feedback
+from minitest_cli.commands.run_cancel import cancel_run_targets, display_cancel_result
 from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
@@ -153,17 +154,12 @@ def cancel(run_id: Annotated[str, typer.Argument(help="Run ID to cancel.")]) -> 
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="run id")
 
-    async def _cancel() -> StoryRunResponse:
+    async def _cancel() -> tuple[StoryRunResponse, int]:
         async with ApiClient(settings) as client:
-            resp = await client.post(f"{base_path(app_id)}/{run_id}/cancel")
-            handle_response_error(resp, resource="Run")
-            return StoryRunResponse.model_validate(resp.json())
+            return await cancel_run_targets(client, app_id, run_id)
 
-    run = run_api_call(_cancel())
-    if json_mode:
-        output(run.model_dump(mode="json", by_alias=True), json_mode=True)
-    else:
-        print_success(f"Run cancelled: {run.id} (status: {_derive_run_status(run)})")
+    run, requested = run_api_call(_cancel())
+    display_cancel_result(run, requested, json_mode)
 
 
 @app.command(name="all")

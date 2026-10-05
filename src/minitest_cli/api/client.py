@@ -1,5 +1,6 @@
 """Async HTTP client with automatic auth and channel headers."""
 
+from collections.abc import Generator
 from typing import Any
 
 import httpx
@@ -17,6 +18,19 @@ UPLOAD_TIMEOUT = 300.0  # 5 minutes for large file uploads
 BATCH_CREATE_TIMEOUT = 180.0
 
 
+class _BearerAuth(httpx.Auth):
+    """Resolves the token per request, since polling clients outlive OAuth access tokens."""
+
+    def __init__(self, settings: Settings, token_override: str | None) -> None:
+        self._settings = settings
+        self._token_override = token_override
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        token = self._token_override or load_token(self._settings)
+        request.headers["Authorization"] = f"Bearer {token}"
+        yield request
+
+
 class ApiClient:
     """Wraps httpx.AsyncClient with auto-injected auth and channel headers.
 
@@ -32,9 +46,7 @@ class ApiClient:
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "ApiClient":
-        token = self._token_override or load_token(self._settings)
         headers: dict[str, str] = {
-            "Authorization": f"Bearer {token}",
             CHANNEL_HEADER: self._settings.channel,
         }
         if self._settings.conversation_id is not None:
@@ -44,6 +56,7 @@ class ApiClient:
         self._client = httpx.AsyncClient(
             base_url=self._settings.api_url,
             headers=headers,
+            auth=_BearerAuth(self._settings, self._token_override),
             timeout=DEFAULT_TIMEOUT,
         )
         return self

@@ -22,6 +22,7 @@ from minitest_cli.commands.run_helpers import (
     RUN_TABLE_HEADERS,
     TERMINAL_STATUSES,
 )
+from minitest_cli.commands.run_cancel import cancel
 from minitest_cli.commands.run_commit import from_commit
 from minitest_cli.commands.run_targets import (
     AndroidBuildOpt,
@@ -148,25 +149,6 @@ def list_runs(
         print_info(tip)
 
 
-@app.command()
-def cancel(run_id: Annotated[str, typer.Argument(help="Run ID to cancel.")]) -> None:
-    """Cancel a pending or running story run."""
-    settings, app_id, json_mode = resolve_app()
-    ensure_uuid(run_id, kind="run id")
-
-    async def _cancel() -> StoryRunResponse:
-        async with ApiClient(settings) as client:
-            resp = await client.post(f"{base_path(app_id)}/{run_id}/cancel")
-            handle_response_error(resp, resource="Run")
-            return StoryRunResponse.model_validate(resp.json())
-
-    run = run_api_call(_cancel())
-    if json_mode:
-        output(run.model_dump(mode="json", by_alias=True), json_mode=True)
-    else:
-        print_success(f"Run cancelled: {run.id} (status: {_derive_run_status(run)})")
-
-
 @app.command(name="all")
 def run_all(
     ios_build: IosBuildOpt = None,
@@ -194,6 +176,7 @@ def run_all(
     )
 
 
+app.command(name="cancel")(cancel)
 app.command(name="from-commit")(from_commit)
 app.command(name="verdicts")(verdicts)
 app.command(name="feedback")(feedback)

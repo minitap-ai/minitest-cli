@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from minitest_cli.commands.recording_action_fields import action_fields
+from minitest_cli.commands.recording_action_parse import as_str, non_empty, target_of
 from minitest_cli.models.recording import (
     RecordingTimeline,
     SegmentMap,
@@ -100,6 +102,14 @@ def _criterion(
     )
 
 
+def _own_intent(action: dict[str, Any]) -> str | None:
+    """Mini's step carried by the action itself (text, network, …), as the webapp reads it.
+
+    A web ``key`` action's description is the key name, not an intent.
+    """
+    return None if action.get("type") == "key" else non_empty(action.get("description"))
+
+
 def _actions(trace: dict | None, segment_map: SegmentMap | None) -> list[TimelineAction]:
     if not trace:
         return []
@@ -120,9 +130,10 @@ def _actions(trace: dict | None, segment_map: SegmentMap | None) -> list[Timelin
             at_sec=seconds(action.get("offsetMs", 0)) or 0.0,
             end_sec=seconds(action.get("endOffsetMs")),
             type=action.get("type", "unknown"),
-            target=(action.get("target") or {}).get("label"),
+            target=as_str(target_of(action).get("label")),
             url=action.get("url"),
-            intent=intent_by_index.get(idx),
+            intent=intent_by_index.get(idx) or _own_intent(action),
+            **action_fields(action),
         )
         for idx, action in enumerate(raw_actions)
     ]

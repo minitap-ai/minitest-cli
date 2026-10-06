@@ -124,6 +124,11 @@ class TestRecordingTimeline:
             ("swipe", 15.0, None, None, None),
         ]
 
+    def test_build_timeline_labels_actions_like_the_webapp(self) -> None:
+        timeline = _timeline(duration_sec=21.0)
+
+        assert [a.label for a in timeline.actions] == ["Tap on “Continue”", "Swipe"]
+
     def test_build_timeline_keeps_raw_seconds_when_file_is_uncut(self) -> None:
         timeline = _timeline(duration_sec=56.0)
 

@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands.batch_helpers import batch_summary_payload, post_batch
+from minitest_cli.commands.batch_helpers import post_batch
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
     base_path,
@@ -32,6 +32,7 @@ from minitest_cli.commands.run_targets import (
 )
 from minitest_cli.commands.run_feedback import feedback
 from minitest_cli.commands.run_recording import register_recording_commands
+from minitest_cli.commands.run_tagged import print_batch_started, start_tagged
 from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
@@ -52,7 +53,13 @@ app = typer.Typer(name="run", help="Test execution.")
 
 @app.command()
 def start(
-    user_story: Annotated[str, typer.Argument(help="User-story name or UUID to run.")],
+    user_story: Annotated[
+        str | None, typer.Argument(help="User-story name or UUID to run. Excludes --tag.")
+    ] = None,
+    tag: Annotated[
+        list[str] | None,
+        typer.Option("--tag", help="Run every scenario carrying any of these tags (repeatable)."),
+    ] = None,
     ios_build: IosBuildOpt = None,
     android_build: AndroidBuildOpt = None,
     web: WebOpt = False,
@@ -60,13 +67,20 @@ def start(
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
 ) -> None:
-    """Start a new test run for a user story (via the batches endpoint)."""
+    """Start a run for one user story, or one batch over every story with --tag."""
+    if (user_story is None) == (not tag):
+        print_error("Pass either a user story or --tag, not both or neither.")
+        raise typer.Exit(code=1)
     settings, app_id, json_mode = resolve_app()
     targets = build_targets(ios_build, android_build, web)
+    if tag:
+        print_batch_started(start_tagged(settings, app_id, tag, targets), json_mode)
+        return
+    story_ref = user_story or ""
 
     async def _start() -> StoryRunResponse:
         async with ApiClient(settings) as client:
-            user_story_id = await resolve_user_story_id(client, app_id, user_story)
+            user_story_id = await resolve_user_story_id(client, app_id, story_ref)
             body = CreateBatchRequest(user_story_ids=[user_story_id], targets=targets)
             batch = await post_batch(client, app_id, body)
             if not batch.story_runs:
@@ -164,16 +178,7 @@ def run_all(
             body = CreateBatchRequest(targets=targets)
             return await post_batch(client, app_id, body)
 
-    batch = run_api_call(_run_all())
-    if json_mode:
-        print_json(batch_summary_payload(batch))
-        return
-    rows = [format_run_row(r) for r in batch.story_runs]
-    print_table(RUN_TABLE_HEADERS, rows, title=f"Batch {batch.id} — {batch.status.value}")
-    print_info(
-        f"Started {len(batch.story_runs)} runs. "
-        f"Use `minitest batch get {batch.id}` or `minitest run status <id>` to follow up."
-    )
+    print_batch_started(run_api_call(_run_all()), json_mode)
 
 
 app.command(name="cancel")(cancel)

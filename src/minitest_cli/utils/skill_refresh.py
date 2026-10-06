@@ -68,7 +68,7 @@ def find_skill_path() -> str | None:
 
 
 def _md5(content: str) -> str:
-    return hashlib.md5(content.encode()).hexdigest()  # noqa: S324
+    return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
 
 def reinstall_skill() -> bool:

@@ -5,7 +5,6 @@ Validates business logic, error handling, and CLI parsing.
 
 import json
 from contextlib import contextmanager
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -16,21 +15,9 @@ from typer.testing import CliRunner
 
 from minitest_cli.commands.user_story import app as user_story_app
 from minitest_cli.core.config import Settings
-from minitest_cli.models.flow_type import CustomFlowType
 from minitest_cli.models.user_story import CriterionVersionResponse
 
 runner = CliRunner()
-
-VALID_USER_STORY_TYPES = ["login", "registration", "checkout", "onboarding", "other"]
-
-CUSTOM_FLOW_TYPE = CustomFlowType(
-    id="cft-1",
-    tenant_id="tenant-1",
-    name="Payments",
-    icon="tag",
-    color="gray",
-    created_at=datetime(2026, 1, 1, tzinfo=UTC),
-)
 
 
 def _make_settings(tmp_path, **overrides):
@@ -65,22 +52,6 @@ def _run_with_context(args, settings, json_mode=False, app_flag=None):
     return result
 
 
-@contextmanager
-def _patch_flow_types(custom_types=()):
-    """Resolve ``--type`` against fixed built-in and custom types, never the network."""
-    with (
-        patch(
-            "minitest_cli.commands.flow_types_helpers.fetch_builtin_flow_types",
-            return_value=VALID_USER_STORY_TYPES,
-        ),
-        patch(
-            "minitest_cli.commands.flow_types_helpers.fetch_custom_flow_types",
-            return_value=list(custom_types),
-        ),
-    ):
-        yield
-
-
 def _mock_response(status_code=200, json_data=None):
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = status_code
@@ -111,20 +82,9 @@ SAMPLE_USER_STORY = {
 
 
 class TestCreateUserStory:
-    def test_invalid_type_rejected(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        with _patch_flow_types():
-            result = _run_with_context(
-                ["create", "--name", "Bad Story", "--type", "invalid_type"],
-                settings,
-            )
-        assert result.exit_code != 0
-        assert "invalid" in result.output.lower()
-
     def test_network_error_exits_3(self, tmp_path):
         settings = _make_settings(tmp_path)
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -132,28 +92,11 @@ class TestCreateUserStory:
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "Story", "--type", "login"],
+                ["create", "--name", "Story"],
                 settings,
             )
         assert result.exit_code == 3
         assert "network error" in result.output.lower() or "error" in result.output.lower()
-
-    def test_valid_type_accepted(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        mock_resp = _mock_response(201, {"id": "new-story", "name": "Story", "type": "login"})
-        with (
-            _patch_flow_types(),
-            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
-        ):
-            instance = AsyncMock()
-            instance.post.return_value = mock_resp
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-            result = _run_with_context(
-                ["create", "--name", "Story", "--type", "login"],
-                settings,
-            )
-        assert result.exit_code == 0
 
     def test_absent_idempotency_key_preserves_legacy_request_and_human_output(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -166,8 +109,8 @@ class TestCreateUserStory:
                 json={"id": "legacy-story", "name": "Story", "type": "login"},
             )
 
-        with _patch_flow_types(), _patch_http_transport(handler):
-            result = _run_with_context(["create", "--name", "Story", "--type", "login"], settings)
+        with _patch_http_transport(handler):
+            result = _run_with_context(["create", "--name", "Story"], settings)
 
         assert result.exit_code == 0
         assert "Idempotency-Key" not in requests[0].headers
@@ -205,8 +148,8 @@ class TestCreateUserStory:
                 json={"detail": "Idempotency key is already used for a different request."},
             )
 
-        base_args = ["create", "--name", "Story", "--type", "login", "--idempotency-key", key]
-        with _patch_flow_types(), _patch_http_transport(handler):
+        base_args = ["create", "--name", "Story", "--idempotency-key", key]
+        with _patch_http_transport(handler):
             first = _run_with_context(base_args, settings, json_mode=True)
             replay = _run_with_context(base_args, settings, json_mode=True)
             conflict = _run_with_context(
@@ -214,8 +157,6 @@ class TestCreateUserStory:
                     "create",
                     "--name",
                     "Different story",
-                    "--type",
-                    "login",
                     "--idempotency-key",
                     key,
                 ],
@@ -238,11 +179,10 @@ class TestCreateUserStory:
     @pytest.mark.parametrize("key", ["", "x" * 256])
     def test_invalid_idempotency_key_is_rejected_locally(self, tmp_path, key):
         settings = _make_settings(tmp_path)
-        with _patch_flow_types():
-            result = _run_with_context(
-                ["create", "--name", "Story", "--type", "login", "--idempotency-key", key],
-                settings,
-            )
+        result = _run_with_context(
+            ["create", "--name", "Story", "--idempotency-key", key],
+            settings,
+        )
 
         assert result.exit_code == 2
         plain_output = unstyle(result.output)
@@ -255,7 +195,6 @@ class TestCreateUserStoryProfiles:
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -267,8 +206,6 @@ class TestCreateUserStoryProfiles:
                     "create",
                     "--name",
                     "Story",
-                    "--type",
-                    "login",
                     "--profile",
                     "p-1",
                     "--profile",
@@ -285,7 +222,6 @@ class TestCreateUserStoryProfiles:
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -293,7 +229,7 @@ class TestCreateUserStoryProfiles:
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "Story", "--type", "login"],
+                ["create", "--name", "Story"],
                 settings,
                 json_mode=True,
             )
@@ -374,13 +310,6 @@ class TestUpdateUserStoryProfiles:
 
 
 class TestListUserStories:
-    def test_invalid_type_rejected(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        with _patch_flow_types():
-            result = _run_with_context(["list", "--type", "bad_type"], settings)
-        assert result.exit_code != 0
-        assert "bad_type" in result.output.lower() or "invalid" in result.output.lower()
-
     def test_all_flag_fetches_multiple_pages(self, tmp_path):
         settings = _make_settings(tmp_path)
         page1_resp = _mock_response(
@@ -399,79 +328,6 @@ class TestListUserStories:
         assert instance.get.call_count == 2
         data = json.loads(result.output)
         assert len(data) == 2
-
-
-class TestCustomFlowTypes:
-    """A custom flow type name maps onto the API's ``custom`` type + its type id."""
-
-    def test_create_sends_custom_type_id(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "custom"})
-        with (
-            _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]),
-            patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
-        ):
-            instance = AsyncMock()
-            instance.post.return_value = mock_resp
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-            result = _run_with_context(
-                ["create", "--name", "Story", "--type", "payments"],
-                settings,
-                json_mode=True,
-            )
-        assert result.exit_code == 0, result.output
-        payload = instance.post.call_args.kwargs["json"]
-        assert payload["type"] == "custom"
-        assert payload["customUserStoryTypeId"] == "cft-1"
-
-    def test_update_sends_custom_type_id(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        mock_resp = _mock_response(200, {"id": "story-1", "name": "Login", "type": "custom"})
-        with (
-            _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]),
-            patch("minitest_cli.commands.user_story_update.ApiClient") as MockClient,
-        ):
-            instance = AsyncMock()
-            instance.patch.return_value = mock_resp
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-            result = _run_with_context(
-                ["update", "story-1", "--type", "Payments"],
-                settings,
-                json_mode=True,
-            )
-        assert result.exit_code == 0, result.output
-        payload = instance.patch.call_args.kwargs["json"]
-        assert payload["type"] == "custom"
-        assert payload["customUserStoryTypeId"] == "cft-1"
-
-    def test_list_filters_on_custom_type_id(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        mock_resp = _mock_response(200, {"items": [], "total": 0, "page": 1, "pageSize": 20})
-        with (
-            _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]),
-            patch("minitest_cli.commands.user_story.ApiClient") as MockClient,
-        ):
-            instance = AsyncMock()
-            instance.get.return_value = mock_resp
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-            result = _run_with_context(["list", "--type", "payments"], settings, json_mode=True)
-        assert result.exit_code == 0, result.output
-        params = instance.get.call_args.kwargs["params"]
-        assert params["custom_type_id"] == "cft-1"
-        assert "type" not in params
-
-    def test_unknown_type_lists_custom_names(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        with _patch_flow_types(custom_types=[CUSTOM_FLOW_TYPE]):
-            result = _run_with_context(
-                ["create", "--name", "Story", "--type", "nope"],
-                settings,
-            )
-        assert result.exit_code == 1
-        assert "Payments" in result.output
 
 
 class TestGetUserStory:
@@ -644,16 +500,6 @@ class TestUpdateUserStory:
         assert result.exit_code == 1
         assert "Use either --criteria or --add-criteria, not both" in result.output
 
-    def test_invalid_type_rejected(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        with _patch_flow_types():
-            result = _run_with_context(
-                ["update", "story-1", "--type", "nonsense"],
-                settings,
-            )
-        assert result.exit_code != 0
-        assert "invalid" in result.output.lower() or "nonsense" in result.output.lower()
-
 
 STORY_WITH_OVERRIDES = {
     "id": "story-1",
@@ -819,7 +665,6 @@ class TestCreateUserStoryDependsOn:
         post_resp = _mock_response(201, {"id": "story-new", "name": "Checkout", "type": "checkout"})
         patch_resp = _mock_response(200, SAMPLE_STORY_WITH_DEPS)
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -832,8 +677,6 @@ class TestCreateUserStoryDependsOn:
                     "create",
                     "--name",
                     "Checkout",
-                    "--type",
-                    "checkout",
                     "--depends-on",
                     "story-login",
                     "--depends-on",
@@ -853,7 +696,6 @@ class TestCreateUserStoryDependsOn:
         settings = _make_settings(tmp_path)
         post_resp = _mock_response(201, {"id": "story-new", "name": "S", "type": "login"})
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -861,7 +703,7 @@ class TestCreateUserStoryDependsOn:
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "S", "--type", "login"],
+                ["create", "--name", "S"],
                 settings,
                 json_mode=True,
             )
@@ -1053,7 +895,6 @@ class TestDeviceCountCreate:
         settings = _make_settings(tmp_path)
         mock_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -1061,7 +902,7 @@ class TestDeviceCountCreate:
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "Story", "--type", "login", *extra_args],
+                ["create", "--name", "Story", *extra_args],
                 settings,
                 json_mode=True,
             )
@@ -1183,7 +1024,6 @@ class TestCameraMediaCreate:
         settings = _make_settings(tmp_path)
         post_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -1191,7 +1031,7 @@ class TestCameraMediaCreate:
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "Story", "--type", "login", "--camera-media", CAMERA_FILE_ID],
+                ["create", "--name", "Story", "--camera-media", CAMERA_FILE_ID],
                 settings,
                 json_mode=True,
             )
@@ -1207,7 +1047,6 @@ class TestCameraMediaCreate:
         upload_resp = _mock_response(201, {"id": "file-x", "kind": "image"})
         post_resp = _mock_response(201, {"id": "s-1", "name": "Story", "type": "login"})
         with (
-            _patch_flow_types(),
             patch("minitest_cli.commands.user_story_create.ApiClient") as MockClient,
         ):
             instance = AsyncMock()
@@ -1216,7 +1055,7 @@ class TestCameraMediaCreate:
             MockClient.return_value.__aenter__ = AsyncMock(return_value=instance)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
             result = _run_with_context(
-                ["create", "--name", "Story", "--type", "login", "--camera-media", str(image)],
+                ["create", "--name", "Story", "--camera-media", str(image)],
                 settings,
                 json_mode=True,
             )

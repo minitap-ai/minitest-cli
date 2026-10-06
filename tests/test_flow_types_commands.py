@@ -4,7 +4,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-import pytest
 import typer
 from typer.testing import CliRunner
 
@@ -67,7 +66,7 @@ def _mock_response(status_code=200, json_data=None):
 
 
 def _names(result):
-    return [item["name"] for item in json.loads(result.output)]
+    return [item["name"] for item in json.loads(result.stdout)]
 
 
 def _apps_response(*tenant_ids):
@@ -97,8 +96,9 @@ class TestListFlowTypes:
             result = _run_with_context(["list"], settings, app_flag="app-1")
 
         assert result.exit_code == 0, result.output
-        lines = [line.strip() for line in result.output.splitlines() if line.strip()]
+        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         assert lines == _TYPES
+        assert "`minitest flow-types` is deprecated" in result.stderr
 
     def test_custom_types_are_appended(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -109,7 +109,7 @@ class TestListFlowTypes:
 
         assert result.exit_code == 0, result.output
         assert _names(result) == [*_TYPES, "Payments"]
-        assert json.loads(result.output)[-1] == {
+        assert json.loads(result.stdout)[-1] == {
             "name": "Payments",
             "custom": True,
             "id": "cft-1",
@@ -163,7 +163,7 @@ class TestListFlowTypes:
 
         assert result.exit_code == 0, result.output
         assert _names(result) == _TYPES
-        assert all(item["custom"] is False for item in json.loads(result.output))
+        assert all(item["custom"] is False for item in json.loads(result.stdout))
 
     def test_calls_correct_endpoint(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -231,7 +231,7 @@ class TestCreateFlowType:
             )
 
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output) == _CUSTOM_TYPE_JSON
+        assert json.loads(result.stdout) == _CUSTOM_TYPE_JSON
         client.post.assert_called_once_with(
             _CUSTOM_TYPES_PATH,
             json={"name": "Payments", "icon": "credit-card", "color": "green"},
@@ -294,7 +294,7 @@ class TestUpdateFlowType:
             )
 
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["name"] == "Billing"
+        assert json.loads(result.stdout)["name"] == "Billing"
         client.patch.assert_called_once_with(
             f"{_CUSTOM_TYPES_PATH}/cft-1", json={"name": "Billing"}
         )
@@ -346,7 +346,7 @@ class TestDeleteFlowType:
             )
 
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output) == {"deleted": True, "id": "cft-1"}
+        assert json.loads(result.stdout) == {"deleted": True, "id": "cft-1"}
         client.delete.assert_called_once_with(f"{_CUSTOM_TYPES_PATH}/cft-1")
 
     def test_refuses_without_confirmation(self, tmp_path):
@@ -372,46 +372,3 @@ class TestDeleteFlowType:
 
         assert result.exit_code == 4
         client.delete.assert_not_called()
-
-
-class TestFetchBuiltinFlowTypes:
-    def test_returns_api_types_on_success(self, tmp_path):
-        from minitest_cli.commands.flow_types_helpers import fetch_builtin_flow_types
-
-        settings = _make_settings(tmp_path)
-        mock_resp = MagicMock(spec=httpx.Response)
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = _TYPES
-        with patch("minitest_cli.commands.flow_types_helpers.httpx.get", return_value=mock_resp):
-            assert fetch_builtin_flow_types(settings) == _TYPES
-
-    def test_network_error_exits_3(self, tmp_path):
-        from click.exceptions import Exit
-
-        from minitest_cli.commands.flow_types_helpers import fetch_builtin_flow_types
-
-        settings = _make_settings(tmp_path)
-        with (
-            patch(
-                "minitest_cli.commands.flow_types_helpers.httpx.get",
-                side_effect=httpx.ConnectError("fail"),
-            ),
-            pytest.raises(Exit) as exc_info,
-        ):
-            fetch_builtin_flow_types(settings)
-        assert exc_info.value.exit_code == 3
-
-    def test_non_200_exits_3(self, tmp_path):
-        from click.exceptions import Exit
-
-        from minitest_cli.commands.flow_types_helpers import fetch_builtin_flow_types
-
-        settings = _make_settings(tmp_path)
-        mock_resp = MagicMock(spec=httpx.Response)
-        mock_resp.status_code = 500
-        with (
-            patch("minitest_cli.commands.flow_types_helpers.httpx.get", return_value=mock_resp),
-            pytest.raises(Exit) as exc_info,
-        ):
-            fetch_builtin_flow_types(settings)
-        assert exc_info.value.exit_code == 3

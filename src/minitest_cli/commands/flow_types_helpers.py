@@ -1,7 +1,5 @@
 """Shared helpers for flow (user-story) types: API paths, fetching, name resolution."""
 
-import asyncio
-from typing import NamedTuple
 from uuid import UUID
 
 import httpx
@@ -18,7 +16,6 @@ EXIT_NOT_FOUND = 4
 
 APPS_PATH = "/api/v1/apps"
 BUILTIN_TYPES_PATH = "/api/v1/user-story-types"
-CUSTOM_TYPE_VALUE = "custom"
 
 
 def custom_types_path(app_id: str, custom_type_id: str | None = None) -> str:
@@ -48,23 +45,6 @@ def handle_response_error(resp: httpx.Response) -> None:
         raise typer.Exit(code=1)
     print_error(f"API error ({resp.status_code}): {detail}")
     raise typer.Exit(code=EXIT_NETWORK_ERROR)
-
-
-def fetch_builtin_flow_types(settings: Settings) -> list[str]:
-    """Fetch the built-in flow type values from the API."""
-    try:
-        resp = httpx.get(f"{settings.api_url}{BUILTIN_TYPES_PATH}", timeout=10)
-    except httpx.HTTPError as exc:
-        print_error(f"Failed to fetch flow types: {exc}")
-        raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
-    if resp.status_code != 200:
-        print_error(f"Failed to fetch flow types: HTTP {resp.status_code}")
-        raise typer.Exit(code=EXIT_NETWORK_ERROR)
-    data = resp.json()
-    if not isinstance(data, list) or not data:
-        print_error("Invalid response from the flow types endpoint.")
-        raise typer.Exit(code=EXIT_NETWORK_ERROR)
-    return data
 
 
 def get_settings() -> Settings:
@@ -135,44 +115,3 @@ async def resolve_custom_flow_type_id(client: ApiClient, app_id: str, selector: 
     known = ", ".join(t.name for t in custom_types) or "none"
     print_error(f"No custom flow type named '{selector}'. Existing custom types: {known}")
     raise typer.Exit(code=EXIT_NOT_FOUND)
-
-
-def fetch_custom_flow_types(settings: Settings, app_id: str) -> list[CustomFlowType]:
-    """Fetch the tenant's custom flow types from a synchronous command body."""
-
-    async def _run() -> list[CustomFlowType]:
-        async with ApiClient(settings) as client:
-            return await get_custom_flow_types(client, app_id)
-
-    try:
-        return asyncio.run(_run())
-    except httpx.HTTPError as exc:
-        print_error(f"Failed to fetch custom flow types: {exc}")
-        raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
-
-
-class ResolvedFlowType(NamedTuple):
-    """A ``--type`` value resolved into the fields the user-story API expects."""
-
-    value: str
-    custom_type_id: str | None
-
-
-def resolve_flow_type(value: str, settings: Settings, app_id: str) -> ResolvedFlowType:
-    """Resolve a ``--type`` value against built-in types, then the tenant's custom ones.
-
-    Custom types resolve to the ``custom`` API type plus the matching type id, which
-    is what testing-service expects — the custom name itself is not a valid API value.
-    """
-    builtin_types = fetch_builtin_flow_types(settings)
-    if value in builtin_types:
-        return ResolvedFlowType(value, None)
-
-    custom_types = fetch_custom_flow_types(settings, app_id)
-    for custom_type in custom_types:
-        if custom_type.name.lower() == value.lower():
-            return ResolvedFlowType(CUSTOM_TYPE_VALUE, custom_type.id)
-
-    valid = [*builtin_types, *(t.name for t in custom_types)]
-    print_error(f"Invalid flow type '{value}'. Valid types: {', '.join(valid)}")
-    raise typer.Exit(code=1)

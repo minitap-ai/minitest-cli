@@ -22,6 +22,7 @@ from minitest_cli.commands import (
     run,
     screens,
     skill,
+    tags,
     test_file,
     test_profile,
     upgrade,
@@ -47,6 +48,7 @@ app.add_typer(user_story_bindings.app)
 app.add_typer(draft_feature.app)
 app.add_typer(test_profile.app)
 app.add_typer(test_file.app)
+app.add_typer(tags.app)
 app.add_typer(flow_types.app)
 app.add_typer(app_knowledge.app)
 app.add_typer(app_skill.app)

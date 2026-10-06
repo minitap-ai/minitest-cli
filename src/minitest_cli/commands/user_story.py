@@ -11,17 +11,23 @@ from minitest_cli.commands import (
     user_story_modify,
     user_story_setup_commit,
 )
-from minitest_cli.commands.flow_types_helpers import resolve_flow_type
+from minitest_cli.commands.tags_helpers import (
+    LegacyTypeOption,
+    collect_tag_names,
+    resolve_tag_ids,
+)
 from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_helpers import (
     USER_STORY_TABLE_HEADERS,
     base_path,
+    fetch_all_user_stories,
     format_pagination_info,
     format_user_story_row,
     get_app_flag,
     get_settings,
     handle_response_error,
     is_json_mode,
+    page_items,
     run_api_call,
 )
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
@@ -39,10 +45,11 @@ app.command(name="revoke-setup-commit")(user_story_setup_commit.revoke_setup_com
 
 @app.command(name="list")
 def list_user_stories(
-    user_story_type: Annotated[
-        str | None,
-        typer.Option("--type", help="Filter by built-in type or custom flow type name."),
+    tag: Annotated[
+        list[str] | None,
+        typer.Option("--tag", help="Only stories carrying any of these tags (repeatable)."),
     ] = None,
+    user_story_type: LegacyTypeOption = None,
     page: Annotated[int, typer.Option("--page", min=1, help="Page number.")] = 1,
     page_size: Annotated[
         int, typer.Option("--page-size", min=1, max=100, help="Items per page.")
@@ -57,51 +64,27 @@ def list_user_stories(
     json_mode = is_json_mode()
     require_auth(settings)
     app_id = resolve_app_id(settings, get_app_flag())
-    if all_stories:
-        page, page_size = 1, 100
-
-    params: dict[str, Any] = {"page": page, "page_size": page_size}
-    if user_story_type is not None:
-        flow_type = resolve_flow_type(user_story_type, settings, app_id)
-        if flow_type.custom_type_id is not None:
-            params["custom_type_id"] = flow_type.custom_type_id
-        else:
-            params["type"] = flow_type.value
+    tag_names = collect_tag_names(tag, user_story_type)
 
     async def _run() -> Any:
         async with ApiClient(settings) as client:
-            if not all_stories:
-                resp = await client.get(base_path(app_id), params=params)
-                handle_response_error(resp)
-                return resp.json()
-
-            items: list[dict[str, Any]] = []
-            next_page = 1
-            total: int | None = None
-            while total is None or len(items) < total:
-                resp = await client.get(
-                    base_path(app_id),
-                    params={**params, "page": next_page, "page_size": page_size},
-                )
-                handle_response_error(resp)
-                body = resp.json()
-                page_items = (
-                    body if isinstance(body, list) else body.get("items", body.get("results", []))
-                )
-                items.extend(page_items)
-                if isinstance(body, dict):
-                    total = body.get("total")
-                if not page_items or isinstance(body, list):
-                    break
-                next_page += 1
-            return items
+            params: dict[str, Any] = {}
+            if tag_names:
+                params["tagId"] = await resolve_tag_ids(client, app_id, tag_names)
+            if all_stories:
+                return await fetch_all_user_stories(client, app_id, params)
+            resp = await client.get(
+                base_path(app_id), params={**params, "page": page, "page_size": page_size}
+            )
+            handle_response_error(resp)
+            return resp.json()
 
     data = run_api_call(_run())
     if json_mode:
         output(data, json_mode=True)
         return
 
-    items = data if isinstance(data, list) else data.get("items", data.get("results", []))
+    items = page_items(data)
     if not items:
         print_info("No user stories found.")
         return

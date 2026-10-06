@@ -26,14 +26,17 @@ from minitest_cli.commands.flow_types_helpers import (
 )
 from minitest_cli.core.auth import require_auth
 from minitest_cli.models.flow_type import FlowTypeListItem
-from minitest_cli.utils.output import print_error, print_json
+from minitest_cli.utils.output import print_error, print_json, print_warning
 
-app = typer.Typer(name="flow-types", help="List, create and update flow (user-story) types.")
+app = typer.Typer(
+    name="flow-types", help="Deprecated: use `minitest tags`. Manage legacy flow types."
+)
 
 
 @app.callback()
 def _callback() -> None:
-    """Flow types operations."""
+    """Deprecated: use `minitest tags`."""
+    print_warning("`minitest flow-types` is deprecated; use `minitest tags` instead.")
 
 
 @app.command(name="list")

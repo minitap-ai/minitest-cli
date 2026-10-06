@@ -12,7 +12,7 @@ from minitest_cli.commands.user_story_device_count import (
     DeviceCountUpdateOption,
     parse_device_count,
 )
-from minitest_cli.commands.flow_types_helpers import resolve_flow_type
+from minitest_cli.commands import tags_helpers
 from minitest_cli.commands.user_story_helpers import (
     get_app_flag,
     get_settings,
@@ -42,9 +42,9 @@ from minitest_cli.utils.output import output, print_warning
 def update_user_story(
     user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
     name: Annotated[str | None, typer.Option("--name", help="New user-story name.")] = None,
-    user_story_type: Annotated[
-        str | None, typer.Option("--type", help="New built-in or custom flow type.")
-    ] = None,
+    tag: tags_helpers.TagOption = None,
+    clear_tags: tags_helpers.ClearTagsOption = False,
+    user_story_type: tags_helpers.LegacyTypeOption = None,
     description: Annotated[
         str | None, typer.Option("--description", help="New description.")
     ] = None,
@@ -138,7 +138,7 @@ def update_user_story(
 
     camera_source = resolve_camera_source(camera_media)
 
-    flow_type = resolve_flow_type(user_story_type, settings, app_id) if user_story_type else None
+    tags = tags_helpers.update_tag_names(tag, user_story_type, clear_tags=clear_tags)
 
     device_count_provided = device_count is not None
     device_count_value = parse_device_count(device_count) if device_count_provided else None
@@ -155,7 +155,7 @@ def update_user_story(
 
     payload = build_update_payload(
         name=name,
-        flow_type=flow_type,
+        tags=tags,
         description=description,
         depends_on=depends_on,
         profile=profile,

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from minitest_cli.models.base import CamelModel
+from minitest_cli.models.tag import TagRef
 from minitest_cli.models.targets import Platform
 
 
@@ -49,13 +50,14 @@ class UserStoryResponse(CamelModel):
     app_id: str
     name: str
     description: str | None = None
-    type: str
+    type: str | None = None
     created_at: datetime
     depends_on: list[str] = []
     test_profile_id: str | None = None
     test_profile: TestProfileSummary | None = None
     test_profiles: list[TestProfileSummary] = []
     camera_media_file_id: str | None = None
+    tags: list[TagRef] = []
 
 
 class UserStoryDetailResponse(UserStoryResponse):
@@ -81,8 +83,7 @@ class CreateUserStoryRequest(CamelModel):
 class UpdateUserStoryRequest(CamelModel):
     name: str | None = None
     description: str | None = None
-    type: str | None = None
-    custom_user_story_type_id: str | None = None
+    tags: list[str] | None = None
     acceptance_criteria: list[CriterionUpsertItem] | None = None
     depends_on: list[str] | None = None
     test_profile_ids: list[str] | None = None

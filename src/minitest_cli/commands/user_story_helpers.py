@@ -10,6 +10,7 @@ import typer
 from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
+from minitest_cli.api.client import ApiClient
 from minitest_cli.core.config import Settings
 from minitest_cli.models.user_story import (
     CriterionVersionResponse,
@@ -21,7 +22,7 @@ from minitest_cli.utils.output import print_error
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
 
-USER_STORY_TABLE_HEADERS = ["ID", "Name", "Type", "Description", "Acceptance Criteria", "Profiles"]
+USER_STORY_TABLE_HEADERS = ["ID", "Name", "Tags", "Description", "Acceptance Criteria", "Profiles"]
 
 
 def get_settings() -> Settings:
@@ -71,6 +72,32 @@ def handle_response_error(resp: httpx.Response, *, resource: str = "User story")
         raise typer.Exit(code=EXIT_NETWORK_ERROR)
 
 
+def page_items(body: Any) -> list[dict[str, Any]]:
+    return body if isinstance(body, list) else body.get("items", body.get("results", []))
+
+
+async def fetch_all_user_stories(
+    client: ApiClient, app_id: str, params: dict[str, Any]
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    next_page = 1
+    total: int | None = None
+    while total is None or len(items) < total:
+        resp = await client.get(
+            base_path(app_id), params={**params, "page": next_page, "page_size": 100}
+        )
+        handle_response_error(resp)
+        body = resp.json()
+        batch = page_items(body)
+        items.extend(batch)
+        if isinstance(body, dict):
+            total = body.get("total")
+        if not batch or isinstance(body, list):
+            break
+        next_page += 1
+    return items
+
+
 def run_api_call[T](coro: Coroutine[Any, Any, T]) -> T:
     try:
         return asyncio.run(coro)
@@ -96,7 +123,7 @@ def format_user_story_row(story: dict[str, Any], *, show_devices: bool = False) 
     row = [
         str(story.get("id", "")),
         story.get("name", ""),
-        story.get("type", ""),
+        ", ".join(str(tag.get("name", "")) for tag in story.get("tags") or []),
         story.get("description", "") or "",
         criteria_str,
         format_bound_profiles(story),

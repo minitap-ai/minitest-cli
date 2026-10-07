@@ -23,6 +23,11 @@ from minitest_cli.commands.run_helpers import (
     run_api_call,
 )
 from minitest_cli.models import BatchResponse, BatchStatus, CreateBatchRequest
+from minitest_cli.commands.run_targets import (
+    AndroidDeviceTypeOpt,
+    IosDeviceTypeOpt,
+    build_commit_targets,
+)
 from minitest_cli.utils.output import output, print_info, print_success, print_warning
 
 CommitShaArg = Annotated[
@@ -49,6 +54,8 @@ TimeoutOpt = Annotated[int, typer.Option("--timeout", help="Seconds to poll befo
 def from_commit(
     commit_sha: CommitShaArg,
     platform: PlatformOpt = None,
+    ios_device_type: IosDeviceTypeOpt = None,
+    android_device_type: AndroidDeviceTypeOpt = None,
     user_story: UserStoryOpt = None,
     watch: WatchOpt = True,
     timeout: TimeoutOpt = DEFAULT_TIMEOUT_SECONDS,
@@ -57,6 +64,7 @@ def from_commit(
     settings, app_id, json_mode = resolve_app()
     sha = validate_commit_sha(commit_sha)
     platforms = validate_platforms(platform)
+    targets = build_commit_targets(platforms, ios_device_type, android_device_type)
 
     async def _run() -> BatchResponse:
         async with ApiClient(settings) as client:
@@ -65,11 +73,19 @@ def from_commit(
                 story_ids = [
                     await resolve_user_story_id(client, app_id, name) for name in user_story
                 ]
-            body = CreateBatchRequest(user_story_ids=story_ids, commit_sha=sha, platforms=platforms)
+            body = CreateBatchRequest(
+                user_story_ids=story_ids,
+                commit_sha=sha,
+                platforms=platforms if targets is None else None,
+                targets=targets,
+            )
             batch = await post_batch(client, app_id, body)
             if not watch:
                 return batch
-            return await poll_batch(client, app_id, batch.id, timeout)
+            seen_warnings = {
+                warning for target in batch.targets for warning in target.compatibility_warnings
+            }
+            return await poll_batch(client, app_id, batch.id, timeout, seen_warnings)
 
     batch = run_api_call(_run())
     payload = batch_commit_payload(batch)

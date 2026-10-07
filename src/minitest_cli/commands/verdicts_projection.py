@@ -38,6 +38,8 @@ def project_target(target: BatchTargetView) -> VerdictTarget:
     counters = target.counters
     return VerdictTarget(
         platform=target.platform,
+        device_type=target.device_type,
+        label=target.label,
         build_id=target.build_id,
         verdict=counters.verdict,
         execution_state=counters.execution_state,
@@ -54,6 +56,8 @@ def _project_platform(platform_run: PlatformRun, *, verbose: bool) -> VerdictSto
     build_id = str(platform_run.build_id) if platform_run.build_id else None
     return VerdictStoryPlatform(
         platform=platform_run.platform,
+        device_type=platform_run.device_type,
+        label=platform_run.label,
         verdict=platform_run.verdict,
         execution_state=platform_run.execution_state,
         skip_reason=platform_run.skip_reason,

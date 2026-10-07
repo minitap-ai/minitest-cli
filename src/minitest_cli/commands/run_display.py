@@ -60,7 +60,7 @@ def format_run_row(run: StoryRunResponse) -> list[str]:
 
 
 def _platform_label(p: PlatformRun) -> str:
-    return p.label or target_label(p.platform, p.browser, p.viewport)
+    return p.label or target_label(p.platform, p.browser, p.viewport, p.device_type)
 
 
 def _platform_status_line(p: PlatformRun) -> tuple[str, str | None]:
@@ -100,7 +100,16 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
     rows: list[list[str]] = []
     for cr in run.results:
         result_str = "[green]✓ pass[/green]" if cr.success else "[red]✗ fail[/red]"
-        platform_label = target_label(cr.platform, None, None)
+        matching_platforms = [
+            p
+            for p in run.platforms
+            if (p.srp_id == cr.srp_id if cr.srp_id else p.platform == cr.platform)
+        ]
+        platform_label = (
+            _platform_label(matching_platforms[0])
+            if len(matching_platforms) == 1
+            else target_label(cr.platform, None, None)
+        )
         if cr.is_platform_override:
             platform_label += " *"
         rows.append([cr.criterion_version_id, platform_label, result_str, cr.fail_reason or ""])

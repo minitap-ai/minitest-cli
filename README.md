@@ -78,6 +78,32 @@ minitest --app <app-id> run all --web
 minitest --app <app-id> run all --ios-build <ios-build-id> --android-build <android-build-id>
 ```
 
+## Native cloud tablets
+
+Native lanes default to phones. Use `--ios-device-type phone|tablet` or
+`--android-device-type phone|tablet` on `run start` (including `--tag`), `run all`,
+or `run from-commit` to configure an already selected native cloud lane:
+
+```bash
+minitest --app <app-id> run all --ios-build <ios-build-id> --ios-device-type tablet
+minitest --app <app-id> run start --tag smoke --android-build <android-build-id> --android-device-type tablet
+minitest --app <app-id> run from-commit <full-sha> --platform ios --ios-device-type tablet
+```
+
+The device-type options do not select an OS: `start`/`all` still need the
+corresponding build flag; `from-commit` uses `--platform` (or its existing iOS +
+Android default). An explicit device type, even `phone`, errors when that OS is
+not selected. These options do not apply to physical devices, web/mobile-web
+targets, or Edge. V1 supports one form factor per OS per run; run phone and
+tablet suites separately. Tablet results are labelled `iOS · Tablet` or
+`Android · Tablet`; phone labels stay unchanged.
+
+An iPhone-only build may run on iPad in compatibility mode; the server warns
+that the run does not establish native tablet-layout coverage. Unknown
+device-family metadata produces a different warning with the same coverage
+limitation. Neither warning blocks launch. These per-run options do not change
+app defaults.
+
 ## Configuration
 
 | Environment Variable          | Description                                                | Required                           |

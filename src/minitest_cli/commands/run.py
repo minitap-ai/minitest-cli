@@ -26,8 +26,10 @@ from minitest_cli.commands.run_cancel import cancel
 from minitest_cli.commands.run_commit import from_commit
 from minitest_cli.commands.run_targets import (
     AndroidBuildOpt,
+    AndroidDeviceTypeOpt,
     build_targets,
     IosBuildOpt,
+    IosDeviceTypeOpt,
     WebOpt,
 )
 from minitest_cli.commands.run_feedback import feedback
@@ -63,6 +65,8 @@ def start(
     ios_build: IosBuildOpt = None,
     android_build: AndroidBuildOpt = None,
     web: WebOpt = False,
+    ios_device_type: IosDeviceTypeOpt = None,
+    android_device_type: AndroidDeviceTypeOpt = None,
     watch: Annotated[
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
@@ -72,7 +76,7 @@ def start(
         print_error("Pass either a user story or --tag, not both or neither.")
         raise typer.Exit(code=1)
     settings, app_id, json_mode = resolve_app()
-    targets = build_targets(ios_build, android_build, web)
+    targets = build_targets(ios_build, android_build, web, ios_device_type, android_device_type)
     if tag:
         print_batch_started(start_tagged(settings, app_id, tag, targets), json_mode)
         return
@@ -168,10 +172,12 @@ def run_all(
     ios_build: IosBuildOpt = None,
     android_build: AndroidBuildOpt = None,
     web: WebOpt = False,
+    ios_device_type: IosDeviceTypeOpt = None,
+    android_device_type: AndroidDeviceTypeOpt = None,
 ) -> None:
     """Start a batch covering every user story for the app."""
     settings, app_id, json_mode = resolve_app()
-    targets = build_targets(ios_build, android_build, web)
+    targets = build_targets(ios_build, android_build, web, ios_device_type, android_device_type)
 
     async def _run_all() -> BatchResponse:
         async with ApiClient(settings) as client:

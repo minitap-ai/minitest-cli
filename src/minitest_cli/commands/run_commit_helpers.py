@@ -6,6 +6,7 @@ from typing import Any
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.batch_helpers import batches_base_path
+from minitest_cli.commands.batch_warnings import print_compatibility_warnings
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import handle_response_error
 from minitest_cli.models import BatchResponse, BatchStatus
@@ -28,6 +29,11 @@ def batch_commit_payload(batch: BatchResponse) -> dict[str, Any]:
         "targets": [
             {
                 "platform": target.platform,
+                **(
+                    {"deviceType": target.device_type, "label": target.label}
+                    if target.device_type is not None
+                    else {}
+                ),
                 "buildId": target.build_id,
                 "status": target.counters.status,
                 "passed": target.counters.passed,
@@ -48,16 +54,22 @@ def batch_commit_payload(batch: BatchResponse) -> dict[str, Any]:
 
 
 async def poll_batch(
-    client: ApiClient, app_id: str, batch_id: str, timeout_seconds: int
+    client: ApiClient,
+    app_id: str,
+    batch_id: str,
+    timeout_seconds: int,
+    seen_warnings: set[str] | None = None,
 ) -> BatchResponse:
     path = f"{batches_base_path(app_id)}/{batch_id}"
     deadline = time.monotonic() + timeout_seconds
+    reported_warnings = seen_warnings if seen_warnings is not None else set()
 
     with err_console.status("[bold blue]Waiting for the build and the run...") as spinner:
         while True:
             resp = await client.get(path)
             handle_response_error(resp, resource="Batch")
             batch = BatchResponse.model_validate(resp.json())
+            print_compatibility_warnings(batch, reported_warnings)
             spinner.update(f"[bold blue]Batch {batch.status.value} ({len(batch.story_runs)} runs)")
             if batch.status in TERMINAL_BATCH_STATUSES:
                 return batch

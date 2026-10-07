@@ -1,6 +1,7 @@
 """Build models: uploaded artifacts and builds produced from a GitHub commit."""
 
 from datetime import datetime
+from typing import Literal
 
 from minitest_cli.models.base import CamelModel
 
@@ -37,6 +38,8 @@ class BuildContext(CamelModel):
     commit_title: str | None = None
     app_version: str | None = None
     build_number: str | None = None
+    device_family: list[int] | None = None
+    tablet_compatibility: Literal["supported", "incompatible", "unknown"] | None = None
     status: str | None = None
     error_class: str | None = None
     error_summary: str | None = None

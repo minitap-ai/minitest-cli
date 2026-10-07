@@ -5,6 +5,7 @@ from typing import Any
 from minitest_cli.api.client import BATCH_CREATE_TIMEOUT, ApiClient
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import handle_response_error
+from minitest_cli.commands.batch_warnings import print_compatibility_warnings
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 
 
@@ -21,7 +22,9 @@ async def post_batch(client: ApiClient, app_id: str, body: CreateBatchRequest) -
         timeout=BATCH_CREATE_TIMEOUT,
     )
     handle_response_error(resp, resource="Batch")
-    return BatchResponse.model_validate(resp.json())
+    batch = BatchResponse.model_validate(resp.json())
+    print_compatibility_warnings(batch)
+    return batch
 
 
 def batch_summary_payload(batch: BatchResponse) -> dict[str, Any]:

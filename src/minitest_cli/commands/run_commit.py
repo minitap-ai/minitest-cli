@@ -12,6 +12,7 @@ from minitest_cli.commands.commit_helpers import (
     validate_commit_sha,
     validate_platforms,
 )
+from minitest_cli.commands.deprecated_alias import deprecated_option, merge_deprecated_option
 from minitest_cli.commands.run_commit_helpers import (
     DEFAULT_TIMEOUT_SECONDS,
     batch_commit_payload,
@@ -34,13 +35,16 @@ CommitShaArg = Annotated[
     str, typer.Argument(help="Full 40-character commit SHA to build and test.")
 ]
 
-UserStoryOpt = Annotated[
+ScenarioOpt = Annotated[
     list[str] | None,
     typer.Option(
-        "--user-story",
-        "-u",
+        "--scenario",
+        "-s",
         help="Scenario id or name. Repeatable. Omit to run every scenario.",
     ),
+]
+LegacyUserStoryOpt = Annotated[
+    list[str] | None, deprecated_option("--user-story", "-u", new_flag="--scenario")
 ]
 
 WatchOpt = Annotated[
@@ -56,7 +60,8 @@ def from_commit(
     platform: PlatformOpt = None,
     ios_device_type: IosDeviceTypeOpt = None,
     android_device_type: AndroidDeviceTypeOpt = None,
-    user_story: UserStoryOpt = None,
+    scenario: ScenarioOpt = None,
+    legacy_user_story: LegacyUserStoryOpt = None,
     watch: WatchOpt = True,
     timeout: TimeoutOpt = DEFAULT_TIMEOUT_SECONDS,
 ) -> None:
@@ -65,13 +70,16 @@ def from_commit(
     sha = validate_commit_sha(commit_sha)
     platforms = validate_platforms(platform)
     targets = build_commit_targets(platforms, ios_device_type, android_device_type)
+    scenarios = merge_deprecated_option(
+        scenario, legacy_user_story, old_flag="--user-story", new_flag="--scenario"
+    )
 
     async def _run() -> BatchResponse:
         async with ApiClient(settings) as client:
             story_ids = None
-            if user_story:
+            if scenarios:
                 story_ids = [
-                    await resolve_user_story_id(client, app_id, name) for name in user_story
+                    await resolve_user_story_id(client, app_id, name) for name in scenarios
                 ]
             body = CreateBatchRequest(
                 user_story_ids=story_ids,

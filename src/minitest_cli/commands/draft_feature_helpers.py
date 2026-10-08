@@ -59,7 +59,9 @@ def handle_response_error(resp: httpx.Response, *, resource: str = "Draft featur
     if resp.status_code == 409:
         detail = extract_detail(resp)
         print_error(detail or f"{resource} changed since it was read.")
-        print_info("Re-run `df show --view diff`, rebuild against the mainRev it returns, retry.")
+        print_info(
+            "Re-run `draft show --view diff`, rebuild against the mainRev it returns, retry."
+        )
         raise typer.Exit(code=EXIT_CONFLICT)
     if resp.status_code >= 400:
         detail = extract_detail(resp)

@@ -1,4 +1,4 @@
-"""Rendering for `minitest df show --view conflicts`.
+"""Rendering for `minitest draft show --view conflicts`.
 
 The three sides of a conflict are whole story tuples, so printing them as three
 JSON blobs in a table makes the one thing a resolver needs — which key is in

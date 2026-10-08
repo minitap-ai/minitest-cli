@@ -11,6 +11,7 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands import draft_feature_apply, draft_feature_show
+from minitest_cli.commands.deprecated_alias import deprecated_alias
 from minitest_cli.commands.draft_feature_helpers import (
     DRAFT_FEATURE_TABLE_HEADERS,
     base_path,
@@ -21,7 +22,7 @@ from minitest_cli.commands.run_helpers import ensure_uuid, resolve_app, run_api_
 from minitest_cli.models.draft_feature import DraftFeatureResponse, DraftFeatureStatus
 from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
 
-app = typer.Typer(name="df", help="Draft features — branches of the app's test suite.")
+app = typer.Typer(name="draft", help="Drafts — branches of the app's test suite.")
 draft_feature_show.register(app)
 draft_feature_apply.register(app)
 
@@ -42,7 +43,7 @@ def list_draft_features(
     async def _list() -> list[DraftFeatureResponse]:
         async with ApiClient(settings) as client:
             resp = await client.get(base_path(app_id), params=params)
-            handle_response_error(resp, resource="Draft features")
+            handle_response_error(resp, resource="Drafts")
             return [DraftFeatureResponse.model_validate(item) for item in resp.json()]
 
     features = run_api_call(_list())
@@ -51,12 +52,12 @@ def list_draft_features(
         output([f.model_dump(mode="json", by_alias=True) for f in features], json_mode=True)
         return
     if not features:
-        print_info("No draft features found.")
+        print_info("No drafts found.")
         return
     print_table(
         DRAFT_FEATURE_TABLE_HEADERS,
         [format_draft_feature_row(f) for f in features],
-        title=f"Draft features ({len(features)})",
+        title=f"Drafts ({len(features)})",
     )
 
 
@@ -88,7 +89,7 @@ def create_draft_feature(
 
     feature = run_api_call(_create())
     if not json_mode:
-        print_success(f"Draft feature created: {feature.id}")
+        print_success(f"Draft created: {feature.id}")
     output(feature.model_dump(mode="json", by_alias=True), json_mode=json_mode)
 
 
@@ -114,4 +115,7 @@ def delete_draft_feature(
     if json_mode:
         output(feature.model_dump(mode="json", by_alias=True), json_mode=True)
     else:
-        print_success(f"Draft feature abandoned: {feature.id} (status: {feature.status.value})")
+        print_success(f"Draft abandoned: {feature.id} (status: {feature.status.value})")
+
+
+legacy_app = deprecated_alias(app, old_name="df")

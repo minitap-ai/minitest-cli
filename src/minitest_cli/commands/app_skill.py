@@ -21,7 +21,7 @@ from minitest_cli.utils.output import print_info, print_json, print_success, pri
 
 app = typer.Typer(
     name="app-skill",
-    help="Manage app skills: procedures Mini loads to arrange test state.",
+    help="Manage app skills (Skills in the webapp): procedures Mini loads to arrange test state.",
     no_args_is_help=True,
 )
 app.add_typer(app_skill_secret.app)

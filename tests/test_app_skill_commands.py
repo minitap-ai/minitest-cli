@@ -1,4 +1,4 @@
-"""`app-skill` and `user-story-binding set-skills` against a recorded testing-service contract."""
+"""`app-skill` and `scenario-binding set-app-skills` against a recorded testing-service contract."""
 
 import json
 
@@ -210,9 +210,12 @@ def test_backend_refusals_map_to_documented_exit_codes(tmp_path, status, body, e
 def test_set_skills_replaces_the_scenario_links(tmp_path):
     recorder = Recorder(httpx.Response(200, json={"skills": []}))
 
-    result = _invoke(binding_app, ["set-skills", "story-1", "--clear"], recorder, tmp_path)
+    result = _invoke(binding_app, ["set-app-skills", "story-1", "--clear"], recorder, tmp_path)
     linked = _invoke(
-        binding_app, ["set-skills", "story-1", "--skill", "clutch-test-backend"], recorder, tmp_path
+        binding_app,
+        ["set-app-skills", "story-1", "--skill", "clutch-test-backend"],
+        recorder,
+        tmp_path,
     )
 
     assert result.exit_code == 0, result.output

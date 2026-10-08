@@ -7,7 +7,10 @@ import typer
 from minitest_cli.api.errors import format_network_error
 from minitest_cli.utils.output import err_console, print_error
 
-app = typer.Typer(name="skill", help="Retrieve the minitest CLI skill for AI agents.")
+app = typer.Typer(
+    name="skill",
+    help="Print the minitest CLI skill for your AI coding agent (not app skills: see app-skill).",
+)
 
 _DEFAULT_SKILL_URL = (
     "https://raw.githubusercontent.com/minitap-ai/agent-skills/main/skills/minitest-cli/SKILL.md"

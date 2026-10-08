@@ -1,3 +1,5 @@
+import functools
+from collections.abc import Callable
 from typing import Any
 
 import typer
@@ -16,6 +18,23 @@ def deprecated_alias(source: typer.Typer, *, old_name: str) -> typer.Typer:
 
     alias.registered_commands = source.registered_commands
     return alias
+
+
+def deprecated_command(
+    group: typer.Typer, command: Callable[..., Any], *, old_name: str, new_name: str
+) -> None:
+    """Register ``command`` again under a hidden legacy subcommand name that warns on stderr."""
+    group_name = group.info.name
+
+    @functools.wraps(command)
+    def _legacy(*args: Any, **kwargs: Any) -> Any:
+        print_warning(
+            f"`minitest {group_name} {old_name}` is deprecated; "
+            f"use `minitest {group_name} {new_name}` instead."
+        )
+        return command(*args, **kwargs)
+
+    group.command(name=old_name, hidden=True, help=f"Deprecated: use `{new_name}`.")(_legacy)
 
 
 def deprecated_option(*param_decls: str, new_flag: str) -> Any:

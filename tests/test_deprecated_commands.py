@@ -15,12 +15,14 @@ from minitest_cli.main import app
 runner = CliRunner()
 
 STORY = {"id": "story-1", "name": "Login", "acceptanceCriteria": [], "testProfiles": []}
+SKILLS = {"skills": [{"name": "seed-backend"}]}
 DRAFTS: list[dict[str, str]] = []
 FILES = {"items": [{"id": "file-1", "name": "avatar.png", "kind": "image"}]}
 BACKEND = {
     "/api/v1/apps/app-123/user-stories/story-1": STORY,
     "/api/v1/apps/app-123/user-stories/story-1/files": FILES,
     "/api/v1/apps/app-123/draft-features": DRAFTS,
+    "/api/v1/apps/app-123/user-stories/story-1/skills": SKILLS,
 }
 
 
@@ -45,25 +47,32 @@ def _invoke(args: list[str]):
 @pytest.mark.parametrize(
     ("new", "legacy", "args", "expected"),
     [
-        ("scenario", "user-story", ["get", "story-1"], STORY),
-        ("scenario-binding", "user-story-binding", ["list-files", "story-1"], FILES),
-        ("draft", "df", ["list"], DRAFTS),
+        (["scenario"], ["user-story"], ["get", "story-1"], STORY),
+        (["scenario-binding"], ["user-story-binding"], ["list-files", "story-1"], FILES),
+        (["draft"], ["df"], ["list"], DRAFTS),
+        (
+            ["scenario-binding", "set-app-skills"],
+            ["scenario-binding", "set-skills"],
+            ["story-1", "--skill", "seed-backend"],
+            SKILLS,
+        ),
     ],
 )
 class TestLegacyAlias:
     def test_json_stdout_is_identical_and_unchanged(self, new, legacy, args, expected):
-        current = _invoke(["--json", new, *args])
-        deprecated = _invoke(["--json", legacy, *args])
+        current = _invoke(["--json", *new, *args])
+        deprecated = _invoke(["--json", *legacy, *args])
 
         assert current.exit_code == deprecated.exit_code == 0, deprecated.output
         assert deprecated.stdout == current.stdout
         assert json.loads(deprecated.stdout) == expected
 
     def test_only_the_legacy_name_warns_once_on_stderr(self, new, legacy, args, expected):
-        current = _invoke(["--json", new, *args])
-        deprecated = _invoke(["--json", legacy, *args])
+        current = _invoke(["--json", *new, *args])
+        deprecated = _invoke(["--json", *legacy, *args])
 
-        warning = f"`minitest {legacy}` is deprecated; use `minitest {new}` instead."
+        old_cmd, new_cmd = " ".join(legacy), " ".join(new)
+        warning = f"`minitest {old_cmd}` is deprecated; use `minitest {new_cmd}` instead."
         assert " ".join(unstyle(deprecated.stderr).split()).count(warning) == 1
         assert "deprecated" not in deprecated.stdout
         assert "deprecated" not in current.stderr

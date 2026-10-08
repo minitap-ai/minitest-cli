@@ -134,7 +134,8 @@ app defaults.
 | ---------------- | ------------------------- |
 | `minitest auth`  | Authentication management |
 | `minitest apps`  | List, inspect, and create apps |
-| `minitest user-story` | User-story operations |
+| `minitest scenario` | Create, update, list and delete scenarios (`user-story` is a deprecated alias) |
+| `minitest scenario-binding` | Bind test profiles, files or skills to scenarios (`user-story-binding` is a deprecated alias) |
 | `minitest df`    | Draft features — branches of the test suite |
 | `minitest flow-types` | List flow types, create/rename/delete custom ones |
 | `minitest screens` | Inspect the screens exploration mapped for an app |
@@ -144,7 +145,7 @@ app defaults.
 
 ## CLI-only maintenance
 
-`minitest maintenance` lets a coding agent keep Minitest user stories in sync
+`minitest maintenance` lets a coding agent keep Minitest scenarios in sync
 without connecting GitHub. Run it from the app repository: the code stays on the
 machine, while the CLI sends only proposed test-flow edits and the local HEAD SHA.
 
@@ -156,7 +157,7 @@ minitest maintenance --agent
 minitest --json maintenance context
 minitest maintenance affected --file affected.json
 minitest maintenance change --file change.json
-minitest maintenance status --phase writing --message "Updating affected stories"
+minitest maintenance status --phase writing --message "Updating affected scenarios"
 minitest maintenance complete --changed
 
 # Apply proposed edits now, or open the web review queue

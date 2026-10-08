@@ -27,7 +27,7 @@ from minitest_cli.utils.output import (
     print_table,
 )
 
-app = typer.Typer(name="batch", help="Manage batch runs (multi-scenario executions).")
+app = typer.Typer(name="batch", help="List, inspect and cancel runs (Runs in the webapp).")
 
 BATCH_TABLE_HEADERS = ["ID", "Status", "Source", "Commit", "Tag", "Targets", "Created"]
 
@@ -67,7 +67,7 @@ def list_batches(
     search: Annotated[str | None, typer.Option("--search")] = None,
     all_pages: Annotated[bool, typer.Option("--all", help="Fetch all pages.")] = False,
 ) -> None:
-    """List batches for the current app."""
+    """List the runs (batches) of the current app."""
     settings, app_id, json_mode = resolve_app()
     if all_pages:
         page, page_size = 1, 100
@@ -115,9 +115,9 @@ def list_batches(
 
 @app.command(name="get")
 def get_batch(
-    batch_id: Annotated[str, typer.Argument(help="Batch ID.")],
+    batch_id: Annotated[str, typer.Argument(help="Run (batch) ID.")],
 ) -> None:
-    """Get a single batch with its scenario runs."""
+    """Get one run (batch) with its scenario runs."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(batch_id, kind="batch id")
 
@@ -180,9 +180,9 @@ def get_batch(
 
 @app.command()
 def cancel(
-    batch_id: Annotated[str, typer.Argument(help="Batch ID to cancel.")],
+    batch_id: Annotated[str, typer.Argument(help="Run (batch) ID to cancel.")],
 ) -> None:
-    """Cancel a batch and all its pending/running scenario runs."""
+    """Cancel a run (batch) and all its pending/running scenario runs."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(batch_id, kind="batch id")
 

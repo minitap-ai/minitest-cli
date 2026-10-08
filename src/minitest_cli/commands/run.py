@@ -50,7 +50,9 @@ from minitest_cli.utils.output import (
     print_table,
 )
 
-app = typer.Typer(name="run", help="Test execution.")
+app = typer.Typer(
+    name="run", help="Start runs (Runs in the webapp) and inspect their scenario runs."
+)
 
 
 @app.command()
@@ -71,7 +73,7 @@ def start(
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
 ) -> None:
-    """Start a run for one scenario, or one batch over every scenario with --tag."""
+    """Start a run for one scenario, or for every scenario carrying --tag."""
     if (user_story is None) == (not tag):
         print_error("Pass either a scenario or --tag, not both or neither.")
         raise typer.Exit(code=1)
@@ -113,7 +115,7 @@ def status(
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: no-watch).")
     ] = False,
 ) -> None:
-    """Check the status of a test run."""
+    """Check the status of a scenario run."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="run id")
 
@@ -143,7 +145,7 @@ def list_runs(
     ] = None,
     all_pages: Annotated[bool, typer.Option("--all", help="Fetch all results.")] = False,
 ) -> None:
-    """List runs for a scenario."""
+    """List the scenario runs of one scenario."""
     settings, app_id, json_mode = resolve_app()
     if all_pages:
         page, page_size = 1, 100
@@ -175,7 +177,7 @@ def run_all(
     ios_device_type: IosDeviceTypeOpt = None,
     android_device_type: AndroidDeviceTypeOpt = None,
 ) -> None:
-    """Start a batch covering every scenario for the app."""
+    """Start a run covering every scenario of the app."""
     settings, app_id, json_mode = resolve_app()
     targets = build_targets(ios_build, android_build, web, ios_device_type, android_device_type)
 

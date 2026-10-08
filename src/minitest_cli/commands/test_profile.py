@@ -25,7 +25,9 @@ from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_success
 
-app = typer.Typer(name="test-profile", help="Test-profile operations (app-scoped).")
+app = typer.Typer(
+    name="test-profile", help="Manage the app's test profiles (Test accounts in the webapp)."
+)
 test_profile_list.register(app)
 test_profile_default.register(app)
 test_profile_update.register(app)

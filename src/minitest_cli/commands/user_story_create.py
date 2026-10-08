@@ -28,11 +28,11 @@ from minitest_cli.utils.output import output, print_error, print_info, print_suc
 
 
 def create_user_story(
-    name: Annotated[str, typer.Option("--name", help="User-story name.")],
+    name: Annotated[str, typer.Option("--name", help="Scenario name.")],
     tag: TagOption = None,
     user_story_type: LegacyTypeOption = None,
     description: Annotated[
-        str | None, typer.Option("--description", help="User-story description.")
+        str | None, typer.Option("--description", help="Scenario description.")
     ] = None,
     criteria: Annotated[
         list[str] | None, typer.Option("--criteria", help="Acceptance criteria (repeatable).")
@@ -42,7 +42,7 @@ def create_user_story(
         typer.Option(
             "--depends-on",
             help=(
-                "Parent user-story IDs this story depends on (repeatable). "
+                "Parent scenario IDs this scenario depends on (repeatable). "
                 "Validated server-side after creation: same-app, no cycles, "
                 "references must exist."
             ),
@@ -67,7 +67,7 @@ def create_user_story(
         ),
     ] = None,
 ) -> None:
-    """Create a new user story."""
+    """Create a new scenario."""
     if idempotency_key is not None and not 1 <= len(idempotency_key) <= 255:
         raise typer.BadParameter(
             "must contain between 1 and 255 characters",
@@ -108,7 +108,7 @@ def create_user_story(
             if depends_on:
                 story_id = created.get("id")
                 if not story_id:
-                    print_error("Server did not return an id for the new user story.")
+                    print_error("Server did not return an id for the new scenario.")
                     raise typer.Exit(code=1)
                 patch_resp = await client.patch(
                     f"{base_path(app_id)}/{story_id}",
@@ -120,7 +120,7 @@ def create_user_story(
 
     data = run_api_call(_run())
     if not json_mode:
-        print_success(f"User story created: {data.get('id', '')}")
+        print_success(f"Scenario created: {data.get('id', '')}")
         bound = format_bound_profiles(data)
         if bound:
             label = "Default profile auto-assigned" if not profile else "Profiles bound"

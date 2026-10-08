@@ -19,10 +19,10 @@ from minitest_cli.utils.output import output, print_error, print_success
 
 
 def delete_user_story(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation.")] = False,
 ) -> None:
-    """Delete a user story. Requires --force flag."""
+    """Delete a scenario. Requires --force flag."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -40,4 +40,4 @@ def delete_user_story(
     if json_mode:
         output({"deleted": True, "id": user_story_id}, json_mode=True)
     else:
-        print_success(f"User story deleted: {user_story_id}")
+        print_success(f"Scenario deleted: {user_story_id}")

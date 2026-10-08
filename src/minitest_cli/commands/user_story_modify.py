@@ -40,8 +40,8 @@ from minitest_cli.utils.output import output, print_warning
 
 
 def update_user_story(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
-    name: Annotated[str | None, typer.Option("--name", help="New user-story name.")] = None,
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
+    name: Annotated[str | None, typer.Option("--name", help="New scenario name.")] = None,
     tag: tags_helpers.TagOption = None,
     clear_tags: tags_helpers.ClearTagsOption = False,
     user_story_type: tags_helpers.LegacyTypeOption = None,
@@ -77,7 +77,7 @@ def update_user_story(
         typer.Option(
             "--depends-on",
             help=(
-                "Replace the full set of parent user-story IDs (repeatable). Validated "
+                "Replace the full set of parent scenario IDs (repeatable). Validated "
                 "server-side: same-app, no cycles, no self-loops, references must exist."
             ),
         ),
@@ -87,7 +87,7 @@ def update_user_story(
         typer.Option(
             "--remove-dependency",
             help=(
-                "Remove specific parent user-story IDs from the existing set (repeatable). "
+                "Remove specific parent scenario IDs from the existing set (repeatable). "
                 "Ignored when --depends-on is also provided."
             ),
         ),
@@ -115,7 +115,7 @@ def update_user_story(
         ),
     ] = False,
 ) -> None:
-    """Update an existing user story (partial update)."""
+    """Update an existing scenario (partial update)."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)

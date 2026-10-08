@@ -1,4 +1,4 @@
-"""User-story commands: list, get."""
+"""Scenario commands (legacy name: user story): list, get."""
 
 from typing import Annotated, Any
 
@@ -11,6 +11,7 @@ from minitest_cli.commands import (
     user_story_modify,
     user_story_setup_commit,
 )
+from minitest_cli.commands.deprecated_alias import deprecated_alias
 from minitest_cli.commands.tags_helpers import (
     LegacyTypeOption,
     collect_tag_names,
@@ -35,7 +36,7 @@ from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_info, print_table
 
-app = typer.Typer(name="user-story", help="User-story operations.")
+app = typer.Typer(name="scenario", help="Create, update, list and delete scenarios.")
 app.command(name="create")(user_story_create.create_user_story)
 app.command(name="update")(user_story_modify.update_user_story)
 app.command(name="delete")(user_story_delete.delete_user_story)
@@ -47,7 +48,7 @@ app.command(name="revoke-setup-commit")(user_story_setup_commit.revoke_setup_com
 def list_user_stories(
     tag: Annotated[
         list[str] | None,
-        typer.Option("--tag", help="Only stories carrying any of these tags (repeatable)."),
+        typer.Option("--tag", help="Only scenarios carrying any of these tags (repeatable)."),
     ] = None,
     user_story_type: LegacyTypeOption = None,
     page: Annotated[int, typer.Option("--page", min=1, help="Page number.")] = 1,
@@ -56,10 +57,10 @@ def list_user_stories(
     ] = 20,
     all_stories: Annotated[
         bool,
-        typer.Option("--all", help="Fetch all user stories (ignores --page and --page-size)."),
+        typer.Option("--all", help="Fetch all scenarios (ignores --page and --page-size)."),
     ] = False,
 ) -> None:
-    """List user stories for the active app."""
+    """List scenarios for the active app."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -86,16 +87,16 @@ def list_user_stories(
 
     items = page_items(data)
     if not items:
-        print_info("No user stories found.")
+        print_info("No scenarios found.")
         return
 
     if all_stories:
-        title = f"User stories (showing all {len(items)} user stories)"
+        title = f"Scenarios (showing all {len(items)} scenarios)"
         tip = None
     elif isinstance(data, dict):
         title, tip = format_pagination_info(data, page, page_size)
     else:
-        title, tip = "User stories", None
+        title, tip = "Scenarios", None
     show_devices = any(effective_device_count(s) > 1 for s in items)
     headers = [*USER_STORY_TABLE_HEADERS, "Devices"] if show_devices else USER_STORY_TABLE_HEADERS
     rows = [format_user_story_row(s, show_devices=show_devices) for s in items]
@@ -106,9 +107,9 @@ def list_user_stories(
 
 @app.command(name="get")
 def get_user_story(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
 ) -> None:
-    """Show details for a specific user story."""
+    """Show details for a specific scenario."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -130,3 +131,6 @@ def get_user_story(
         if isinstance(permission, dict):
             print_info(f"Setup commit allowed: {permission.get('customerQuote')}")
     output(data, json_mode=json_mode)
+
+
+legacy_app = deprecated_alias(app, old_name="user-story")

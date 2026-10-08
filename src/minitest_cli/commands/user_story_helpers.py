@@ -61,7 +61,7 @@ def extract_detail(resp: httpx.Response) -> str | None:
     return body.get("message")
 
 
-def handle_response_error(resp: httpx.Response, *, resource: str = "User story") -> None:
+def handle_response_error(resp: httpx.Response, *, resource: str = "Scenario") -> None:
     if resp.status_code == 404:
         detail = extract_detail(resp)
         print_error(detail or f"{resource} not found.")
@@ -169,14 +169,13 @@ def format_pagination_info(
         start = (current_page - 1) * current_page_size + 1
         end = min(start + item_count - 1, total)
 
-    title = f"User stories (Page {current_page} of {total_pages}, showing {start}-{end} of {total})"
+    title = f"Scenarios (Page {current_page} of {total_pages}, showing {start}-{end} of {total})"
 
     tip = None
     if current_page < total_pages:
         next_page = current_page + 1
         tip = (
-            f"\n💡 Tip: Use --page {next_page} to see more, "
-            f"or --all to fetch all {total} user stories"
+            f"\n💡 Tip: Use --page {next_page} to see more, or --all to fetch all {total} scenarios"
         )
     elif total > current_page_size and current_page_size < 100:
         tip = f"\n💡 Tip: Use --all to fetch all {total} user stories in one request"

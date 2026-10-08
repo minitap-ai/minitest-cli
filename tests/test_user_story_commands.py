@@ -115,7 +115,7 @@ class TestCreateUserStory:
         assert result.exit_code == 0
         assert "Idempotency-Key" not in requests[0].headers
         assert "id: legacy-story" in result.stdout
-        assert "User story created: legacy-story" in result.stderr
+        assert "Scenario created: legacy-story" in result.stderr
 
     def test_idempotency_replay_and_conflict_follow_server_contract(self, tmp_path):
         settings = _make_settings(tmp_path)

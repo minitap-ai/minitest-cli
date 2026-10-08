@@ -3,6 +3,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.deprecated_alias import deprecated_alias
 from minitest_cli.commands.app_skill_helpers import handle_skill_response
 from minitest_cli.commands.user_story_helpers import (
     base_path,
@@ -16,9 +17,7 @@ from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
 
-app = typer.Typer(
-    name="user-story-binding", help="Bind test profiles, files or skills to user stories."
-)
+app = typer.Typer(name="scenario-binding", help="Bind test profiles, files or skills to scenarios.")
 
 _FILE_BINDING_HEADERS = ["ID", "Name", "Kind"]
 
@@ -37,7 +36,7 @@ def _normalize_items(data: Any) -> list[dict[str, Any]]:
 
 @app.command(name="set-profile")
 def set_profile(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
     profile_ids: Annotated[
         list[str] | None,
         typer.Option(
@@ -74,16 +73,16 @@ def set_profile(
     data = run_api_call(_run())
     if not json_mode:
         if clear:
-            print_success(f"Test profiles cleared on user story {user_story_id}.")
+            print_success(f"Test profiles cleared on scenario {user_story_id}.")
         else:
             bound = ", ".join(profile_ids or [])
-            print_success(f"Test profiles [{bound}] bound to user story {user_story_id}.")
+            print_success(f"Test profiles [{bound}] bound to scenario {user_story_id}.")
     output(data, json_mode=json_mode)
 
 
 @app.command(name="set-files")
 def set_files(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
     file_ids: Annotated[
         list[str] | None,
         typer.Option(
@@ -124,7 +123,7 @@ def set_files(
         output(data, json_mode=True)
         return
     if not items:
-        print_info("No files bound to this user story.")
+        print_info("No files bound to this scenario.")
         return
     rows = [_binding_row(f) for f in items]
     print_table(_FILE_BINDING_HEADERS, rows, title=f"Files bound to {user_story_id} ({len(items)})")
@@ -132,7 +131,7 @@ def set_files(
 
 @app.command(name="set-skills")
 def set_skills(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
     skill_names: Annotated[
         list[str] | None,
         typer.Option("--skill", help="Skill name Mini loads before starting (repeatable)."),
@@ -167,7 +166,7 @@ def set_skills(
 
 @app.command(name="list-files")
 def list_files(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
     page: Annotated[int, typer.Option("--page", min=1)] = 1,
     page_size: Annotated[int, typer.Option("--page-size", min=1, max=100)] = 50,
 ) -> None:
@@ -191,7 +190,10 @@ def list_files(
         output(data, json_mode=True)
         return
     if not items:
-        print_info("No files bound to this user story.")
+        print_info("No files bound to this scenario.")
         return
     rows = [_binding_row(f) for f in items]
     print_table(_FILE_BINDING_HEADERS, rows, title=f"Files bound to {user_story_id} ({len(items)})")
+
+
+legacy_app = deprecated_alias(app, old_name="user-story-binding")

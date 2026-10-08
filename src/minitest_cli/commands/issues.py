@@ -1,4 +1,4 @@
-"""Commands for reading app findings, their fix prompts, and closing them."""
+"""Commands for reading app issues, their fix prompts, and closing them."""
 
 from enum import StrEnum
 from typing import Annotated
@@ -23,27 +23,27 @@ class IssueCriticality(StrEnum):
 
 
 app = typer.Typer(
-    name="issues", help="Read app findings, fix prompts, and mark them fixed.", no_args_is_help=True
+    name="issues", help="Read app issues, fix prompts, and mark them fixed.", no_args_is_help=True
 )
 app.command()(fix)
 
 
 @app.command("list")
 def list_issues(
-    issue: Annotated[str | None, typer.Option("--issue", help="Scope to one failure ID.")] = None,
+    issue: Annotated[str | None, typer.Option("--issue", help="Scope to one issue ID.")] = None,
     run: Annotated[str | None, typer.Option("--run", help="Scope to one scenario run ID.")] = None,
     batch: Annotated[str | None, typer.Option("--batch", help="Scope to one batch ID.")] = None,
     platform: Annotated[
         IssuePlatform | None, typer.Option(help="Filter by execution platform.")
     ] = None,
     criticality: Annotated[
-        IssueCriticality | None, typer.Option(help="Filter by finding criticality.")
+        IssueCriticality | None, typer.Option(help="Filter by issue criticality.")
     ] = None,
     include_resolved: Annotated[
-        bool, typer.Option("--include-resolved", help="Include resolved findings.")
+        bool, typer.Option("--include-resolved", help="Include resolved issues.")
     ] = False,
 ) -> None:
-    """Return scoped findings, build provenance, fix prompts, and deeplinks as JSON."""
+    """Return scoped issues, build provenance, fix prompts, and deeplinks as JSON."""
     scopes = {"issue": issue, "run": run, "batch": batch}
     selected = [(kind, value) for kind, value in scopes.items() if value is not None]
     if len(selected) > 1:

@@ -74,7 +74,7 @@ def fix(
         typer.Argument(help="One or more app-failure IDs to mark as fixed."),
     ],
 ) -> None:
-    """Mark findings as fixed, reporting one result per ID."""
+    """Mark issues as fixed, reporting one result per ID."""
     settings, app_id, _ = resolve_app()
     results, exit_codes = run_api_call(_fix_issues(settings, app_id, issue_ids))
     fixed = sum(result["status"] == "fixed" for result in results)

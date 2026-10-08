@@ -122,7 +122,7 @@ async def _reject_batch_id_passed_as_run(client: ApiClient, app_id: str, given_i
     """
     if await fetch_optional_batch(client, app_id, given_id) is None:
         return
-    print_error(f"Run not found: {given_id} is a batch id, not a story-run id.")
+    print_error(f"Run not found: {given_id} is a batch id, not a scenario-run id.")
     err_console.print("  [dim]The webapp path[/dim] /test/runs/<id> [dim]carries a batch id.[/dim]")
     err_console.print(f"  [yellow]Try:[/yellow] [bold]--batch {given_id}[/bold]")
     raise typer.Exit(code=EXIT_NOT_FOUND)

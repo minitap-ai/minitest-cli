@@ -37,7 +37,7 @@ WidthOpt = Annotated[int, typer.Option("--width", min=32, help="Frame width in p
 
 
 def recording(
-    run_id: Annotated[str, typer.Argument(help="Story-run ID.")],
+    run_id: Annotated[str, typer.Argument(help="Scenario-run ID.")],
     platform: Annotated[str | None, typer.Option(help="Target platform (ios/android/web).")] = None,
     srp: Annotated[str | None, typer.Option(help="Exact target (srpId) when ambiguous.")] = None,
     device: Annotated[int, typer.Option(min=1, help="Device index on multi-device runs.")] = 1,

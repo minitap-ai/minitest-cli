@@ -56,7 +56,7 @@ app = typer.Typer(name="run", help="Test execution.")
 @app.command()
 def start(
     user_story: Annotated[
-        str | None, typer.Argument(help="User-story name or UUID to run. Excludes --tag.")
+        str | None, typer.Argument(help="Scenario name or UUID to run. Excludes --tag.")
     ] = None,
     tag: Annotated[
         list[str] | None,
@@ -71,9 +71,9 @@ def start(
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
 ) -> None:
-    """Start a run for one user story, or one batch over every story with --tag."""
+    """Start a run for one scenario, or one batch over every scenario with --tag."""
     if (user_story is None) == (not tag):
-        print_error("Pass either a user story or --tag, not both or neither.")
+        print_error("Pass either a scenario or --tag, not both or neither.")
         raise typer.Exit(code=1)
     settings, app_id, json_mode = resolve_app()
     targets = build_targets(ios_build, android_build, web, ios_device_type, android_device_type)
@@ -88,7 +88,7 @@ def start(
             body = CreateBatchRequest(user_story_ids=[user_story_id], targets=targets)
             batch = await post_batch(client, app_id, body)
             if not batch.story_runs:
-                print_error("Batch created but no story runs were returned.")
+                print_error("Batch created but no scenario runs were returned.")
                 raise typer.Exit(code=3)
             run = batch.story_runs[0]
             if not watch:
@@ -131,7 +131,7 @@ def status(
 
 @app.command(name="list")
 def list_runs(
-    user_story: Annotated[str, typer.Argument(help="User-story name or UUID to list runs for.")],
+    user_story: Annotated[str, typer.Argument(help="Scenario name or UUID to list runs for.")],
     page: Annotated[int, typer.Option(help="Page number.")] = 1,
     page_size: Annotated[int, typer.Option(help="Items per page.")] = 20,
     status_filter: Annotated[
@@ -143,7 +143,7 @@ def list_runs(
     ] = None,
     all_pages: Annotated[bool, typer.Option("--all", help="Fetch all results.")] = False,
 ) -> None:
-    """List runs for a user story."""
+    """List runs for a scenario."""
     settings, app_id, json_mode = resolve_app()
     if all_pages:
         page, page_size = 1, 100
@@ -175,7 +175,7 @@ def run_all(
     ios_device_type: IosDeviceTypeOpt = None,
     android_device_type: AndroidDeviceTypeOpt = None,
 ) -> None:
-    """Start a batch covering every user story for the app."""
+    """Start a batch covering every scenario for the app."""
     settings, app_id, json_mode = resolve_app()
     targets = build_targets(ios_build, android_build, web, ios_device_type, android_device_type)
 

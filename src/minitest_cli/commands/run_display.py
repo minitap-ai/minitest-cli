@@ -13,7 +13,7 @@ from minitest_cli.utils.output import (
     print_table,
 )
 
-RUN_TABLE_HEADERS = ["ID", "User Story", "Status", "Created"]
+RUN_TABLE_HEADERS = ["ID", "Scenario", "Status", "Created"]
 
 RESULTS_TABLE_HEADERS = ["Criterion ID", "Platform", "Result", "Fail Reason"]
 

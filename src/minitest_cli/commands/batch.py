@@ -26,7 +26,7 @@ from minitest_cli.utils.output import (
     print_table,
 )
 
-app = typer.Typer(name="batch", help="Manage batch runs (multi-story executions).")
+app = typer.Typer(name="batch", help="Manage batch runs (multi-scenario executions).")
 
 BATCH_TABLE_HEADERS = ["ID", "Status", "Source", "Commit", "Tag", "Targets", "Created"]
 
@@ -110,7 +110,7 @@ def list_batches(
 def get_batch(
     batch_id: Annotated[str, typer.Argument(help="Batch ID.")],
 ) -> None:
-    """Get a single batch with its story runs."""
+    """Get a single batch with its scenario runs."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(batch_id, kind="batch id")
 
@@ -165,9 +165,9 @@ def get_batch(
         )
     if rows:
         print_table(
-            ["Run ID", "User Story", "Status", "Created"],
+            ["Run ID", "Scenario", "Status", "Created"],
             rows,
-            title=f"Story runs ({len(rows)})",
+            title=f"Scenario runs ({len(rows)})",
         )
 
 
@@ -175,7 +175,7 @@ def get_batch(
 def cancel(
     batch_id: Annotated[str, typer.Argument(help="Batch ID to cancel.")],
 ) -> None:
-    """Cancel a batch and all its pending/running story runs."""
+    """Cancel a batch and all its pending/running scenario runs."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(batch_id, kind="batch id")
 

@@ -102,7 +102,7 @@ def handle_response_error(resp: httpx.Response, *, resource: str = "Run") -> Non
         detail = extract_detail(resp) or ""
         if "violates foreign key constraint" in detail:
             msg = f"{resource} references a resource that does not exist."
-            print_error(f"{msg} Check the user-story and build IDs.")
+            print_error(f"{msg} Check the scenario and build IDs.")
             raise typer.Exit(code=EXIT_NOT_FOUND)
     if resp.status_code >= 400:
         detail = extract_detail(resp)
@@ -141,14 +141,14 @@ async def resolve_user_story_id(
         f"/api/v1/apps/{app_id}/user-stories",
         params={"page_size": 100},
     )
-    handle_response_error(resp, resource="User story")
+    handle_response_error(resp, resource="Scenario")
 
     items = resp.json().get("items", [])
     for story in items:
         if story.get("name", "").lower() == user_story_ref.lower():
             return story["id"]
 
-    print_error(f"User story not found: '{user_story_ref}'. Use a valid user-story name or UUID.")
+    print_error(f"Scenario not found: '{user_story_ref}'. Use a valid scenario name or UUID.")
     raise typer.Exit(code=EXIT_NOT_FOUND)
 
 

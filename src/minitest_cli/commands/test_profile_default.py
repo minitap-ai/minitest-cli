@@ -26,7 +26,7 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Set a test profile as the default for the app.
 
-        New user stories without an explicit ``--profile`` will auto-assign
+        New scenarios without an explicit ``--profile`` will auto-assign
         this profile.
         """
         settings = get_settings()

@@ -69,7 +69,7 @@ def maintenance(
 
 @app.command()
 def context() -> None:
-    """Open a maintenance run and emit its context (mode, fromSha, stories) as JSON.
+    """Open a maintenance run and emit its context (mode, fromSha, scenarios) as JSON.
 
     First run for an app has no watermark → audit mode (review the whole suite). Later runs
     return the previous sha so the agent diffs `git diff <fromSha>..HEAD` locally.

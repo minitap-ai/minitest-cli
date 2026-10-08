@@ -171,7 +171,7 @@ class TestIssueScopes:
         assert result.exit_code == 4
         # Rich wraps the message, so compare on collapsed whitespace.
         said = " ".join(result.stderr.split())
-        assert f"{BATCH_ID} is a batch id, not a story-run id" in said
+        assert f"{BATCH_ID} is a batch id, not a scenario-run id" in said
         assert f"--batch {BATCH_ID}" in said
 
     def test_an_id_that_is_nothing_still_reads_as_not_found(self):

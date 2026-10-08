@@ -1,4 +1,4 @@
-"""`minitest maintenance` — keep test flows in sync with local app code, no GitHub.
+"""`minitest maintenance` — keep scenarios in sync with local app code, no GitHub.
 
 The customer's own coding agent runs the reasoning locally against their checkout;
 only the proposed criteria edits and an opaque commit sha reach Minitest. The maintenance
@@ -41,7 +41,7 @@ from minitest_cli.utils.output import (
 
 app = typer.Typer(
     name="maintenance",
-    help="Maintain test flows against local app code (CLI-only, no GitHub).",
+    help="Keep scenarios in sync with local app code (CLI-only, no GitHub).",
 )
 register_callback_commands(app)
 

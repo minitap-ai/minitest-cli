@@ -1,4 +1,4 @@
-"""`minitest scenario` is the command; `user-story` survives as a hidden, warning alias."""
+"""Renamed command groups survive under their old name as a hidden, warning alias."""
 
 import json
 import re
@@ -15,10 +15,12 @@ from minitest_cli.main import app
 runner = CliRunner()
 
 STORY = {"id": "story-1", "name": "Login", "acceptanceCriteria": [], "testProfiles": []}
+DRAFTS: list[dict[str, str]] = []
 FILES = {"items": [{"id": "file-1", "name": "avatar.png", "kind": "image"}]}
 BACKEND = {
     "/api/v1/apps/app-123/user-stories/story-1": STORY,
     "/api/v1/apps/app-123/user-stories/story-1/files": FILES,
+    "/api/v1/apps/app-123/draft-features": DRAFTS,
 }
 
 
@@ -45,6 +47,7 @@ def _invoke(args: list[str]):
     [
         ("scenario", "user-story", ["get", "story-1"], STORY),
         ("scenario-binding", "user-story-binding", ["list-files", "story-1"], FILES),
+        ("draft", "df", ["list"], DRAFTS),
     ],
 )
 class TestLegacyAlias:
@@ -70,5 +73,5 @@ def test_root_help_lists_scenario_commands_and_hides_legacy_ones():
     result = runner.invoke(app, ["--help"], terminal_width=200)
 
     commands = set(re.findall(r"│ (\S+)", unstyle(result.stdout)))
-    assert {"scenario", "scenario-binding"} <= commands
-    assert not {"user-story", "user-story-binding"} & commands
+    assert {"scenario", "scenario-binding", "draft"} <= commands
+    assert not {"user-story", "user-story-binding", "df"} & commands

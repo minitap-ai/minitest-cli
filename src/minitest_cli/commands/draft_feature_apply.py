@@ -1,4 +1,4 @@
-"""`minitest df apply` — post a changeset file to a branch."""
+"""`minitest draft apply` — post a changeset file to a branch."""
 
 from pathlib import Path
 from typing import Annotated

@@ -229,7 +229,7 @@ class TestShow:
 
 
 class TestShowConflicts:
-    """`df show --view conflicts` is what T7 specifies as the resolver's input.
+    """`draft show --view conflicts` is what T7 specifies as the resolver's input.
 
     The payload below is the shape ``draft_feature_conflicts`` really emits (see
     the testing-service integration suite): ``fields`` names keys of a flat story
@@ -312,7 +312,7 @@ class TestShowConflicts:
     def test_a_copied_main_value_is_appliable_as_a_story_edit(self, tmp_path):
         """The recipe the command documents, executed against its own output.
 
-        `df apply` sends the file through unchanged, so what this pins is that
+        `draft apply` sends the file through unchanged, so what this pins is that
         `--json` yields the keys that recipe reads: the disputed key names, and a
         `main` carrying a value for each of them.
         """
@@ -431,7 +431,7 @@ class TestApply:
         assert "mainRev: 7" in stdout
 
     def test_apply_keeps_main_rev_out_of_the_table_title(self, tmp_path):
-        """Same trap as `df show`: rich wraps a narrow table's title mid-value.
+        """Same trap as `draft show`: rich wraps a narrow table's title mid-value.
 
         The created-stories table is two short columns, so a title carrying the
         cursor renders as "Applied - mainRev \\n 7, ..." - and mainRev is the one
@@ -564,7 +564,7 @@ class TestApply:
                 ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
             )
         assert result.exit_code == 6
-        assert "df show --view diff" in _text(result)
+        assert "draft show --view diff" in _text(result)
 
 
 class TestDelete:

@@ -39,7 +39,7 @@ UserStoryOpt = Annotated[
     typer.Option(
         "--user-story",
         "-u",
-        help="User story id or name. Repeatable. Omit to run every story.",
+        help="Scenario id or name. Repeatable. Omit to run every scenario.",
     ),
 ]
 
@@ -97,7 +97,7 @@ def from_commit(
     print_success(f"Batch {batch.id} is {batch.status.value}")
     if batch.status is BatchStatus.failed and not batch.story_runs:
         print_warning(
-            "The batch failed before any story ran, which usually means the build failed. "
+            "The batch failed before any scenario ran, which usually means the build failed. "
             f"Inspect it with `minitest build list --status failed`. {CONNECT_REPO_HINT}"
         )
     elif not watch:

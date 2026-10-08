@@ -31,7 +31,7 @@ app.command()(fix)
 @app.command("list")
 def list_issues(
     issue: Annotated[str | None, typer.Option("--issue", help="Scope to one failure ID.")] = None,
-    run: Annotated[str | None, typer.Option("--run", help="Scope to one story run ID.")] = None,
+    run: Annotated[str | None, typer.Option("--run", help="Scope to one scenario run ID.")] = None,
     batch: Annotated[str | None, typer.Option("--batch", help="Scope to one batch ID.")] = None,
     platform: Annotated[
         IssuePlatform | None, typer.Option(help="Filter by execution platform.")

@@ -26,7 +26,7 @@ def print_simulation_summary(result: dict[str, Any]) -> None:
         print_warning(f"Refused: this change would create a cycle: {cycle}")
         return
     affected = ", ".join(ref["name"] for ref in result["affectedStories"]) or "none"
-    print_info(f"Affected stories: {affected}")
+    print_info(f"Affected scenarios: {affected}")
     for index, level in enumerate(result["runOrder"] or [], start=1):
         print_info(f"Run wave {index}: {', '.join(ref['name'] for ref in level)}")
     print_success("Simulation only — nothing was written.")
@@ -40,7 +40,7 @@ def parse_edge_arg(raw: str) -> tuple[str, str]:
         print_error(f"Invalid edge '{raw}': expected <story_id>:<depends_on_id>.")
         raise typer.Exit(code=EXIT_GENERAL_ERROR)
     if child == parent:
-        print_error(f"Invalid edge '{raw}': a story cannot depend on itself.")
+        print_error(f"Invalid edge '{raw}': a scenario cannot depend on itself.")
         raise typer.Exit(code=EXIT_GENERAL_ERROR)
     return child, parent
 
@@ -116,7 +116,7 @@ def simulate_dependency_changes(
 
     unknown = sorted({sid for pair in [*add, *remove] for sid in pair if sid not in known})
     if unknown:
-        print_error(f"Unknown user-story id(s): {', '.join(unknown)}")
+        print_error(f"Unknown scenario id(s): {', '.join(unknown)}")
         raise typer.Exit(code=EXIT_GENERAL_ERROR)
 
     edge_set = {(str(e["source"]), str(e["target"])) for e in edges}

@@ -45,7 +45,7 @@ def dependencies(
             "--simulate",
             help=(
                 "Simulate dependency edits without writing: reports cycle "
-                "verdict, affected stories, and the new run order."
+                "verdict, affected scenarios, and the new run order."
             ),
         ),
     ] = False,
@@ -54,7 +54,7 @@ def dependencies(
         typer.Option(
             "--add",
             help=(
-                "Edge to add, as <story_id>:<depends_on_id> — the story will "
+                "Edge to add, as <story_id>:<depends_on_id> — the scenario will "
                 "depend on (run after) the second id. Repeatable; requires --simulate."
             ),
         ),
@@ -69,7 +69,7 @@ def dependencies(
         ),
     ] = None,
 ) -> None:
-    """Print the user-story dependency graph as a Mermaid flowchart.
+    """Print the scenario dependency graph as a Mermaid flowchart.
 
     Fetches the dependency graph for the app and renders it as a Mermaid
     ``flowchart TD`` diagram to stdout. With ``--json``, outputs the raw
@@ -129,7 +129,7 @@ def dependencies(
 
     mermaid = build_dependency_graph(nodes, edges)
     if not mermaid:
-        print_info("No user stories found for this app.")
+        print_info("No scenarios found for this app.")
         raise typer.Exit(code=0)
 
     print(mermaid)  # noqa: T201

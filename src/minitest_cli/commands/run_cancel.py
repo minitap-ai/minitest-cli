@@ -90,10 +90,10 @@ def cancel(
     ] = None,
     srp_id: Annotated[
         str | None,
-        typer.Option("--srp", help="Only cancel this story-run platform ID."),
+        typer.Option("--srp", help="Only cancel this scenario-run platform ID."),
     ] = None,
 ) -> None:
-    """Cancel every pending or running platform of a story run."""
+    """Cancel every pending or running platform of a scenario run."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="run id")
     if srp_id is not None:

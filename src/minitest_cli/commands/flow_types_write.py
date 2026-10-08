@@ -48,7 +48,7 @@ def create_flow_type(
     color: Annotated[str, typer.Option("--color", help="Tailwind color name.")] = "gray",
     usage_prompt: UsagePromptOption = None,
 ) -> None:
-    """Create a custom flow type, usable as --type on any user-story command.
+    """Create a custom flow type, usable as --type on any scenario command.
 
     Custom types are tenant-scoped: every app on your tenant can use them.
     """

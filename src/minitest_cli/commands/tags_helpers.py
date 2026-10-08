@@ -11,7 +11,8 @@ from minitest_cli.utils.output import print_error, print_warning
 TagOption = Annotated[
     list[str] | None,
     typer.Option(
-        "--tag", help="Tag name (repeatable; replaces the story's tags). Unknown tags are created."
+        "--tag",
+        help="Tag name (repeatable; replaces the scenario's tags). Unknown tags are created.",
     ),
 ]
 ClearTagsOption = Annotated[

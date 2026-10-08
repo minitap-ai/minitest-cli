@@ -19,7 +19,7 @@ def register_callback_commands(app: typer.Typer) -> None:
     def affected(
         file: Annotated[Path, typer.Option("--file", help="JSON file: {stories:[...]}.")],
     ) -> None:
-        """Declare which stories the change affects (idempotent per run)."""
+        """Declare which scenarios the change affects (idempotent per run)."""
         _post_file(file, sub_path="affected-stories")
 
     @app.command()

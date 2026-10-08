@@ -15,7 +15,7 @@ def verdicts(
         str | None, typer.Option(help="Filter to one platform (ios/android/web).")
     ] = None,
     only_failed: Annotated[
-        bool, typer.Option("--only-failed", help="Drop fully-passing stories.")
+        bool, typer.Option("--only-failed", help="Drop fully-passing scenarios.")
     ] = False,
     actionable: Annotated[
         bool,

@@ -49,7 +49,7 @@ LegacyUserStoryOpt = Annotated[
 
 WatchOpt = Annotated[
     bool,
-    typer.Option("--watch/--no-watch", help="Poll until the batch reaches a verdict."),
+    typer.Option("--watch/--no-watch", help="Poll until the run reaches a verdict."),
 ]
 
 TimeoutOpt = Annotated[int, typer.Option("--timeout", help="Seconds to poll before giving up.")]

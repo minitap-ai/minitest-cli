@@ -10,7 +10,7 @@ from minitest_cli.utils.output import print_error, print_json
 
 
 def verdicts(
-    batch_id: Annotated[str, typer.Argument(help="Batch ID to summarise verdicts for.")],
+    batch_id: Annotated[str, typer.Argument(help="Run (batch) ID to summarise verdicts for.")],
     platform: Annotated[
         str | None, typer.Option(help="Filter to one platform (ios/android/web).")
     ] = None,
@@ -32,7 +32,7 @@ def verdicts(
         typer.Option("--verbose", help="Include passing criteria and per-criterion evidence."),
     ] = False,
 ) -> None:
-    """Product-level pass/fail verdicts for a batch, projected as JSON."""
+    """Product-level pass/fail verdicts for a run (batch), projected as JSON."""
     settings, app_id, _ = resolve_app()
     ensure_uuid(batch_id, kind="batch")
     if platform is not None and platform not in VALID_PLATFORMS:

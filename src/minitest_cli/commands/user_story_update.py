@@ -118,7 +118,7 @@ def print_update_summary(
     device_count_value: int | None,
     clear_camera_media: bool,
 ) -> None:
-    print_success(f"User story updated: {user_story_id}")
+    print_success(f"Scenario updated: {user_story_id}")
     if clear_profiles:
         print_info("Test profiles cleared.")
     elif profile:

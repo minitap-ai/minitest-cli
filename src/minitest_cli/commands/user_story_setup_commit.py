@@ -25,19 +25,19 @@ def _permission_path(app_id: str, user_story_id: str) -> str:
 
 
 def allow_setup_commit(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
     customer_quote: Annotated[
         str,
         typer.Option(
             "--customer-quote",
             help=(
-                "The customer's own words allowing validation to activate this story's "
+                "The customer's own words allowing validation to activate this scenario's "
                 f"commit step, quoted verbatim (max {CUSTOMER_QUOTE_MAX_LENGTH} chars)."
             ),
         ),
     ],
 ) -> None:
-    """Allow validation to perform this story's commit so dependent stories can start from it."""
+    """Allow validation to perform this scenario's commit so dependent scenarios start from it."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -59,14 +59,14 @@ def allow_setup_commit(
     if json_mode:
         output(data, json_mode=True)
         return
-    print_success(f"Setup commit allowed for user story {user_story_id}")
+    print_success(f"Setup commit allowed for scenario {user_story_id}")
     print_info(f"Customer quote: {data.get('customerQuote', quote)}")
 
 
 def revoke_setup_commit(
-    user_story_id: Annotated[str, typer.Argument(help="User-story ID.")],
+    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
 ) -> None:
-    """Stop validation from performing this story's commit."""
+    """Stop validation from performing this scenario's commit."""
     settings = get_settings()
     json_mode = is_json_mode()
     require_auth(settings)
@@ -81,4 +81,4 @@ def revoke_setup_commit(
     if json_mode:
         output({"revoked": True, "id": user_story_id}, json_mode=True)
     else:
-        print_success(f"Setup commit revoked for user story {user_story_id}")
+        print_success(f"Setup commit revoked for scenario {user_story_id}")

@@ -7,6 +7,7 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.batch_helpers import batches_base_path
+from minitest_cli.commands.deprecated_alias import deprecated_option, merge_deprecated_option
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
     ensure_uuid,
@@ -57,7 +58,12 @@ def list_batches(
         typer.Option("--result", help="Filter by derived result (repeatable)."),
     ] = None,
     commit_sha: Annotated[str | None, typer.Option("--commit-sha")] = None,
-    user_story_id: Annotated[str | None, typer.Option("--user-story-id")] = None,
+    scenario_id: Annotated[
+        str | None, typer.Option("--scenario", help="Only runs that include this scenario ID.")
+    ] = None,
+    legacy_user_story_id: Annotated[
+        str | None, deprecated_option("--user-story-id", new_flag="--scenario")
+    ] = None,
     search: Annotated[str | None, typer.Option("--search")] = None,
     all_pages: Annotated[bool, typer.Option("--all", help="Fetch all pages.")] = False,
 ) -> None:
@@ -66,17 +72,18 @@ def list_batches(
     if all_pages:
         page, page_size = 1, 100
 
+    scenario_id = merge_deprecated_option(
+        scenario_id, legacy_user_story_id, old_flag="--user-story-id", new_flag="--scenario"
+    )
+    filters = {
+        "status": status_filter,
+        "result": result_filter,
+        "commit_sha": commit_sha,
+        "user_story_id": scenario_id,
+        "search": search,
+    }
     params: dict[str, object] = {"page": page, "page_size": page_size}
-    if status_filter:
-        params["status"] = status_filter
-    if result_filter:
-        params["result"] = result_filter
-    if commit_sha:
-        params["commit_sha"] = commit_sha
-    if user_story_id:
-        params["user_story_id"] = user_story_id
-    if search:
-        params["search"] = search
+    params.update({key: value for key, value in filters.items() if value})
 
     async def _list() -> BatchListResponse:
         async with ApiClient(settings) as client:

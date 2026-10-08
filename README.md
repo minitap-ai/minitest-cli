@@ -134,20 +134,42 @@ app defaults.
 | ---------------- | ------------------------- |
 | `minitest auth`  | Authentication management |
 | `minitest apps`  | List, inspect, and create apps |
-| `minitest scenario` | Create, update, list and delete scenarios (`user-story` is a deprecated alias) |
-| `minitest scenario-binding` | Bind test profiles, files or skills to scenarios (`user-story-binding` is a deprecated alias) |
-| `minitest df`    | Draft features — branches of the test suite |
-| `minitest flow-types` | List flow types, create/rename/delete custom ones |
+| `minitest scenario` | Create, update, list and delete scenarios |
+| `minitest scenario-binding` | Bind test accounts, test files or app skills to scenarios |
+| `minitest draft` | Drafts — branches of the test suite |
+| `minitest test-profile` | Test profiles (Test accounts in the webapp) |
+| `minitest tags`  | List, create, update and delete scenario tags |
+| `minitest app-skill` | App skills (Skills in the webapp): procedures Mini loads to arrange test state |
 | `minitest screens` | Inspect the screens exploration mapped for an app |
 | `minitest build` | Native iOS/Android build management |
-| `minitest run`   | Test execution for mobile and web lanes |
-| `minitest maintenance` | CLI-only test-flow maintenance against local code |
+| `minitest run`   | Start runs and inspect their scenario runs |
+| `minitest batch` | List, inspect and cancel runs (a batch is a Run in the webapp) |
+| `minitest issues` | Read app issues and their fix prompts, mark them fixed |
+| `minitest maintenance` | CLI-only scenario maintenance against local code |
+| `minitest skill` | Print the CLI skill for your AI coding agent (not app skills) |
+
+### Deprecated names
+
+Old names keep working as hidden aliases: they print a deprecation warning on
+stderr and leave `--json` stdout unchanged. Switch to the new names.
+
+| Deprecated | Use instead |
+| ---------- | ----------- |
+| `minitest user-story` | `minitest scenario` |
+| `minitest user-story-binding` | `minitest scenario-binding` |
+| `minitest scenario-binding set-skills` | `minitest scenario-binding set-app-skills` |
+| `minitest df` | `minitest draft` |
+| `minitest flow-types` | `minitest tags` |
+| `run from-commit --user-story` / `-u` | `run from-commit --scenario` / `-s` |
+| `batch list --user-story-id` | `batch list --scenario` |
+| `run cancel --srp`, `run recording --srp` | `--target-id` |
+| `--type` on `scenario create/update/list` | `--tag` |
 
 ## CLI-only maintenance
 
 `minitest maintenance` lets a coding agent keep Minitest scenarios in sync
 without connecting GitHub. Run it from the app repository: the code stays on the
-machine, while the CLI sends only proposed test-flow edits and the local HEAD SHA.
+machine, while the CLI sends only proposed scenario edits and the local HEAD SHA.
 
 ```bash
 # Print the server-composed maintenance instructions for your coding agent

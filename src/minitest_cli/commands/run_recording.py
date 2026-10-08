@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.deprecated_alias import deprecated_option, merge_deprecated_option
 from minitest_cli.commands.recording_timeline import build_timeline, recording_source
 from minitest_cli.commands.run_helpers import (
     EXIT_NOT_FOUND,
@@ -39,7 +40,10 @@ WidthOpt = Annotated[int, typer.Option("--width", min=32, help="Frame width in p
 def recording(
     run_id: Annotated[str, typer.Argument(help="Scenario-run ID.")],
     platform: Annotated[str | None, typer.Option(help="Target platform (ios/android/web).")] = None,
-    srp: Annotated[str | None, typer.Option(help="Exact target (srpId) when ambiguous.")] = None,
+    target_id: Annotated[
+        str | None, typer.Option("--target-id", help="Exact target (srpId) when ambiguous.")
+    ] = None,
+    legacy_srp: Annotated[str | None, deprecated_option("--srp", new_flag="--target-id")] = None,
     device: Annotated[int, typer.Option(min=1, help="Device index on multi-device runs.")] = 1,
     out: Annotated[Path | None, typer.Option(help="Output directory.")] = None,
     criterion_frames: Annotated[
@@ -65,6 +69,7 @@ def recording(
             return StoryRunResponse.model_validate(resp.json())
 
     run = run_api_call(_fetch())
+    srp = merge_deprecated_option(target_id, legacy_srp, old_flag="--srp", new_flag="--target-id")
     platform_run = select_platform_run(run, platform, srp)
     source = recording_source(platform_run, device)
     if source is None:

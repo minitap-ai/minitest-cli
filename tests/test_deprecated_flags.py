@@ -29,11 +29,32 @@ BATCH = {
     "storyRuns": [],
 }
 BATCH_PAGE = {"items": [], "total": 0, "page": 1, "pageSize": 20}
+RUN_ID = "11111111-2222-3333-4444-555555555555"
+TARGET = "aaaaaaaa-0000-0000-0000-000000000001"
+
+
+def _story_run(cancelled: bool) -> dict[str, Any]:
+    platform = {
+        "platform": "ios",
+        "srpId": TARGET,
+        "executionState": "running",
+        "cancellationRequestedAt": "2026-10-05T10:01:00Z" if cancelled else None,
+    }
+    return {
+        "id": RUN_ID,
+        "userStoryId": SCENARIO,
+        "createdAt": "2026-10-05T10:00:00Z",
+        "platforms": [platform],
+    }
 
 
 def _respond(request: httpx.Request) -> httpx.Response:
     if request.url.path == f"/api/v1/apps/{APP}/batches":
         return httpx.Response(200, json=BATCH if request.method == "POST" else BATCH_PAGE)
+    if request.url.path == f"/api/v1/apps/{APP}/story-runs/{RUN_ID}":
+        return httpx.Response(200, json=_story_run(cancelled=False))
+    if request.url.path == f"/api/v1/apps/{APP}/story-run-platforms/{TARGET}/cancel":
+        return httpx.Response(200, json=_story_run(cancelled=True))
     return httpx.Response(404, json={"detail": f"unexpected {request.url.path}"})
 
 
@@ -64,6 +85,7 @@ def _invoke(args: list[str]) -> tuple[Any, list[tuple[str, str, bytes]]]:
         (["run", "from-commit", SHA, "--no-watch"], "--scenario", "--user-story", SCENARIO),
         (["run", "from-commit", SHA, "--no-watch"], "--scenario", "-u", SCENARIO),
         (["batch", "list"], "--scenario", "--user-story-id", SCENARIO),
+        (["run", "cancel", RUN_ID], "--target-id", "--srp", TARGET),
     ],
 )
 def test_deprecated_flag_behaves_like_its_new_name_and_warns(command, new, old, value):

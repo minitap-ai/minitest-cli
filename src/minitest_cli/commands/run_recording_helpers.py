@@ -26,13 +26,15 @@ def select_platform_run(
     if len(candidates) == 1:
         return candidates[0]
     if not candidates:
-        print_error("No target of this run matches the given --platform/--srp.")
+        print_error("No target of this run matches the given --platform/--target-id.")
         raise typer.Exit(code=EXIT_NOT_FOUND)
     with_recording = [p for p in candidates if p.recording_url or p.device_recordings]
     if len(with_recording) == 1:
         return with_recording[0]
-    listing = ", ".join(f"{p.platform} (srp {p.srp_id})" for p in candidates)
-    print_error(f"This run has several targets: {listing}. Pick one with --platform or --srp.")
+    listing = ", ".join(f"{p.platform} (target {p.srp_id})" for p in candidates)
+    print_error(
+        f"This run has several targets: {listing}. Pick one with --platform or --target-id."
+    )
     raise typer.Exit(code=1)
 
 

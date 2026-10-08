@@ -101,7 +101,7 @@ class TestRunCancel:
         ("args", "expected_calls"),
         [
             (["--platform", "android"], [ANDROID_SRP]),
-            (["--srp", IOS_SRP], [IOS_SRP]),
+            (["--target-id", IOS_SRP], [IOS_SRP]),
         ],
     )
     def test_cancel_honours_platform_filters(self, invoke, args, expected_calls) -> None:

@@ -1,6 +1,6 @@
 """The `minitest run cancel` command: cancel the in-flight platforms of a story run.
 
-testing-service only cancels per story-run platform (SRP), so the command reads
+testing-service only cancels per target (story-run platform, SRP), so the command reads
 the run, then cancels each selected platform that has not finished yet.
 """
 
@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.deprecated_alias import deprecated_option, merge_deprecated_option
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
     base_path,
@@ -60,7 +61,7 @@ def _select(
     if not selected:
         wanted = [
             f"{platform.value} platform" if platform else "",
-            f"SRP {srp_id}" if srp_id else "",
+            f"target {srp_id}" if srp_id else "",
         ]
         print_error(f"Run {run.id} has no {' / '.join(w for w in wanted if w) or 'platforms'}.")
         raise typer.Exit(code=EXIT_NOT_FOUND)
@@ -88,16 +89,22 @@ def cancel(
         RunPlatform | None,
         typer.Option("--platform", help="Only cancel this platform (ios, android or web)."),
     ] = None,
-    srp_id: Annotated[
+    target_id: Annotated[
         str | None,
-        typer.Option("--srp", help="Only cancel this scenario-run platform ID."),
+        typer.Option(
+            "--target-id", help="Only cancel this target (its srpId in `run status --json`)."
+        ),
     ] = None,
+    legacy_srp: Annotated[str | None, deprecated_option("--srp", new_flag="--target-id")] = None,
 ) -> None:
     """Cancel every pending or running platform of a scenario run."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="run id")
+    srp_id = merge_deprecated_option(
+        target_id, legacy_srp, old_flag="--srp", new_flag="--target-id"
+    )
     if srp_id is not None:
-        ensure_uuid(srp_id, kind="SRP id")
+        ensure_uuid(srp_id, kind="target id")
 
     async def _cancel() -> tuple[StoryRunResponse, list[PlatformRun]]:
         async with ApiClient(settings) as client:

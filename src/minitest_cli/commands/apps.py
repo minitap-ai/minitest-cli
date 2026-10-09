@@ -12,6 +12,7 @@ from minitest_cli.api.client import ApiClient
 from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands import apps_dependencies, apps_get
 from minitest_cli.commands.apps_helpers import create_app_request
+from minitest_cli.commands.apps_table import APP_TABLE_HEADERS, app_row
 from minitest_cli.core.auth import require_auth
 from minitest_cli.core.config import Settings
 from minitest_cli.core.tenants import fetch_user_tenants, resolve_tenant_id
@@ -34,22 +35,6 @@ app.command(name="get")(apps_get.get_app)
 @app.callback()
 def _callback() -> None:
     """App management."""
-
-
-APP_TABLE_HEADERS = ["ID", "Name", "Platform"]
-
-_PLATFORM_LABELS: dict[str, str] = {
-    "android": "Android",
-    "ios": "iOS",
-    "web": "Web",
-}
-
-
-def _format_platforms(values: list[str]) -> str:
-    """Render an app's platform lanes for the table."""
-    if not values:
-        return "—"
-    return ", ".join(_PLATFORM_LABELS.get(v, v) for v in values)
 
 
 def _get_settings() -> Settings:
@@ -92,8 +77,7 @@ def list_apps() -> None:
         print_json([a.model_dump(mode="json", by_alias=True) for a in data.apps])
         return
 
-    rows = [[a.id, a.name, _format_platforms(a.platforms)] for a in data.apps]
-    print_table(APP_TABLE_HEADERS, rows, title="Apps")
+    print_table(APP_TABLE_HEADERS, [app_row(a) for a in data.apps], title="Apps")
 
 
 @app.command(name="create")

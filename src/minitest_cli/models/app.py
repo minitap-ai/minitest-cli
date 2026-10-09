@@ -17,6 +17,12 @@ class AppPlatform(StrEnum):
     WEB = "web"
 
 
+class AppRepository(CamelModel):
+    full_name: str
+    provider: str = "github"
+    folder: str | None = None
+
+
 class AppResponse(CamelModel):
     """A single app."""
 
@@ -25,6 +31,7 @@ class AppResponse(CamelModel):
     tenant_id: str
     platforms: list[str] = []
     web_url: str | None = None
+    repository: AppRepository | None = None
 
 
 class AppListResponse(CamelModel):

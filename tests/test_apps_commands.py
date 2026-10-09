@@ -16,7 +16,13 @@ runner = CliRunner()
 
 _APPS_DATA = {
     "apps": [
-        {"id": "aaa-111", "name": "My App", "tenantId": "t-1", "platforms": ["android"]},
+        {
+            "id": "aaa-111",
+            "name": "My App",
+            "tenantId": "t-1",
+            "platforms": ["android"],
+            "repository": {"fullName": "acme/apps", "provider": "github", "folder": "apps/my-app"},
+        },
         {"id": "bbb-222", "name": "Other App", "tenantId": "t-1", "platforms": ["ios"]},
         {
             "id": "ccc-333",
@@ -89,7 +95,13 @@ class TestListApps:
         assert len(data) == 3
         assert data[0]["id"] == "aaa-111"
         assert data[0]["name"] == "My App"
+        assert data[0]["repository"] == {
+            "fullName": "acme/apps",
+            "provider": "github",
+            "folder": "apps/my-app",
+        }
         assert data[1]["id"] == "bbb-222"
+        assert data[1]["repository"] is None
 
     def test_human_output(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -103,6 +115,8 @@ class TestListApps:
         assert "My App" in result.output
         assert "Other App" in result.output
         assert "aaa-111" in result.output
+        assert "acme/apps" in result.output
+        assert "apps/my-app" in result.output
 
     def test_empty_list(self, tmp_path):
         settings = _make_settings(tmp_path)

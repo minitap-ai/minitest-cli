@@ -13,8 +13,7 @@ CONVERSATION_ID_HEADER = "X-Minitest-Conversation-Id"
 CAUSE_HEADER = "X-Minitest-Cause"
 DEFAULT_TIMEOUT = 30.0
 UPLOAD_TIMEOUT = 300.0  # 5 minutes for large file uploads
-# Creating a batch can block on server-side maintenance before it answers, and the
-# POST is not idempotent — timing out client-side leaves a batch running unseen.
+# Creating a batch is not idempotent — timing out client-side leaves a batch running unseen.
 BATCH_CREATE_TIMEOUT = 180.0
 
 

@@ -98,6 +98,31 @@ class TestList:
         assert "No test profiles" in result.output
 
 
+class TestTakenQaAddress:
+    _TAKEN = {**_PROFILE, "username": "free@qa.minitap.ai", "qaInboxShared": True}
+
+    def test_create_warns_that_mini_cannot_read_the_inbox(self, tmp_path):
+        client = _mock_client(post=_mock_response(201, self._TAKEN))
+        with patch("minitest_cli.commands.test_profile.ApiClient", return_value=client):
+            result = _run(
+                ["create", "--name", "Customer A", "--username", "free@qa.minitap.ai"],
+                _make_settings(tmp_path),
+                json_mode=True,
+            )
+        assert result.exit_code == 0
+        assert "free@qa.minitap.ai belongs to another workspace" in result.stderr
+        assert json.loads(result.stdout)["qaInboxShared"] is True
+
+    def test_list_names_only_the_taken_address(self, tmp_path):
+        items = [self._TAKEN, {**_PROFILE, "username": "mine@qa.minitap.ai"}]
+        client = _mock_client(get=_mock_response(200, {"items": items}))
+        with patch("minitest_cli.commands.test_profile_list.ApiClient", return_value=client):
+            result = _run(["list"], _make_settings(tmp_path))
+        assert result.exit_code == 0
+        assert "free@qa.minitap.ai belongs to another workspace" in result.stderr
+        assert "mine@qa.minitap.ai belongs" not in result.stderr
+
+
 class TestListShared:
     def test_list_shared(self, tmp_path):
         settings = _make_settings(tmp_path)

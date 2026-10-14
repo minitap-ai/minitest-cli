@@ -13,7 +13,7 @@ from minitest_cli.commands.user_story_helpers import (
     is_json_mode,
     run_api_call,
 )
-from minitest_cli.utils.output import print_error
+from minitest_cli.utils.output import print_error, print_warning
 
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
@@ -87,3 +87,11 @@ __all__ = [
     "read_stdin_secret",
     "run_api_call",
 ]
+
+
+def warn_if_qa_inbox_unreadable(profile: dict[str, Any]) -> None:
+    if profile.get("qaInboxShared"):
+        print_warning(
+            f"{profile.get('username')} belongs to another workspace, so Mini can't read its "
+            "emails (login codes, verification links). Use a different @qa.minitap.ai address."
+        )

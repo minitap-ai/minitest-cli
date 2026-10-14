@@ -1,4 +1,4 @@
-"""App management commands: list, get, create, dependencies, residential proxy."""
+"""App management commands: list, get, create, dependencies, network settings."""
 
 import asyncio
 from pathlib import Path
@@ -13,6 +13,7 @@ from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands import (
     apps_dependencies,
     apps_get,
+    private_network,
     residential_proxy,
 )
 from minitest_cli.commands.apps_helpers import create_app_request
@@ -35,6 +36,7 @@ app = typer.Typer(name="apps", help="App management.")
 app.command(name="dependencies")(apps_dependencies.dependencies)
 app.command(name="get")(apps_get.get_app)
 app.add_typer(residential_proxy.app)
+app.add_typer(private_network.app)
 
 
 @app.callback()

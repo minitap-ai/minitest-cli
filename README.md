@@ -133,7 +133,7 @@ app defaults.
 | Command          | Description               |
 | ---------------- | ------------------------- |
 | `minitest auth`  | Authentication management |
-| `minitest apps`  | List, inspect, and create apps |
+| `minitest apps`  | List, inspect, and create apps; residential proxy and private network settings |
 | `minitest scenario` | Create, update, list and delete scenarios |
 | `minitest scenario-binding` | Bind test accounts, test files or app skills to scenarios |
 | `minitest draft` | Drafts — branches of the test suite |
@@ -164,6 +164,34 @@ stderr and leave `--json` stdout unchanged. Switch to the new names.
 | `batch list --user-story-id` | `batch list --scenario` |
 | `run cancel --srp`, `run recording --srp` | `--target-id` |
 | `--type` on `scenario create/update/list` | `--tag` |
+
+## App network settings
+
+Two per-app settings decide how test devices reach the network. Anyone on the
+app can read them; only workspace **owners and admins** can change them (other
+roles get `Only workspace owners and admins can change this setting`, exit 2).
+`set` reads the current settings first and changes only what you pass.
+Domains are an exact host (`api.stg.example.com`) or `*.example.com`, which
+matches subdomains only, not `example.com` itself.
+
+```bash
+# Residential proxy: reach the listed domains from a residential IP in one country
+minitest --app <app-id> apps residential-proxy show
+minitest --app <app-id> apps residential-proxy set [--enable|--disable] [--country tr] \
+  [--domain ipinfo.io ...] [--remove-domain <d> ...] [--clear-domains]
+
+# Private network: reach internal domains through a connector running in your network
+minitest --app <app-id> apps private-network show
+minitest --app <app-id> apps private-network connectors
+minitest --app <app-id> apps private-network set [--enable|--disable] [--connector <name-or-id>] \
+  [--domain api.stg.corp.internal ...] [--remove-domain <d> ...] [--clear-domains] [--port 443 ...]
+```
+
+`--clear-domains --domain a --domain b` replaces the list; `--port` replaces the
+ports (default 443). Turning the private network on needs a connector and at
+least one domain. Connectors cannot be created from the CLI: a workspace owner
+or admin creates them in the webapp, under **Workspace settings → Private
+network**.
 
 ## CLI-only maintenance
 

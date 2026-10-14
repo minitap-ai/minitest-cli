@@ -22,6 +22,7 @@ from minitest_cli.commands.build_helpers import (
     upload_status_message,
 )
 from minitest_cli.commands.build_commit import from_commit
+from minitest_cli.commands.build_get import get
 from minitest_cli.commands.build_fix_prompts import print_fix_prompts, redacted_payload
 from minitest_cli.models import BuildListResponse, BuildResponse
 from minitest_cli.utils.output import (
@@ -145,4 +146,5 @@ def list_builds(
     print_fix_prompts(result.items)
 
 
+app.command(name="get")(get)
 app.command(name="from-commit")(from_commit)

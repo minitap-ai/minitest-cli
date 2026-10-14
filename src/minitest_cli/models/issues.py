@@ -75,3 +75,8 @@ class IssuesListResponse(CamelModel):
     scope: IssuesScope
     build: IssuesBuild
     issues: list[IssueItem]
+
+
+class IssueDetailResponse(CamelModel):
+    issue: IssueItem
+    build: IssuesBuild

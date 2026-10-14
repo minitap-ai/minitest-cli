@@ -1,4 +1,4 @@
-"""App management commands: list, get, create, dependencies."""
+"""App management commands: list, get, create, dependencies, residential proxy."""
 
 import asyncio
 from pathlib import Path
@@ -10,7 +10,11 @@ import typer
 from minitest_cli.api.apps_manager_client import AppsManagerClient  # noqa: F401  re-exported for tests
 from minitest_cli.api.client import ApiClient
 from minitest_cli.api.errors import format_network_error
-from minitest_cli.commands import apps_dependencies, apps_get
+from minitest_cli.commands import (
+    apps_dependencies,
+    apps_get,
+    residential_proxy,
+)
 from minitest_cli.commands.apps_helpers import create_app_request
 from minitest_cli.commands.apps_table import APP_TABLE_HEADERS, app_row
 from minitest_cli.core.auth import require_auth
@@ -30,6 +34,7 @@ EXIT_NETWORK_ERROR = 3
 app = typer.Typer(name="apps", help="App management.")
 app.command(name="dependencies")(apps_dependencies.dependencies)
 app.command(name="get")(apps_get.get_app)
+app.add_typer(residential_proxy.app)
 
 
 @app.callback()

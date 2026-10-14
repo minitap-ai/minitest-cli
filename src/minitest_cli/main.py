@@ -18,7 +18,6 @@ from minitest_cli.commands import (
     flow_types,
     init,
     issues,
-    maintenance,
     run,
     screens,
     skill,
@@ -60,7 +59,6 @@ app.add_typer(build.app)
 app.add_typer(env.app)
 app.add_typer(run.app)
 app.add_typer(issues.app)
-app.add_typer(maintenance.app)
 app.add_typer(batch.app)
 app.add_typer(skill.app)
 app.add_typer(upgrade.app)

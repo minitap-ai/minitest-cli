@@ -145,7 +145,6 @@ app defaults.
 | `minitest run`   | Start runs and inspect their scenario runs |
 | `minitest batch` | List, inspect and cancel runs (a batch is a Run in the webapp) |
 | `minitest issues` | Read app issues and their fix prompts, mark them fixed |
-| `minitest maintenance` | CLI-only scenario maintenance against local code |
 | `minitest skill` | Print the CLI skill for your AI coding agent (not app skills) |
 
 ### Deprecated names
@@ -192,28 +191,6 @@ ports (default 443). Turning the private network on needs a connector and at
 least one domain. Connectors cannot be created from the CLI: a workspace owner
 or admin creates them in the webapp, under **Workspace settings → Private
 network**.
-
-## CLI-only maintenance
-
-`minitest maintenance` lets a coding agent keep Minitest scenarios in sync
-without connecting GitHub. Run it from the app repository: the code stays on the
-machine, while the CLI sends only proposed scenario edits and the local HEAD SHA.
-
-```bash
-# Print the server-composed maintenance instructions for your coding agent
-minitest maintenance --agent
-
-# Agent workflow primitives
-minitest --json maintenance context
-minitest maintenance affected --file affected.json
-minitest maintenance change --file change.json
-minitest maintenance status --phase writing --message "Updating affected scenarios"
-minitest maintenance complete --changed
-
-# Apply proposed edits now, or open the web review queue
-minitest maintenance apply
-minitest maintenance apply --review
-```
 
 ## Exit Codes
 

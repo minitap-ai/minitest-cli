@@ -13,6 +13,7 @@ from minitest_cli.commands.test_profile_helpers import (
     handle_profile_response,
     is_json_mode,
     run_api_call,
+    warn_if_qa_inbox_unreadable,
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
@@ -36,6 +37,8 @@ def register(app: typer.Typer) -> None:
 
         data = run_api_call(_run())
         items = data["items"] if isinstance(data, dict) and "items" in data else data
+        for profile in items:
+            warn_if_qa_inbox_unreadable(profile)
         if json_mode:
             output(items, json_mode=True)
             return

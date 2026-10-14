@@ -20,6 +20,7 @@ from minitest_cli.commands.test_profile_helpers import (
     is_json_mode,
     read_stdin_secret,
     run_api_call,
+    warn_if_qa_inbox_unreadable,
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
@@ -125,6 +126,7 @@ def create_profile(
     data = run_api_call(_run())
     if not json_mode:
         print_success(f"Test profile created: {data.get('id', '')}")
+    warn_if_qa_inbox_unreadable(data)
     output(data, json_mode=json_mode)
 
 
@@ -143,7 +145,9 @@ def get_profile(
             handle_profile_response(resp)
             return resp.json()
 
-    output(run_api_call(_run()), json_mode=json_mode)
+    data = run_api_call(_run())
+    warn_if_qa_inbox_unreadable(data)
+    output(data, json_mode=json_mode)
 
 
 @app.command(name="delete")

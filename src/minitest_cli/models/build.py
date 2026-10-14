@@ -17,6 +17,10 @@ class BuildResponse(CamelModel):
     size_bytes: int | None = None
     commit_sha: str | None = None
     commit_title: str | None = None
+    app_version: str | None = None
+    build_number: str | None = None
+    verification_status: str | None = None
+    verification_reason: str | None = None
     error_class: str | None = None
     error_summary: str | None = None
     error_remediation: str | None = None

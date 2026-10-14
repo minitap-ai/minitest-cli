@@ -40,18 +40,23 @@ def build_guidance(build: BuildResponse) -> dict[str, str | None]:
     return {"source": "none", "text": None}
 
 
+def redacted_build(build: BuildResponse) -> dict[str, Any]:
+    item = build.model_dump(mode="json", by_alias=True)
+    if build.status != FAILED_STATUS:
+        item["guidance"] = None
+        return item
+    item["guidance"] = build_guidance(build)
+    if is_withheld(build.error_class):
+        item["errorSummary"] = WITHHELD_NOTICE
+        item["errorRemediation"] = None
+        item["errorFixPrompt"] = None
+        item["errorRaw"] = None
+    return item
+
+
 def redacted_payload(result: BuildListResponse) -> dict[str, Any]:
     payload = result.model_dump(mode="json", by_alias=True)
-    for item, build in zip(payload.get("items", []), result.items, strict=False):
-        if build.status != FAILED_STATUS:
-            item["guidance"] = None
-            continue
-        item["guidance"] = build_guidance(build)
-        if is_withheld(build.error_class):
-            item["errorSummary"] = WITHHELD_NOTICE
-            item["errorRemediation"] = None
-            item["errorFixPrompt"] = None
-            item["errorRaw"] = None
+    payload["items"] = [redacted_build(build) for build in result.items]
     return payload
 
 

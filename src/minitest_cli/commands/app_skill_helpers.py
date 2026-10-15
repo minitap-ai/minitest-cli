@@ -103,6 +103,16 @@ def read_instructions(instructions: str | None, instructions_file: Path | None) 
     return instructions
 
 
+def instruction_edits(
+    replace: list[str] | None, replacements: list[str] | None
+) -> list[dict[str, str]]:
+    old, new = replace or [], replacements or []
+    if len(old) != len(new):
+        print_error("Give exactly one --with for each --replace.")
+        raise typer.Exit(code=1)
+    return [{"oldText": o, "newText": n} for o, n in zip(old, new, strict=True)]
+
+
 def warn_undefined_secrets(skill: dict[str, Any]) -> None:
     undefined = skill.get("undefinedSecrets") or []
     if undefined:

@@ -8,11 +8,12 @@ import typer
 from minitest_cli.commands.app_skill_helpers import (
     call,
     command_context,
+    instruction_edits,
     read_instructions,
     skills_path,
     warn_undefined_secrets,
 )
-from minitest_cli.utils.output import print_error, print_json, print_success
+from minitest_cli.utils.output import print_error, print_info, print_json, print_success
 
 Description = Annotated[
     str | None,
@@ -29,6 +30,24 @@ InstructionsFile = Annotated[
     Path | None,
     typer.Option(
         "--instructions-file", exists=True, readable=True, dir_okay=False, help="Markdown file."
+    ),
+]
+Replace = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--replace",
+        help="Exact text of the instructions to replace; pair each with a --with (repeatable).",
+    ),
+]
+With = Annotated[
+    list[str] | None,
+    typer.Option("--with", help="Replacement for the matching --replace; empty deletes it."),
+]
+AllowDestructive = Annotated[
+    bool,
+    typer.Option(
+        "--allow-destructive",
+        help="Accept a version that removes runnable code or most of the instructions.",
     ),
 ]
 AllPlatforms = Annotated[
@@ -94,17 +113,34 @@ def register(app: typer.Typer) -> None:
         all_platforms: AllPlatforms = False,
         instructions: Instructions = None,
         instructions_file: InstructionsFile = None,
+        replace: Replace = None,
+        with_: With = None,
+        allow_destructive: AllowDestructive = False,
     ) -> None:
-        """Change a skill; every change becomes a new version."""
+        """Change a skill; every change becomes a new version.
+
+        Change part of the instructions with --replace/--with pairs instead of resending them.
+        """
         settings, json_mode, app_id = command_context()
         body = _patch(description, platforms, all_platforms, instructions, instructions_file)
+        edits = instruction_edits(replace, with_)
+        if edits and "instructions" in body:
+            print_error("Use either --replace/--with or --instructions, not both.")
+            raise typer.Exit(code=1)
+        if edits:
+            body["edits"] = edits
         if new_name is not None:
             body["name"] = new_name
         if not body:
             print_error("Nothing to update.")
             raise typer.Exit(code=1)
+        if allow_destructive:
+            body["allowDestructive"] = True
         skill = call(settings, "PATCH", f"{skills_path(app_id)}/{name}", json=body)
         _report(skill, json_mode, f"Skill {skill['name']} is now v{skill['version']}.")
+        if not json_mode:
+            for change in skill.get("changes", []):
+                print_info(f"  {change}")
 
     @app.command(name="propose")
     def propose_update(

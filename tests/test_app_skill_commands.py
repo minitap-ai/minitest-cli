@@ -97,6 +97,56 @@ def test_update_all_platforms_clears_the_platform_filter(tmp_path):
     assert recorder.body == {"platforms": []}
 
 
+def test_update_sends_paired_replacements_and_prints_what_changed(tmp_path):
+    changes = ["Changed runnable blocks: fill.sh", "Instructions went from 900 to 940 characters"]
+    recorder = Recorder(httpx.Response(200, json=_skill(version=3, changes=changes)))
+
+    result = _invoke(
+        skill_app,
+        [
+            "update",
+            "color-by-number-fill",
+            "--replace",
+            "retry once",
+            "--with",
+            "retry three times",
+            "--replace",
+            "# old check\n",
+            "--with",
+            "",
+            "--allow-destructive",
+        ],
+        recorder,
+        tmp_path,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert recorder.body == {
+        "edits": [
+            {"oldText": "retry once", "newText": "retry three times"},
+            {"oldText": "# old check\n", "newText": ""},
+        ],
+        "allowDestructive": True,
+    }
+    assert "Changed runnable blocks: fill.sh" in result.output
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--replace", "a", "--with", "b", "--replace", "c"],
+        ["--replace", "a", "--with", "b", "--instructions", "whole"],
+    ],
+)
+def test_update_refuses_ambiguous_instruction_changes_before_calling_the_api(tmp_path, args):
+    recorder = Recorder(httpx.Response(200, json=_skill()))
+
+    result = _invoke(skill_app, ["update", "color-by-number-fill", *args], recorder, tmp_path)
+
+    assert result.exit_code == 1
+    assert recorder.requests == []
+
+
 def test_delete_linked_skill_lists_scenarios_and_keeps_the_skill(tmp_path):
     recorder = Recorder(
         httpx.Response(

@@ -121,6 +121,23 @@ class TestGetWatch:
         assert result.exit_code == 0, result.output
         assert json.loads(result.stdout)["state"] == "ready"
 
+    def test_watch_settled_waits_for_a_check_the_state_does_not_show_yet(self):
+        started = draft(stateReasonCode="not_checked", counts={"validating": 1})
+        backend = Backend().on(
+            "GET",
+            ONE,
+            httpx.Response(200, json=started),
+            httpx.Response(200, json=draft(state="ready", stateReasonCode=None)),
+        )
+
+        with patch("minitest_cli.commands.draft_watch.asyncio.sleep", AsyncMock()):
+            result = invoke(
+                backend, ["--json", "draft", "get", DRAFT_ID, "--watch", "--until", "settled"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert len(backend.sent("GET", ONE)) == 2
+
     def test_watch_stops_on_a_question_for_the_user(self):
         backend = Backend().on("GET", ONE, httpx.Response(200, json=draft(needsUser=True)))
 

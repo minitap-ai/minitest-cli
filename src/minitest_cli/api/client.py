@@ -39,9 +39,16 @@ class ApiClient:
             response = await client.get("/api/v1/apps")
     """
 
-    def __init__(self, settings: Settings, *, token_override: str | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        token_override: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
         self._settings = settings
         self._token_override = token_override
+        self._base_url = base_url or settings.api_url
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "ApiClient":
@@ -53,7 +60,7 @@ class ApiClient:
         if self._settings.cause is not None:
             headers[CAUSE_HEADER] = self._settings.cause
         self._client = httpx.AsyncClient(
-            base_url=self._settings.api_url,
+            base_url=self._base_url,
             headers=headers,
             auth=_BearerAuth(self._settings, self._token_override),
             timeout=DEFAULT_TIMEOUT,

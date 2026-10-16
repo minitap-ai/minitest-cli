@@ -49,7 +49,6 @@ def _invoke(args: list[str]):
     [
         (["scenario"], ["user-story"], ["get", "story-1"], STORY),
         (["scenario-binding"], ["user-story-binding"], ["list-files", "story-1"], FILES),
-        (["draft"], ["df"], ["list"], DRAFTS),
         (
             ["scenario-binding", "set-app-skills"],
             ["scenario-binding", "set-skills"],
@@ -82,5 +81,21 @@ def test_root_help_lists_scenario_commands_and_hides_legacy_ones():
     result = runner.invoke(app, ["--help"], terminal_width=200)
 
     commands = set(re.findall(r"│ (\S+)", unstyle(result.stdout)))
-    assert {"scenario", "scenario-binding", "draft"} <= commands
-    assert not {"user-story", "user-story-binding", "df"} & commands
+    assert {"scenario", "scenario-binding", "draft", "df"} <= commands
+    assert not {"user-story", "user-story-binding"} & commands
+
+
+def test_df_is_the_low_level_branch_group_again_and_does_not_warn():
+    result = _invoke(["--json", "df", "list"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == DRAFTS
+    assert "deprecated" not in result.stderr
+
+
+def test_low_level_draft_show_still_works_with_a_pointer_to_df():
+    show = _invoke(["draft", "show", "--help"])
+    help_text = unstyle(_invoke(["draft", "--help"]).stdout)
+
+    assert show.exit_code == 0
+    assert "show" not in help_text.split("Commands")[1].split()

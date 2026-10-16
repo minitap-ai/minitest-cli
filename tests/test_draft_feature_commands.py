@@ -564,7 +564,7 @@ class TestApply:
                 ["apply", _FEATURE_UUID, "--changeset", str(path)], _make_settings(tmp_path)
             )
         assert result.exit_code == 6
-        assert "draft show --view diff" in _text(result)
+        assert "df show --view diff" in _text(result)
 
 
 class TestDelete:

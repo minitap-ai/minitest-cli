@@ -1,7 +1,8 @@
-"""Draft-feature commands: list, create, delete.
+"""Low-level draft-feature commands (`minitest df`): list, create, delete.
 
 A draft feature is a branch of the app's test suite — it holds a delta against
 main rather than a copy of it, so `show` is the only way to see what it changes.
+Mini writes these branches; customer agents work with Mini through `minitest draft`.
 """
 
 import json
@@ -11,7 +12,6 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands import draft_feature_apply, draft_feature_show
-from minitest_cli.commands.deprecated_alias import deprecated_alias
 from minitest_cli.commands.draft_feature_helpers import (
     DRAFT_FEATURE_TABLE_HEADERS,
     base_path,
@@ -22,7 +22,13 @@ from minitest_cli.commands.run_helpers import ensure_uuid, resolve_app, run_api_
 from minitest_cli.models.draft_feature import DraftFeatureResponse, DraftFeatureStatus
 from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
 
-app = typer.Typer(name="draft", help="Drafts — branches of the app's test suite.")
+app = typer.Typer(
+    name="df",
+    help=(
+        "Low-level branches of the app's test suite (draft features). "
+        "To ask Mini for a change, use `minitest draft`."
+    ),
+)
 draft_feature_show.register(app)
 draft_feature_apply.register(app)
 
@@ -116,6 +122,3 @@ def delete_draft_feature(
         output(feature.model_dump(mode="json", by_alias=True), json_mode=True)
     else:
         print_success(f"Draft abandoned: {feature.id} (status: {feature.status.value})")
-
-
-legacy_app = deprecated_alias(app, old_name="df")

@@ -112,6 +112,7 @@ app defaults.
 | `MINITEST_APP_ID`             | Default app ID                                             | No (can use `--app` flag)          |
 | `MINITEST_API_URL`            | testing-service base URL                                   | No (defaults to production)        |
 | `MINITEST_APPS_MANAGER_URL`   | apps-manager base URL (used by `minitest apps create`)     | No (defaults to production)        |
+| `MINITEST_CONDUCTOR_URL`      | Conductor base URL (used by `minitest draft`)              | No (defaults to production)        |
 | `MINITEST_INTEGRATIONS_URL`   | minihands-integrations base URL (used to list tenants)     | No (defaults to production)        |
 | `MINITEST_WEBAPP_URL`         | Minitest webapp base URL (used for review links)            | No (defaults to production)        |
 | `MINITEST_SUPABASE_URL`       | Supabase project URL used for OAuth login                  | No (defaults to production)        |
@@ -136,7 +137,8 @@ app defaults.
 | `minitest apps`  | List, inspect, and create apps; residential proxy and private network settings |
 | `minitest scenario` | Create, update, list and delete scenarios |
 | `minitest scenario-binding` | Bind test accounts, test files or app skills to scenarios |
-| `minitest draft` | Drafts — branches of the test suite |
+| `minitest draft` | Ask Mini for a suite change, follow it, check and merge it (drafts in the webapp) |
+| `minitest df` | Low-level suite branches Mini writes (draft features) |
 | `minitest test-profile` | Test profiles (Test accounts in the webapp) |
 | `minitest tags`  | List, create, update and delete scenario tags |
 | `minitest app-skill` | App skills (Skills in the webapp): procedures Mini loads to arrange test state |
@@ -157,7 +159,7 @@ stderr and leave `--json` stdout unchanged. Switch to the new names.
 | `minitest user-story` | `minitest scenario` |
 | `minitest user-story-binding` | `minitest scenario-binding` |
 | `minitest scenario-binding set-skills` | `minitest scenario-binding set-app-skills` |
-| `minitest df` | `minitest draft` |
+| `minitest draft show/apply/delete` (v0.34–v0.36) | `minitest df show/apply/delete` |
 | `minitest flow-types` | `minitest tags` |
 | `run from-commit --user-story` / `-u` | `run from-commit --scenario` / `-s` |
 | `batch list --user-story-id` | `batch list --scenario` |

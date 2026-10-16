@@ -1,4 +1,4 @@
-"""`minitest draft show` — read a branch as a diff, as the suite it runs, or as its conflicts."""
+"""`minitest df show` — read a branch as a diff, as the suite it runs, or as its conflicts."""
 
 from enum import StrEnum
 from typing import Annotated

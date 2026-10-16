@@ -41,7 +41,9 @@ def is_stable(draft: dict[str, Any], until: WatchUntil) -> bool:
     idle = not draft.get("miniWriting") and draft.get("stateReasonCode") not in TURN_REASON_CODES
     if until is WatchUntil.IDLE:
         return idle
-    return idle and state != "validating"
+    # The counts move before the state does: a check just started still reads "drafting".
+    checking = (draft.get("counts") or {}).get("validating", 0) > 0
+    return idle and state != "validating" and not checking
 
 
 def _progress(draft: dict[str, Any]) -> str:

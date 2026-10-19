@@ -4,7 +4,8 @@ Two stopping rules, so an agent can wait for exactly what it acts on next:
 
 - ``idle``: Mini is not writing and has no turn queued — read the reply, answer an
   ask, or send the next message. The default.
-- ``settled``: idle, and no check is running either — the verdict is in.
+- ``settled``: idle, no check running and no build Conductor started for the draft
+  in flight — the verdict is in.
 
 A closed draft (merged/discarded) and a draft waiting on a person stop both.
 """
@@ -23,6 +24,7 @@ from minitest_cli.utils.output import print_info
 
 CLOSED_STATES = frozenset({"merged", "discarded"})
 TURN_REASON_CODES = frozenset({"authoring", "queued"})
+BUILD_IN_FLIGHT = frozenset({"requested", "building"})
 
 
 def _now() -> float:
@@ -43,7 +45,13 @@ def is_stable(draft: dict[str, Any], until: WatchUntil) -> bool:
         return idle
     # The counts move before the state does: a check just started still reads "drafting".
     checking = (draft.get("counts") or {}).get("validating", 0) > 0
-    return idle and state != "validating" and not checking
+    return idle and state != "validating" and not checking and not building(draft)
+
+
+def building(draft: dict[str, Any]) -> bool:
+    """Conductor is building the commit the draft waits for (e.g. a linked PR's head)."""
+    build = (draft.get("waitingFor") or {}).get("build") or {}
+    return build.get("status") in BUILD_IN_FLIGHT
 
 
 def _progress(draft: dict[str, Any]) -> str:

@@ -77,7 +77,7 @@ def get_draft(
         WatchUntil,
         typer.Option(
             "--until",
-            help="idle: Mini has nothing queued. settled: also no check running.",
+            help="idle: Mini has nothing queued. settled: also no check or draft build running.",
         ),
     ] = WatchUntil.IDLE,
     interval: Annotated[

@@ -66,6 +66,9 @@ def show_draft(draft: dict[str, Any], *, json_mode: bool) -> None:
     for key in _SUMMARY_KEYS:
         if key in draft:
             print(f"{key}: {_display(draft[key])}")  # noqa: T201
+    linked = draft.get("linkedPr")
+    if linked:
+        print(f"linkedPr: {linked.get('repo') or ''}#{linked.get('number')}")  # noqa: T201
     stories = draft.get("stories")
     if stories:
         print(f"stories: {len(stories)}")  # noqa: T201

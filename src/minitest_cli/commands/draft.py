@@ -15,6 +15,7 @@ from minitest_cli.commands import (
     draft_create,
     draft_legacy,
     draft_lifecycle,
+    draft_pr,
     draft_update,
 )
 from minitest_cli.commands.draft_helpers import (
@@ -105,5 +106,6 @@ draft_create.register(app)
 draft_update.register(app)
 draft_conversation.register(app)
 draft_lifecycle.register(app)
+draft_pr.register(app)
 app.add_typer(draft_asks.app)
 draft_legacy.register(app)

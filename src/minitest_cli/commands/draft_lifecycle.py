@@ -42,11 +42,23 @@ def register(app: typer.Typer) -> None:
         ] = None,
         include_waiting: Annotated[
             bool,
-            typer.Option("--include-waiting", help="Also run scenarios waiting for a newer build."),
+            typer.Option(
+                "--include-waiting",
+                help="Also run scenarios waiting for a newer build, on the newest build there is "
+                "(never with a PR-linked draft: it would skip the PR's head).",
+            ),
+        ] = False,
+        again: Annotated[
+            bool,
+            typer.Option(
+                "--again", help="Re-run every scenario, proven ones too (e.g. after a new push)."
+            ),
         ] = False,
     ) -> None:
-        """Run the draft's changed scenarios on the latest build to prove them."""
+        """Run the draft's changed scenarios to prove them (a PR-linked draft: on the PR head)."""
         body: dict[str, object] = {"includeWaiting": include_waiting}
+        if again:
+            body["again"] = True
         if story_ids:
             body["storyIds"] = [ensure_uuid(s, kind="scenario id") for s in story_ids]
         _act(draft_id, "/check", body, "Check started.")

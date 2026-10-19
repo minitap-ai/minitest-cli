@@ -1,6 +1,7 @@
 """`minitest draft link-pr|unlink-pr` and `draft check --again`."""
 
 import json
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
@@ -80,3 +81,37 @@ class TestCheckAgain:
 
         assert result.exit_code == 0, result.output
         assert backend.sent("POST", f"{ONE}/check") == [{"includeWaiting": False}]
+
+
+class TestWatchBuild:
+    def _waiting(self, status: str) -> dict:
+        build = {"status": status, "commitSha": "b0381df", "etaSeconds": 300}
+        return draft(state="waiting", stateReasonCode="waiting_build", waitingFor={"build": build})
+
+    def test_watch_settled_waits_for_the_pr_head_build(self):
+        backend = Backend().on(
+            "GET",
+            ONE,
+            httpx.Response(200, json=self._waiting("requested")),
+            httpx.Response(200, json=self._waiting("building")),
+            httpx.Response(200, json=draft(state="ready", stateReasonCode=None)),
+        )
+
+        with patch("minitest_cli.commands.draft_watch.asyncio.sleep", AsyncMock()):
+            result = invoke(
+                backend, ["--json", "draft", "get", DRAFT_ID, "--watch", "--until", "settled"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert len(backend.sent("GET", ONE)) == 3
+        assert json.loads(result.stdout)["state"] == "ready"
+
+    def test_watch_settled_stops_on_a_failed_build(self):
+        backend = Backend().on("GET", ONE, httpx.Response(200, json=self._waiting("failed")))
+
+        result = invoke(
+            backend, ["--json", "draft", "get", DRAFT_ID, "--watch", "--until", "settled"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert len(backend.sent("GET", ONE)) == 1

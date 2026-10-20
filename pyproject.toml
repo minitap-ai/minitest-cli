@@ -128,6 +128,9 @@ python_functions = [
 python_classes = [
     "Test*"
 ]
+markers = [
+    "real_app_lookup: resolve --app names through the API instead of the test shortcut",
+]
 addopts = [
     "-v",
     "--tb=short",

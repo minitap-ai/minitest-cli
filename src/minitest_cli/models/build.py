@@ -6,6 +6,17 @@ from typing import Literal
 from minitest_cli.models.base import CamelModel
 
 
+class BuildVariant(CamelModel):
+    """One member of an .aab bundle group: the emulator (x86_64) or the phone (arm64) build."""
+
+    id: str
+    status: str | None = None
+    abis: list[str] | None = None
+    device_build: bool = False
+    supported_backends: list[str] | None = None
+    error_summary: str | None = None
+
+
 class BuildResponse(CamelModel):
     id: str
     app_id: str
@@ -28,6 +39,13 @@ class BuildResponse(CamelModel):
     error_raw: str | None = None
     created_at: datetime
     validation_warnings: list[dict] | None = None
+    # .aab bundle groups (absent on older backends): the head build's native ABIs,
+    # the group it belongs to, the backends its completed members can run on, and
+    # every member of the group.
+    abis: list[str] | None = None
+    bundle_group_id: str | None = None
+    supported_backends: list[str] | None = None
+    variants: list[BuildVariant] | None = None
 
 
 class BuildListResponse(CamelModel):

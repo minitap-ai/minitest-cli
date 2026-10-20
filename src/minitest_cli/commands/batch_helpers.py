@@ -7,7 +7,12 @@ import typer
 
 from minitest_cli.api.client import BATCH_CREATE_TIMEOUT, ApiClient
 from minitest_cli.commands.run_display import _derive_run_status
-from minitest_cli.commands._response_errors import EXIT_NETWORK_ERROR, extract_detail
+from minitest_cli.commands._response_errors import (
+    EXIT_BUILD_INVALID,
+    EXIT_NETWORK_ERROR,
+    extract_detail,
+    try_handle_android_abi_mismatch,
+)
 from minitest_cli.commands.run_helpers import handle_response_error
 from minitest_cli.commands.batch_warnings import print_compatibility_warnings
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
@@ -28,6 +33,8 @@ async def post_batch(client: ApiClient, app_id: str, body: CreateBatchRequest) -
     )
     if resp.status_code == 403 and _requests_physical(body):
         _exit_physical_forbidden(resp)
+    if resp.status_code == 422 and try_handle_android_abi_mismatch(resp):
+        raise typer.Exit(code=EXIT_BUILD_INVALID)
     handle_response_error(resp, resource="Batch")
     batch = BatchResponse.model_validate(resp.json())
     print_compatibility_warnings(batch)

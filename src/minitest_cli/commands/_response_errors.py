@@ -1,8 +1,8 @@
 """Shared HTTP response error handling for build/run commands.
 
 Split out of ``build_helpers.py`` so the file-length gate stays comfortable
-as we add per-error pretty renderers (currently: ``build_invalid`` and
-``split_apks_backend_unsupported``).
+as we add per-error pretty renderers (currently: ``build_invalid``,
+``split_apks_backend_unsupported`` and the Android ABI mismatch).
 """
 
 import httpx
@@ -28,6 +28,11 @@ _SPLIT_APKS_BACKEND_UNSUPPORTED_MARKER = "not yet supported on this execution ba
 # points at the upload flag that matches the build.
 _DEVICE_BUILD_CODES = {"ios.device_only_ipa", "ios.device_only_sdk", "ios.no_simulator_slice"}
 _SIMULATOR_BUILD_CODES = {"ios.simulator_only_ipa"}
+
+# The testing-service refuses (plain 422, no error code) a physical Android
+# target whose build has no arm ABI: "This Android build only contains x86_64
+# native libraries and cannot run on physical devices (needs arm64-v8a ...)".
+_ANDROID_ABI_MISMATCH_MARKER = "cannot run on physical device"
 
 # Generic FastAPI ``loc`` prefixes that add noise to a field path (they're
 # implied by "this is a validation error" and repeat across every field).
@@ -102,6 +107,8 @@ def handle_response_error(
         raise typer.Exit(code=EXIT_BUILD_INVALID)
     if resp.status_code == 422 and _try_handle_build_invalid(resp, physical=physical):
         raise typer.Exit(code=EXIT_BUILD_INVALID)
+    if resp.status_code == 422 and try_handle_android_abi_mismatch(resp):
+        raise typer.Exit(code=EXIT_BUILD_INVALID)
     if resp.status_code >= 400:
         print_error(f"API error ({resp.status_code}): {extract_detail(resp)}")
         raise typer.Exit(code=EXIT_NETWORK_ERROR)
@@ -125,6 +132,20 @@ def _try_handle_split_apks_backend_unsupported(resp: httpx.Response) -> bool:
         "(e.g. [bold]bundletool build-apks --mode=universal[/bold] then extract "
         "the .apk from the resulting .apks) and re-upload with "
         "[bold]minitest build upload[/bold]."
+    )
+    return True
+
+
+def try_handle_android_abi_mismatch(resp: httpx.Response) -> bool:
+    """Explain a run refused because its Android build has no arm ABI for physical phones."""
+    detail = extract_detail(resp)
+    if _ANDROID_ABI_MISMATCH_MARKER not in detail.lower():
+        return False
+    print_error(detail)
+    err_console.print(
+        "  [yellow]Hint:[/yellow] upload the [bold].aab[/bold] instead: it converts into a"
+        " build for cloud emulators and one for physical phones, and either id works with"
+        " [bold]--android-physical[/bold]. Or upload an arm64-v8a build for physical devices."
     )
     return True
 

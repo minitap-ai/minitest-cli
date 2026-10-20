@@ -53,7 +53,8 @@ AndroidPhysicalOpt = Annotated[
         "--android-physical",
         help=(
             "Run the Android lane on physical phones instead of emulators (needs"
-            " --android-build, and physical devices enabled for the workspace)."
+            " --android-build, and physical devices enabled for the workspace). The id of"
+            " an uploaded .aab works for both: Minitap picks its phone build."
         ),
     ),
 ]

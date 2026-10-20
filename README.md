@@ -71,6 +71,8 @@ minitest apps create --name "My Web App" --platform web --web-url https://exampl
 minitest --app <app-id> build upload ./app-release.apk
 # Android App Bundle archives (.apks) are also accepted
 minitest --app <app-id> build upload ./app-release.apks
+# An Android App Bundle (.aab) works for both emulators and physical phones
+minitest --app <app-id> build upload ./app-release.aab
 
 # Run tests
 minitest --app <app-id> run all --web
@@ -111,11 +113,26 @@ minitest --app <app-id> run all --ios-build "$BUILD_ID" --ios-physical
 
 # Android: the same works with --android-physical
 minitest --app <app-id> run start --tag smoke --android-build <android-build-id> --android-physical
+
+# Android: an .aab needs no --physical; its id works on emulators and phones
+BUILD_ID=$(minitest --json --app <app-id> build upload ./app-release.aab | jq -r .id)
+minitest --app <app-id> run start --tag smoke --android-build "$BUILD_ID" --android-physical
 ```
+
+An `.aab` with asset packs converts into two builds: one for cloud emulators
+(x86_64, the id `build upload` returns) and one for physical phones (arm64).
+`build upload` waits for both, lists them, and says which devices the upload
+can run on (`supportedBackends` in `--json`). Pass the returned id to
+`--android-build`: Minitap picks the right build for each device. A bundle
+without asset packs converts into a single universal build. `--physical` is not
+needed for an `.aab`. If only one of the two builds converts, the upload still
+succeeds with a warning; it fails only when none converts.
 
 - `build upload --physical` checks the build for physical devices instead of
   virtual ones. A Simulator build is rejected (`ios.simulator_only_ipa`), and a
   device build uploaded without `--physical` is rejected with a hint to add it.
+- A physical Android run on a build with only x86_64 native libraries is
+  refused, with a hint to upload the `.aab` or an arm64 build instead.
 - `--ios-physical` / `--android-physical` need the matching `--ios-build` /
   `--android-build`, and can't be combined with `--*-device-type`.
 - If physical devices aren't enabled for your workspace, the run is refused

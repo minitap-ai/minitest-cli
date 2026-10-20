@@ -21,6 +21,7 @@ from minitest_cli.commands.build_helpers import (
     run_api_call,
     upload_status_message,
 )
+from minitest_cli.commands.build_bundle import PHYSICAL_AAB_NOTE, print_uploaded_build
 from minitest_cli.commands.build_commit import from_commit
 from minitest_cli.commands.build_conversion import wait_for_conversion
 from minitest_cli.commands.build_get import get
@@ -46,6 +47,7 @@ def upload(
             help=(
                 "Path to the build file (.apk, .apks, .aab, .ipa or .app.zip). A Simulator"
                 " build for iOS or an emulator-compatible Android build, unless --physical."
+                " An .aab works for both emulators and physical phones."
             ),
             exists=True,
             readable=True,
@@ -61,7 +63,7 @@ def upload(
             "--physical",
             help=(
                 "Upload a build for physical devices: a signed iOS device .ipa (Ad Hoc or"
-                " Development) or an Android .apk for real phones."
+                " Development) or an Android .apk for real phones. Not needed for an .aab."
             ),
         ),
     ] = False,
@@ -69,7 +71,7 @@ def upload(
         bool,
         typer.Option(
             "--wait/--no-wait",
-            help="For an .aab, wait until Minitap has converted it into APKs (default).",
+            help="For an .aab, wait until Minitap has converted all its builds (default).",
         ),
     ] = True,
 ) -> None:
@@ -83,18 +85,25 @@ def upload(
 
     An .aab is converted into APKs signed with your workspace's Minitap key
     (Play Asset Delivery packs included); the command waits for it unless
-    --no-wait. Register that key's SHA-1 for Google sign-in: see
+    --no-wait. A bundle with asset packs converts into two builds: one for
+    cloud emulators (x86_64, the id returned) and one for physical phones
+    (arm64). Use the returned id for either: Minitap picks the right build
+    for each device. Register the key's SHA-1 for Google sign-in: see
     `minitest build signing-certificate`.
 
     With --physical, builds are checked for physical devices instead: an iOS
-    device .ipa signed for Minitap's iPhones, or an Android .apk. Start runs on
-    them with --ios-physical / --android-physical.
+    device .ipa signed for Minitap's iPhones, or an Android .apk. An .aab
+    does not need it. Start runs on them with --ios-physical / --android-physical.
     """
     settings, app_id, json_mode = resolve_app()
     resolved_platform = platform.value if platform else detect_platform(file)
+    is_bundle = file.suffix.lower() == ".aab"
     form = {"platform": resolved_platform}
     if physical:
+        # Still sent for an .aab: older backends use it to pick the bundle's ABI.
         form["backend"] = "physical"
+        if is_bundle:
+            print_info(PHYSICAL_AAB_NOTE)
 
     async def _run() -> BuildResponse:
         async with ApiClient(settings) as client:
@@ -109,7 +118,7 @@ def upload(
                 )
             handle_response_error(resp, physical=physical)
             build = BuildResponse.model_validate(resp.json())
-            if wait and file.suffix.lower() == ".aab":
+            if wait and is_bundle:
                 with err_console.status("Converting the .aab into APKs..."):
                     build = await wait_for_conversion(client, app_id, build)
         return build
@@ -121,9 +130,9 @@ def upload(
         output(result_dict, json_mode=True)
     else:
         print_validation_warnings(result.validation_warnings)
-        devices = ", physical devices" if physical else ""
+        devices = ", physical devices" if physical and not is_bundle else ""
         print_success(f"Build uploaded: {file.name} ({resolved_platform}{devices})")
-        output(result_dict, json_mode=False)
+        print_uploaded_build(result)
 
 
 @app.command(name="list")

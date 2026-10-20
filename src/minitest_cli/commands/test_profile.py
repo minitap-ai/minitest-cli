@@ -22,6 +22,12 @@ from minitest_cli.commands.test_profile_helpers import (
     run_api_call,
     warn_if_qa_inbox_unreadable,
 )
+from minitest_cli.commands.test_profile_secret_refs import (
+    CardSecretOption,
+    OtpSecretOption,
+    PasswordSecretOption,
+    secret_ref_fields,
+)
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_success
@@ -81,6 +87,9 @@ def create_profile(
     test_card_cvc: CardCvcOption = None,
     test_card_holder_name: CardHolderNameOption = None,
     test_card_postal_code: CardPostalCodeOption = None,
+    password_secret: PasswordSecretOption = None,
+    otp_secret: OtpSecretOption = None,
+    card_secret: CardSecretOption = None,
 ) -> None:
     settings = get_settings()
     json_mode = is_json_mode()
@@ -116,6 +125,14 @@ def create_profile(
     )
     if card:
         body["test_card"] = card
+    body |= secret_ref_fields(
+        password_secret,
+        otp_secret,
+        card_secret,
+        password_given=pwd is not None,
+        otp_given=otp is not None,
+        card_given=bool(card),
+    )
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:

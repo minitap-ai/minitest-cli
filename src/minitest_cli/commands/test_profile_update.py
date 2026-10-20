@@ -22,6 +22,12 @@ from minitest_cli.commands.test_profile_helpers import (
     run_api_call,
     warn_if_qa_inbox_unreadable,
 )
+from minitest_cli.commands.test_profile_secret_refs import (
+    CardSecretOption,
+    OtpSecretOption,
+    PasswordSecretOption,
+    secret_ref_fields,
+)
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_success
@@ -85,6 +91,9 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option("--clear-test-card", help="Remove the stored test card."),
         ] = False,
+        password_secret: PasswordSecretOption = None,
+        otp_secret: OtpSecretOption = None,
+        card_secret: CardSecretOption = None,
     ) -> None:
         settings = get_settings()
         json_mode = is_json_mode()
@@ -139,6 +148,14 @@ def register(app: typer.Typer) -> None:
         if clear_test_card:
             body["test_card"] = None
 
+        body |= secret_ref_fields(
+            password_secret,
+            otp_secret,
+            card_secret,
+            password_given=pwd is not None,
+            otp_given=otp is not None,
+            card_given=bool(card),
+        )
         if not body and not card:
             print_error("Provide at least one field to update.")
             raise typer.Exit(code=1)

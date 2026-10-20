@@ -21,6 +21,7 @@ from minitest_cli.commands import (
     issues,
     run,
     screens,
+    secret,
     skill,
     tags,
     test_file,
@@ -55,6 +56,7 @@ app.add_typer(tags.app)
 app.add_typer(flow_types.app)
 app.add_typer(app_knowledge.app)
 app.add_typer(app_skill.app)
+app.add_typer(secret.app)
 app.add_typer(screens.app)
 app.add_typer(build.app)
 app.add_typer(env.app)

@@ -30,6 +30,7 @@ from minitest_cli.utils.output import (
     print_table,
 )
 
+EXIT_GENERAL_ERROR = 1
 EXIT_NETWORK_ERROR = 3
 
 app = typer.Typer(name="apps", help="App management.")
@@ -70,6 +71,9 @@ def list_apps() -> None:
                         detail = body.get("detail") or body.get("message") or detail
                 except Exception:  # noqa: BLE001
                     pass
+                if resp.status_code in (401, 403):
+                    print_error(f"Authentication failed ({resp.status_code}): {detail}")
+                    raise typer.Exit(code=EXIT_GENERAL_ERROR)
                 print_error(f"API error ({resp.status_code}): {detail}")
                 raise typer.Exit(code=EXIT_NETWORK_ERROR)
             return AppListResponse.model_validate(resp.json())

@@ -98,6 +98,29 @@ targets, or Edge. V1 supports one form factor per OS per run; run phone and
 tablet suites separately. Tablet results are labelled `iOS · Tablet` or
 `Android · Tablet`; phone labels stay unchanged.
 
+## Physical devices
+
+By default builds run on virtual devices (iOS Simulator, Android emulator). If
+physical devices are enabled for your workspace, upload a device build with
+`--physical` and select the physical lane when you start the run:
+
+```bash
+# iOS: an Ad Hoc or Development .ipa signed for Minitap's iPhones
+BUILD_ID=$(minitest --json --app <app-id> build upload ./MyApp.ipa --physical | jq -r .id)
+minitest --app <app-id> run all --ios-build "$BUILD_ID" --ios-physical
+
+# Android: the same works with --android-physical
+minitest --app <app-id> run start --tag smoke --android-build <android-build-id> --android-physical
+```
+
+- `build upload --physical` checks the build for physical devices instead of
+  virtual ones. A Simulator build is rejected (`ios.simulator_only_ipa`), and a
+  device build uploaded without `--physical` is rejected with a hint to add it.
+- `--ios-physical` / `--android-physical` need the matching `--ios-build` /
+  `--android-build`, and can't be combined with `--*-device-type`.
+- If physical devices aren't enabled for your workspace, the run is refused
+  with a message saying so.
+
 An iPhone-only build may run on iPad in compatibility mode; the server warns
 that the run does not establish native tablet-layout coverage. Unknown
 device-family metadata produces a different warning with the same coverage

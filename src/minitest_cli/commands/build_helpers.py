@@ -76,6 +76,7 @@ PLATFORM_EXTENSIONS: dict[str, Platform] = {
     ".ipa": Platform.ios,
     ".apk": Platform.android,
     ".apks": Platform.android,
+    ".app.zip": Platform.ios,
 }
 
 
@@ -97,7 +98,8 @@ class BuildKindFilter(StrEnum):
 
 def detect_platform(file_path: Path) -> str:
     """Auto-detect platform from file extension."""
-    suffix = file_path.suffix.lower()
+    name = file_path.name.lower()
+    suffix = ".app.zip" if name.endswith(".app.zip") else file_path.suffix.lower()
     platform = PLATFORM_EXTENSIONS.get(suffix)
     if platform is None:
         print_error(

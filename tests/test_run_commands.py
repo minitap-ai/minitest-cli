@@ -1025,7 +1025,7 @@ class TestListRunsCommand:
         client = _mock_client()
         client.get.return_value = _mock_response(200, _RUN_LIST_RESPONSE)
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_list.ApiClient", return_value=client):
             result = _run_with_context(["list", _USER_STORY_UUID], settings, json_mode=True)
 
         assert result.exit_code == 0
@@ -1037,7 +1037,7 @@ class TestListRunsCommand:
         client = _mock_client()
         client.get.return_value = _mock_response(200, _RUN_LIST_RESPONSE)
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_list.ApiClient", return_value=client):
             result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 0
@@ -1049,7 +1049,7 @@ class TestListRunsCommand:
         empty = {"items": [], "total": 0, "page": 1, "pageSize": 20}
         client.get.return_value = _mock_response(200, empty)
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_list.ApiClient", return_value=client):
             result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 0
@@ -1059,7 +1059,7 @@ class TestListRunsCommand:
         client = _mock_client()
         client.get.return_value = _mock_response(200, _RUN_LIST_RESPONSE)
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_list.ApiClient", return_value=client):
             result = _run_with_context(
                 ["list", _USER_STORY_UUID, "--status", "completed"], settings, json_mode=True
             )
@@ -1076,7 +1076,7 @@ class TestListRunsCommand:
             _mock_response(200, _RUN_LIST_RESPONSE),
         ]
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_list.ApiClient", return_value=client):
             result = _run_with_context(["list", "Login Story"], settings, json_mode=True)
 
         assert result.exit_code == 0
@@ -1088,7 +1088,7 @@ class TestListRunsCommand:
         client = _mock_client()
         client.get.return_value = _mock_response(500, {"detail": "Server error"})
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_list.ApiClient", return_value=client):
             result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 3
@@ -1098,7 +1098,7 @@ class TestListRunsCommand:
         client = _mock_client()
         client.get.side_effect = httpx.ConnectError("Connection refused")
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_list.ApiClient", return_value=client):
             result = _run_with_context(["list", _USER_STORY_UUID], settings)
 
         assert result.exit_code == 3

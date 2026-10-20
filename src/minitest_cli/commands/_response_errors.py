@@ -24,6 +24,11 @@ BUILD_INVALID_ERROR_CODE = "build_invalid"
 # rollout: both).
 _SPLIT_APKS_BACKEND_UNSUPPORTED_MARKER = "not yet supported on this execution backend"
 
+# Rejection codes that mean "right build, wrong kind of device": the hint
+# points at the upload flag that matches the build.
+_DEVICE_BUILD_CODES = {"ios.device_only_ipa", "ios.device_only_sdk", "ios.no_simulator_slice"}
+_SIMULATOR_BUILD_CODES = {"ios.simulator_only_ipa"}
+
 # Generic FastAPI ``loc`` prefixes that add noise to a field path (they're
 # implied by "this is a validation error" and repeat across every field).
 _LOC_PREFIXES_TO_DROP = {"body", "query", "path"}
@@ -86,14 +91,16 @@ def extract_detail(resp: httpx.Response) -> str:
         return resp.text
 
 
-def handle_response_error(resp: httpx.Response, *, resource: str = "Build") -> None:
+def handle_response_error(
+    resp: httpx.Response, *, resource: str = "Build", physical: bool = False
+) -> None:
     """Check response status; exit with proper code on errors."""
     if resp.status_code == 404:
         print_error(f"{resource} not found: {extract_detail(resp)}")
         raise typer.Exit(code=EXIT_NOT_FOUND)
     if resp.status_code == 422 and _try_handle_split_apks_backend_unsupported(resp):
         raise typer.Exit(code=EXIT_BUILD_INVALID)
-    if resp.status_code == 422 and _try_handle_build_invalid(resp):
+    if resp.status_code == 422 and _try_handle_build_invalid(resp, physical=physical):
         raise typer.Exit(code=EXIT_BUILD_INVALID)
     if resp.status_code >= 400:
         print_error(f"API error ({resp.status_code}): {extract_detail(resp)}")
@@ -122,7 +129,7 @@ def _try_handle_split_apks_backend_unsupported(resp: httpx.Response) -> bool:
     return True
 
 
-def _try_handle_build_invalid(resp: httpx.Response) -> bool:
+def _try_handle_build_invalid(resp: httpx.Response, *, physical: bool = False) -> bool:
     """If response is a build-invalid error, render issues and return True."""
     try:
         body = resp.json()
@@ -130,15 +137,30 @@ def _try_handle_build_invalid(resp: httpx.Response) -> bool:
         return False
     if not isinstance(body, dict) or body.get("error_code") != BUILD_INVALID_ERROR_CODE:
         return False
-    issues = body.get("issues") or []
-    print_error("Build rejected: failed validation for virtual-device execution.")
+    issues = [issue for issue in body.get("issues") or [] if isinstance(issue, dict)]
+    devices = "physical-device" if physical else "virtual-device"
+    print_error(f"Build rejected: failed validation for {devices} execution.")
     for issue in issues:
-        if not isinstance(issue, dict):
-            continue
         code = issue.get("code", "unknown")
         message = issue.get("message", "")
         err_console.print(f"  [red]✖[/red] {code}: {message}")
+    _print_device_kind_hint({str(issue.get("code")) for issue in issues}, physical=physical)
     return True
+
+
+def _print_device_kind_hint(codes: set[str], *, physical: bool) -> None:
+    if not physical and codes & _DEVICE_BUILD_CODES:
+        err_console.print(
+            "  [yellow]Hint:[/yellow] this is a device build. To run it on physical iPhones,"
+            " upload it with [bold]minitest build upload <file> --physical[/bold];"
+            " for virtual devices, build for the iOS Simulator instead."
+        )
+    elif physical and codes & _SIMULATOR_BUILD_CODES:
+        err_console.print(
+            "  [yellow]Hint:[/yellow] this is a Simulator build. Upload it without"
+            " [bold]--physical[/bold] to run it on virtual devices, or export a device"
+            " build (Ad Hoc or Development) for physical iPhones."
+        )
 
 
 def print_validation_warnings(warnings: list[dict] | None) -> None:

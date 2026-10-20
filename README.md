@@ -165,6 +165,7 @@ app defaults.
 | `minitest test-profile` | Test profiles (Test accounts in the webapp) |
 | `minitest tags`  | List, create, update and delete scenario tags |
 | `minitest app-skill` | App skills (Skills in the webapp): procedures Mini loads to arrange test state |
+| `minitest secret` | App secrets vault: passwords, OTP seeds, cards, API tokens referenced as `{{secret:NAME}}` (write-only values) |
 | `minitest screens` | Inspect the screens exploration mapped for an app |
 | `minitest build` | Native iOS/Android build management |
 | `minitest run`   | Start runs and inspect their scenario runs |
@@ -188,6 +189,32 @@ stderr and leave `--json` stdout unchanged. Switch to the new names.
 | `batch list --user-story-id` | `batch list --scenario` |
 | `run cancel --srp`, `run recording --srp` | `--target-id` |
 | `--type` on `scenario create/update/list` | `--tag` |
+
+## Secrets
+
+Credentials live in the app's vault, never in scenario text. Write
+`{{secret:NAME}}` (card fields: `{{secret:NAME.number}}`, `.expiry`, `.cvc`,
+`.holder_name`, `.postal_code`) where Mini must type one; `$NAME` still works
+but `secret lint` warns. Values are write-only: no command prints one back.
+Workspaces without the feature get `Secrets are not enabled for this workspace yet` (exit 4).
+
+```bash
+printf '%s' "$ADMIN_PW" | minitest secret set ADMIN_PASSWORD --kind password --note "Admin login"
+echo '{"number":"4242424242424242","expiry":"12/34","cvc":"123"}' \
+  | minitest secret set STRIPE_CARD --kind card          # optional holder_name, postal_code
+minitest secret list [--missing]                         # names, kinds, usages, requests
+minitest secret describe ADMIN_PASSWORD                  # usages + reference to copy
+minitest secret lint --scenario <id>                     # exit 1 on leaks or missing secrets
+minitest secret extract <id> --as ADMIN_PASSWORD --kind password [--dry-run]
+minitest test-profile update <id> --password-secret ADMIN_PASSWORD
+```
+
+`set` reads stdin only and refuses a terminal (`--interactive` opens a hidden
+prompt). Inside a test run (`MINITAP_SECRETS_SOCKET` or `STORY_RUN_ID` set) it
+refuses: use `minitest secret request NAME --kind <kind> --reason "…"` instead.
+`extract` reads the leaked literal from the scenario on your machine, creates
+the secret with it, then rewrites every occurrence to `{{secret:NAME}}`. Older
+scenario versions and past run logs may still hold the literal: rotate it.
 
 ## App network settings
 

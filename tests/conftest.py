@@ -9,3 +9,18 @@ def _isolate_minitest_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in list(os.environ):
         if name.startswith("MINITEST_"):
             monkeypatch.delenv(name)
+
+
+@pytest.fixture(autouse=True)
+def _app_names_resolve_to_themselves(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Most tests target fake ids like "app-1"; keep them off the name lookup.
+
+    Tests of the lookup itself opt back in with ``@pytest.mark.real_app_lookup``.
+    """
+    if request.node.get_closest_marker("real_app_lookup"):
+        return
+    monkeypatch.setattr(
+        "minitest_cli.core.app_context._app_id_by_name", lambda _settings, name: name
+    )

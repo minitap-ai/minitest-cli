@@ -11,15 +11,11 @@ from minitest_cli.commands.run_helpers import (
     base_path,
     display_run_result,
     ensure_uuid,
-    fetch_runs,
-    format_run_pagination_info,
-    format_run_row,
     handle_response_error,
     poll_run_status,
     resolve_app,
     resolve_user_story_id,
     run_api_call,
-    RUN_TABLE_HEADERS,
     TERMINAL_STATUSES,
 )
 from minitest_cli.commands.run_cancel import cancel
@@ -27,27 +23,27 @@ from minitest_cli.commands.run_commit import from_commit
 from minitest_cli.commands.run_targets import (
     AndroidBuildOpt,
     AndroidDeviceTypeOpt,
+    AndroidPhysicalOpt,
     build_targets,
     IosBuildOpt,
     IosDeviceTypeOpt,
+    IosPhysicalOpt,
     WebOpt,
 )
 from minitest_cli.commands.run_feedback import feedback
+from minitest_cli.commands.run_list import list_runs
 from minitest_cli.commands.run_recording import register_recording_commands
 from minitest_cli.commands.run_tagged import print_batch_started, start_tagged
 from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
-    StoryRunListResponse,
     StoryRunResponse,
 )
 from minitest_cli.utils.output import (
-    output,
     print_error,
     print_info,
     print_json,
     print_success,
-    print_table,
 )
 
 app = typer.Typer(
@@ -69,6 +65,8 @@ def start(
     web: WebOpt = False,
     ios_device_type: IosDeviceTypeOpt = None,
     android_device_type: AndroidDeviceTypeOpt = None,
+    ios_physical: IosPhysicalOpt = False,
+    android_physical: AndroidPhysicalOpt = False,
     watch: Annotated[
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
@@ -78,7 +76,15 @@ def start(
         print_error("Pass either a scenario or --tag, not both or neither.")
         raise typer.Exit(code=1)
     settings, app_id, json_mode = resolve_app()
-    targets = build_targets(ios_build, android_build, web, ios_device_type, android_device_type)
+    targets = build_targets(
+        ios_build,
+        android_build,
+        web,
+        ios_device_type,
+        android_device_type,
+        ios_physical,
+        android_physical,
+    )
     if tag:
         print_batch_started(start_tagged(settings, app_id, tag, targets), json_mode)
         return
@@ -131,44 +137,6 @@ def status(
     display_run_result(run_api_call(_status()), json_mode)
 
 
-@app.command(name="list")
-def list_runs(
-    user_story: Annotated[str, typer.Argument(help="Scenario name or UUID to list runs for.")],
-    page: Annotated[int, typer.Option(help="Page number.")] = 1,
-    page_size: Annotated[int, typer.Option(help="Items per page.")] = 20,
-    status_filter: Annotated[
-        str | None,
-        typer.Option(
-            "--status",
-            help="Filter by status (pending, running, completed, failed, cancelled).",
-        ),
-    ] = None,
-    all_pages: Annotated[bool, typer.Option("--all", help="Fetch all results.")] = False,
-) -> None:
-    """List the scenario runs of one scenario."""
-    settings, app_id, json_mode = resolve_app()
-    if all_pages:
-        page, page_size = 1, 100
-
-    async def _list() -> StoryRunListResponse:
-        async with ApiClient(settings) as client:
-            user_story_id = await resolve_user_story_id(client, app_id, user_story)
-            return await fetch_runs(client, app_id, user_story_id, page, page_size, status_filter)
-
-    result = run_api_call(_list())
-    if json_mode:
-        output(result.model_dump(mode="json", by_alias=True), json_mode=True)
-        return
-    if not result.items:
-        print_info("No runs found.")
-        return
-    title, tip = format_run_pagination_info(result)
-    rows = [format_run_row(r) for r in result.items]
-    print_table(RUN_TABLE_HEADERS, rows, title=title)
-    if tip:
-        print_info(tip)
-
-
 @app.command(name="all")
 def run_all(
     ios_build: IosBuildOpt = None,
@@ -176,10 +144,20 @@ def run_all(
     web: WebOpt = False,
     ios_device_type: IosDeviceTypeOpt = None,
     android_device_type: AndroidDeviceTypeOpt = None,
+    ios_physical: IosPhysicalOpt = False,
+    android_physical: AndroidPhysicalOpt = False,
 ) -> None:
     """Start a run covering every scenario of the app."""
     settings, app_id, json_mode = resolve_app()
-    targets = build_targets(ios_build, android_build, web, ios_device_type, android_device_type)
+    targets = build_targets(
+        ios_build,
+        android_build,
+        web,
+        ios_device_type,
+        android_device_type,
+        ios_physical,
+        android_physical,
+    )
 
     async def _run_all() -> BatchResponse:
         async with ApiClient(settings) as client:
@@ -189,6 +167,7 @@ def run_all(
     print_batch_started(run_api_call(_run_all()), json_mode)
 
 
+app.command(name="list")(list_runs)
 app.command(name="cancel")(cancel)
 app.command(name="from-commit")(from_commit)
 app.command(name="verdicts")(verdicts)

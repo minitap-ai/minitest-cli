@@ -301,7 +301,7 @@ class TestUploadCommand:
         result = runner.invoke(build_app, ["upload", "--help"])
 
         assert result.exit_code == 0
-        assert ".apk, .apks, or .ipa" in result.output
+        assert ".apk, .apks, .ipa or .app.zip" in " ".join(result.output.split())
 
     def test_upload_auto_detects_platform_and_posts_to_correct_endpoint(
         self, tmp_path: Path

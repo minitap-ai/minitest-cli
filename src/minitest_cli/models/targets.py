@@ -20,16 +20,22 @@ class DeviceType(StrEnum):
     tablet = "tablet"
 
 
+Backend = Literal["cloud", "physical"]
+
+
 class BatchTarget(CamelModel):
     platform: Platform
     build_id: str | None = None
     device_type: DeviceType | None = None
+    # ``None`` lets the server default to virtual devices and keeps the
+    # payload of a virtual-device run unchanged.
+    backend: Backend | None = None
 
     @model_validator(mode="before")
     @classmethod
     def validate_cloud_device_type(cls, data: object) -> object:
         if isinstance(data, dict) and data.get("deviceType", data.get("device_type")) is not None:
-            if data.get("backend", "cloud") != "cloud" or any(
+            if (data.get("backend") or "cloud") != "cloud" or any(
                 data.get(field) is not None for field in ("browser", "url", "viewport")
             ):
                 raise ValueError("deviceType is only supported for native cloud targets.")
@@ -37,6 +43,8 @@ class BatchTarget(CamelModel):
 
     @model_validator(mode="after")
     def validate_device_type(self) -> "BatchTarget":
+        if self.backend == "physical" and self.platform == "web":
+            raise ValueError("Physical devices are only supported for native targets.")
         if self.device_type is not None and self.platform == "web":
             raise ValueError("deviceType is only supported for native cloud targets.")
         return self

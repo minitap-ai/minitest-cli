@@ -42,8 +42,8 @@ def upload(
         Path,
         typer.Argument(
             help=(
-                "Path to the build file (.apk, .apks, or .ipa). Must be a Simulator"
-                " build for iOS or an emulator-compatible Android build."
+                "Path to the build file (.apk, .apks, .ipa or .app.zip). A Simulator build"
+                " for iOS or an emulator-compatible Android build, unless --physical."
             ),
             exists=True,
             readable=True,
@@ -53,17 +53,34 @@ def upload(
         Platform | None,
         typer.Option(help="Target platform. Auto-detected from file extension."),
     ] = None,
+    physical: Annotated[
+        bool,
+        typer.Option(
+            "--physical",
+            help=(
+                "Upload a build for physical devices: a signed iOS device .ipa (Ad Hoc or"
+                " Development) or an Android .apk for real phones."
+            ),
+        ),
+    ] = False,
 ) -> None:
-    """Upload a build file (.apk or .apks for Android, .ipa for iOS).
+    """Upload a build file (.apk or .apks for Android, .ipa or .app.zip for iOS).
 
-    Builds must be compatible with virtual devices:
+    By default builds are checked for virtual devices:
 
     \b
-    - iOS: provide a Simulator build (.ipa built for the iOS Simulator, not a physical device).
+    - iOS: provide a Simulator build (.ipa or .app.zip built for the iOS Simulator).
     - Android: provide an emulator-compatible .apk or .apks archive.
+
+    With --physical, builds are checked for physical devices instead: an iOS
+    device .ipa signed for Minitap's iPhones, or an Android .apk. Start runs on
+    them with --ios-physical / --android-physical.
     """
     settings, app_id, json_mode = resolve_app()
     resolved_platform = platform.value if platform else detect_platform(file)
+    form = {"platform": resolved_platform}
+    if physical:
+        form["backend"] = "physical"
 
     async def _run() -> BuildResponse:
         async with ApiClient(settings) as client:
@@ -74,9 +91,9 @@ def upload(
                 resp = await client.upload_file(
                     f"{base_path(app_id)}/build",
                     files={"file": (file.name, f, "application/octet-stream")},
-                    data={"platform": resolved_platform},
+                    data=form,
                 )
-        handle_response_error(resp)
+        handle_response_error(resp, physical=physical)
         return BuildResponse.model_validate(resp.json())
 
     result = run_api_call(_run())
@@ -86,7 +103,8 @@ def upload(
         output(result_dict, json_mode=True)
     else:
         print_validation_warnings(result.validation_warnings)
-        print_success(f"Build uploaded: {file.name} ({resolved_platform})")
+        devices = ", physical devices" if physical else ""
+        print_success(f"Build uploaded: {file.name} ({resolved_platform}{devices})")
         output(result_dict, json_mode=False)
 
 

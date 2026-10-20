@@ -95,7 +95,8 @@ def register(app: typer.Typer) -> None:
         instructions: Instructions = None,
         instructions_file: InstructionsFile = None,
     ) -> None:
-        """Create a skill. Reference secrets as $NAME and set them with `secret set`."""
+        """Create a skill. Reference secrets as $NAME (or {{secret:NAME}} once Secrets are enabled:
+        see `minitest secret`) and set them with `secret set`."""
         settings, json_mode, app_id = command_context()
         body = _patch(description, platforms, False, instructions, instructions_file)
         if "description" not in body or "instructions" not in body:

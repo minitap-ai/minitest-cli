@@ -45,7 +45,11 @@ def print_uploaded_build(build: BuildResponse) -> None:
             ]
             for v in build.variants
         ]
-        title = f"This .aab converted into {len(rows)} builds"
+        title = (
+            f"This .aab converted into {len(rows)} builds"
+            if len(rows) > 1
+            else "This .aab converted into 1 build that runs on every device"
+        )
         print_table(BUNDLE_TABLE_HEADERS, rows, title=title)
     if build.supported_backends is not None:
         typer.echo(f"Runs on: {runs_on(build.supported_backends)}")

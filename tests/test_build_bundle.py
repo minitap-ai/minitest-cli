@@ -172,6 +172,33 @@ class TestBundleWait:
 
 
 class TestBundleOutput:
+    def test_a_single_member_bundle_reads_as_one_build(self, tmp_path: Path) -> None:
+        universal = {
+            **HEAD,
+            "status": "completed",
+            "abis": ["arm64-v8a", "x86_64"],
+            "bundleGroupId": "head-1",
+            "supportedBackends": ["cloud", "physical"],
+            "variants": [
+                {
+                    "id": "head-1",
+                    "status": "completed",
+                    "abis": ["arm64-v8a", "x86_64"],
+                    "deviceBuild": False,
+                    "supportedBackends": ["cloud", "physical"],
+                    "errorSummary": None,
+                }
+            ],
+        }
+        client = _client({**HEAD, "status": "pending"}, universal)
+
+        result = _upload(tmp_path, client, json_mode=False)
+
+        assert result.exit_code == 0, result.output
+        out = _flat(result.stdout)
+        assert "converted into 1 build that runs on every device" in out
+        assert "1 builds" not in out
+
     def test_upload_human_output_lists_both_builds(self, tmp_path: Path) -> None:
         client = _client(
             {**HEAD, "status": "pending"},
@@ -232,6 +259,24 @@ class TestAndroidAbiMismatchHint:
         assert "cannot run on physical devices" in stderr
         assert "upload the .aab instead" in stderr
         assert "arm64-v8a build for physical devices" in stderr
+
+    def test_a_bundle_without_arm64_code_is_told_to_rebuild_not_to_upload_the_aab(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        detail = (
+            "This Android build only contains x86_64 native libraries and cannot run on "
+            "physical devices (needs arm64-v8a or armeabi-v7a). The .aab ships no "
+            "arm64-v8a or armeabi-v7a native code: rebuild it with arm64-v8a or "
+            "armeabi-v7a libraries."
+        )
+
+        with pytest.raises(Exit) as exc:
+            handle_response_error(_resp(422, {"detail": detail}), resource="Batch")
+
+        stderr = _flat(capsys.readouterr().err)
+        assert exc.value.exit_code == 5
+        assert "this .aab has no arm64 native code" in stderr
+        assert "upload the .aab instead" not in stderr
 
     def test_other_422_is_not_mistaken_for_an_abi_mismatch(self) -> None:
         with pytest.raises(Exit) as exc:

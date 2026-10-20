@@ -22,7 +22,9 @@ from minitest_cli.commands.build_helpers import (
     upload_status_message,
 )
 from minitest_cli.commands.build_commit import from_commit
+from minitest_cli.commands.build_conversion import wait_for_conversion
 from minitest_cli.commands.build_get import get
+from minitest_cli.commands.build_signing import signing_certificate
 from minitest_cli.commands.build_fix_prompts import print_fix_prompts, redacted_payload
 from minitest_cli.models import BuildListResponse, BuildResponse
 from minitest_cli.utils.output import (
@@ -42,8 +44,8 @@ def upload(
         Path,
         typer.Argument(
             help=(
-                "Path to the build file (.apk, .apks, .ipa or .app.zip). A Simulator build"
-                " for iOS or an emulator-compatible Android build, unless --physical."
+                "Path to the build file (.apk, .apks, .aab, .ipa or .app.zip). A Simulator"
+                " build for iOS or an emulator-compatible Android build, unless --physical."
             ),
             exists=True,
             readable=True,
@@ -63,14 +65,26 @@ def upload(
             ),
         ),
     ] = False,
+    wait: Annotated[
+        bool,
+        typer.Option(
+            "--wait/--no-wait",
+            help="For an .aab, wait until Minitap has converted it into APKs (default).",
+        ),
+    ] = True,
 ) -> None:
-    """Upload a build file (.apk or .apks for Android, .ipa or .app.zip for iOS).
+    """Upload a build file (.apk, .apks or .aab for Android, .ipa or .app.zip for iOS).
 
     By default builds are checked for virtual devices:
 
     \b
     - iOS: provide a Simulator build (.ipa or .app.zip built for the iOS Simulator).
-    - Android: provide an emulator-compatible .apk or .apks archive.
+    - Android: provide an emulator-compatible .apk or .apks archive, or an .aab.
+
+    An .aab is converted into APKs signed with your workspace's Minitap key
+    (Play Asset Delivery packs included); the command waits for it unless
+    --no-wait. Register that key's SHA-1 for Google sign-in: see
+    `minitest build signing-certificate`.
 
     With --physical, builds are checked for physical devices instead: an iOS
     device .ipa signed for Minitap's iPhones, or an Android .apk. Start runs on
@@ -93,8 +107,12 @@ def upload(
                     files={"file": (file.name, f, "application/octet-stream")},
                     data=form,
                 )
-        handle_response_error(resp, physical=physical)
-        return BuildResponse.model_validate(resp.json())
+            handle_response_error(resp, physical=physical)
+            build = BuildResponse.model_validate(resp.json())
+            if wait and file.suffix.lower() == ".aab":
+                with err_console.status("Converting the .aab into APKs..."):
+                    build = await wait_for_conversion(client, app_id, build)
+        return build
 
     result = run_api_call(_run())
     result_dict = result.model_dump(mode="json", by_alias=True)
@@ -166,3 +184,4 @@ def list_builds(
 
 app.command(name="get")(get)
 app.command(name="from-commit")(from_commit)
+app.command(name="signing-certificate")(signing_certificate)

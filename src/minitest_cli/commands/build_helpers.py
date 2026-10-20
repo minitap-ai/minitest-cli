@@ -73,6 +73,7 @@ class Platform(StrEnum):
 
 
 PLATFORM_EXTENSIONS: dict[str, Platform] = {
+    ".aab": Platform.android,
     ".ipa": Platform.ios,
     ".apk": Platform.android,
     ".apks": Platform.android,

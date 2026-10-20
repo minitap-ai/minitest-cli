@@ -7,11 +7,11 @@ import typer
 
 from minitest_cli.api.client import BATCH_CREATE_TIMEOUT, ApiClient
 from minitest_cli.commands.run_display import _derive_run_status
+from minitest_cli.commands._abi_mismatch import try_handle_android_abi_mismatch
 from minitest_cli.commands._response_errors import (
     EXIT_BUILD_INVALID,
     EXIT_NETWORK_ERROR,
     extract_detail,
-    try_handle_android_abi_mismatch,
 )
 from minitest_cli.commands.run_helpers import handle_response_error
 from minitest_cli.commands.batch_warnings import print_compatibility_warnings

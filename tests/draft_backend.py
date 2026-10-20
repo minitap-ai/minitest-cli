@@ -46,6 +46,7 @@ class Backend:
 
     routes: dict[str, list[Reply]] = field(default_factory=dict)
     requests: list[httpx.Request] = field(default_factory=list)
+    apps_reply: httpx.Response | None = None
 
     def on(self, method: str, path: str, *replies: Reply) -> "Backend":
         self.routes[f"{method} {path}"] = list(replies)
@@ -60,6 +61,8 @@ class Backend:
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         if request.url.host != CONDUCTOR_HOST:
+            if self.apps_reply is not None:
+                return self.apps_reply
             apps = [{"id": APP_ID, "name": "Shop", "tenantId": TENANT_ID}]
             return httpx.Response(200, json={"apps": apps})
         self.requests.append(request)

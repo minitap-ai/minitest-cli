@@ -7,6 +7,7 @@ import typer
 
 from minitest_cli.api.apps_manager_client import AppsManagerClient
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands._response_errors import extract_detail
 from minitest_cli.core.config import Settings
 from minitest_cli.models.app import AppListResponse
 from minitest_cli.models.app_env_vars import AppEnvVarsResponse
@@ -36,6 +37,9 @@ async def resolve_app_and_tenant(settings: Settings, app_flag: str | None) -> tu
 
     async with ApiClient(settings) as client:
         resp = await client.get("/api/v1/apps")
+    if resp.status_code in (401, 403):
+        print_error(f"Authentication failed ({resp.status_code}): {extract_detail(resp)}")
+        raise typer.Exit(code=EXIT_GENERAL_ERROR)
     if resp.status_code >= 400:
         print_error(f"API error ({resp.status_code}): failed to list apps.")
         raise typer.Exit(code=EXIT_NETWORK_ERROR)

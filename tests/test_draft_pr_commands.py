@@ -115,3 +115,21 @@ class TestWatchBuild:
 
         assert result.exit_code == 0, result.output
         assert len(backend.sent("GET", ONE)) == 1
+
+
+class TestRejectedKey:
+    def test_revoked_key_exits_auth_failure_not_network(self):
+        refused = httpx.Response(401, json={"detail": "Invalid minitest API key"})
+        backend = Backend(apps_reply=refused)
+
+        result = invoke(backend, ["draft", "list"])
+
+        assert result.exit_code == 1
+        assert "Authentication failed (401): Invalid minitest API key" in result.output
+
+    def test_testing_service_outage_still_exits_network(self):
+        backend = Backend(apps_reply=httpx.Response(503, text="down"))
+
+        result = invoke(backend, ["draft", "list"])
+
+        assert result.exit_code == 3

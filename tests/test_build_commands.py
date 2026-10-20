@@ -301,7 +301,9 @@ class TestUploadCommand:
         result = runner.invoke(build_app, ["upload", "--help"])
 
         assert result.exit_code == 0
-        assert ".apk, .apks, .ipa or .app.zip" in " ".join(result.output.split())
+        assert "(.apk, .apks or .aab for Android, .ipa or .app.zip for" in " ".join(
+            result.output.split()
+        )
 
     def test_upload_auto_detects_platform_and_posts_to_correct_endpoint(
         self, tmp_path: Path
@@ -589,4 +591,61 @@ class TestListBuildsCommand:
             result = _run_with_context(["list", "--kind", "bogus"], settings)
 
         assert result.exit_code != 0
+        client.get.assert_not_called()
+
+
+class TestUploadBundle:
+    @staticmethod
+    def _client(*polled: dict) -> AsyncMock:
+        client = _mock_upload_client(
+            _mock_response(
+                201, {**_UPLOAD_RESPONSE, "originalName": "app.aab", "status": "pending"}
+            )
+        )
+        client.get = AsyncMock(side_effect=[_mock_response(200, body) for body in polled])
+        return client
+
+    @staticmethod
+    def _upload(tmp_path: Path, client: AsyncMock, *flags: str):
+        bundle = tmp_path / "app.aab"
+        bundle.write_bytes(b"PK bundle")
+        with (
+            patch("minitest_cli.commands.build.ApiClient", return_value=client),
+            patch("minitest_cli.commands.build_conversion.CONVERSION_POLL_SECONDS", 0),
+        ):
+            return _run_with_context(
+                ["upload", str(bundle), *flags], _make_settings(tmp_path), json_mode=True
+            )
+
+    def test_waits_until_the_bundle_is_converted(self, tmp_path: Path) -> None:
+        converting = {**_UPLOAD_RESPONSE, "status": "pending"}
+        converted = {**_UPLOAD_RESPONSE, "status": "completed", "storagePath": "/b/app.apks"}
+        client = self._client(converting, converted)
+
+        result = self._upload(tmp_path, client)
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["status"] == "completed"
+        assert client.upload_file.call_args.kwargs["data"] == {"platform": "android"}
+        assert client.get.call_args.args[0] == "/api/v1/apps/app-123/builds/b1"
+
+    def test_a_failed_conversion_exits_5_with_the_reason(self, tmp_path: Path) -> None:
+        failed = {
+            **_UPLOAD_RESPONSE,
+            "status": "failed",
+            "errorSummary": "bundletool could not build APKs from this bundle: bad config",
+        }
+
+        result = self._upload(tmp_path, self._client(failed))
+
+        assert result.exit_code == 5
+        assert "bad config" in result.output
+
+    def test_no_wait_returns_the_pending_build(self, tmp_path: Path) -> None:
+        client = self._client()
+
+        result = self._upload(tmp_path, client, "--no-wait")
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["status"] == "pending"
         client.get.assert_not_called()

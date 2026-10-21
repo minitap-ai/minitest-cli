@@ -89,10 +89,12 @@ def _exit_without_files(lane_logs: LaneLogs, target: PlatformRun) -> None:
     if lane_logs.status == "pending":
         print_error(f"The {target.platform} target is still running; logs arrive when it ends.")
         raise typer.Exit(code=1)
-    print_error(
-        f"No logs were captured for the {target.platform} target "
-        "(physical iPhones aren't captured yet)."
-    )
+    if lane_logs.unavailable_reason == "browser_unsupported":
+        print_error("No logs for this browser: only Chrome and Edge record the console and HAR.")
+    elif target.platform == "ios":
+        print_error("No logs were captured for the ios target (physical iPhones aren't captured).")
+    else:
+        print_error(f"No logs were captured for the {target.platform} target.")
     raise typer.Exit(code=EXIT_NOT_FOUND)
 
 
@@ -111,7 +113,9 @@ async def _save(file: LaneLogFile, out_dir: Path) -> Path:
 
 def _size(path: Path) -> str:
     size = path.stat().st_size
-    return f"{size / 1024**2:.1f} MB" if size >= 1024**2 else f"{size / 1024:.0f} KB"
+    if size >= 1024**2:
+        return f"{size / 1024**2:.1f} MB"
+    return f"{size / 1024:.0f} KB" if size >= 1024 else f"{size} B"
 
 
 def _clock(offset_ms: int) -> str:

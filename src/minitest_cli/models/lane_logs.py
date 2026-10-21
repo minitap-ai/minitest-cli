@@ -23,5 +23,6 @@ class LaneCrash(CamelModel):
 
 class LaneLogs(CamelModel):
     status: Literal["pending", "ready", "none"]
+    unavailable_reason: str | None = None
     files: list[LaneLogFile]
     crashes: list[LaneCrash]

@@ -105,6 +105,7 @@ class TestRunLogs:
         assert not list((tmp_path / "out").glob("*.gz"))
         assert "NullPointerException in Pay.kt:118" in result.output
         assert "0:52.3" in result.output
+        assert f"{len(LOGCAT)} B" in result.output
 
     def test_logs_json_lists_written_files_and_crashes(self, invoke, tmp_path) -> None:
         result = invoke(
@@ -128,6 +129,16 @@ class TestRunLogs:
         [
             ({"status": "pending", "files": [], "crashes": []}, 1, "still running"),
             ({"status": "none", "files": [], "crashes": []}, 4, "No logs were captured"),
+            (
+                {
+                    "status": "none",
+                    "unavailableReason": "browser_unsupported",
+                    "files": [],
+                    "crashes": [],
+                },
+                4,
+                "only Chrome and Edge",
+            ),
             (None, 4, "aren't enabled"),
         ],
     )

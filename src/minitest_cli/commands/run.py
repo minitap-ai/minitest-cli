@@ -32,6 +32,7 @@ from minitest_cli.commands.run_targets import (
 )
 from minitest_cli.commands.run_feedback import feedback
 from minitest_cli.commands.run_list import list_runs
+from minitest_cli.commands.run_logs import register_logs_command
 from minitest_cli.commands.run_recording import register_recording_commands
 from minitest_cli.commands.run_tagged import print_batch_started, start_tagged
 from minitest_cli.commands.verdicts import verdicts
@@ -173,3 +174,4 @@ app.command(name="from-commit")(from_commit)
 app.command(name="verdicts")(verdicts)
 app.command(name="feedback")(feedback)
 register_recording_commands(app)
+register_logs_command(app)

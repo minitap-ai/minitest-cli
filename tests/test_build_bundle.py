@@ -198,6 +198,7 @@ class TestBundleOutput:
         out = _flat(result.stdout)
         assert "converted into 1 build that runs on every device" in out
         assert "1 builds" not in out
+        assert "All devices" in out and "Emulator" not in out
 
     def test_upload_human_output_lists_both_builds(self, tmp_path: Path) -> None:
         client = _client(
@@ -211,6 +212,7 @@ class TestBundleOutput:
         out = result.stdout
         assert "This .aab converted into 2 builds" in out
         assert "Emulator" in out and "Phone" in out
+        assert "All devices" not in out
         assert "arm64-v8a" in out and "x86_64" in out
         assert "abis: x86_64" in out
         assert "Runs on: cloud emulators and physical phones" in out

@@ -23,7 +23,12 @@ CONVERSION_TIMEOUT_SECONDS = 20 * 60
 
 
 def variant_label(variant: BuildVariant) -> str:
-    return "Phone" if variant.device_build else "Emulator"
+    """Phone for the arm64 member; All devices when a member also runs on phones."""
+    if variant.device_build:
+        return "Phone"
+    if "physical" in (variant.supported_backends or []):
+        return "All devices"
+    return "Emulator"
 
 
 def _pending_ids(build: BuildResponse) -> list[str]:

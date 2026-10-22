@@ -5,7 +5,8 @@ from typing import Annotated
 import typer
 
 from minitest_cli.commands.user_story_camera import (
-    CAMERA_MEDIA_HELP,
+    CameraMediaOption,
+    ClearCameraMediaOption,
     resolve_camera_source,
 )
 from minitest_cli.commands.user_story_device_count import (
@@ -13,6 +14,7 @@ from minitest_cli.commands.user_story_device_count import (
     parse_device_count,
 )
 from minitest_cli.commands import tags_helpers
+from minitest_cli.commands.user_story_iap import InAppPurchasesOption
 from minitest_cli.commands.user_story_helpers import (
     get_app_flag,
     get_settings,
@@ -104,16 +106,9 @@ def update_user_story(
         typer.Option("--clear-profiles", help="Unbind all test profiles. Excludes --profile."),
     ] = False,
     device_count: DeviceCountUpdateOption = None,
-    camera_media: Annotated[
-        str | None, typer.Option("--camera-media", help=CAMERA_MEDIA_HELP)
-    ] = None,
-    clear_camera_media: Annotated[
-        bool,
-        typer.Option(
-            "--clear-camera-media",
-            help="Reset the camera media to the default feed. Excludes --camera-media.",
-        ),
-    ] = False,
+    camera_media: CameraMediaOption = None,
+    clear_camera_media: ClearCameraMediaOption = False,
+    in_app_purchases: InAppPurchasesOption = None,
 ) -> None:
     """Update an existing scenario (partial update)."""
     settings = get_settings()
@@ -164,6 +159,7 @@ def update_user_story(
         device_count_value=device_count_value,
         camera_source=camera_source,
         clear_camera_media=clear_camera_media,
+        in_app_purchases=in_app_purchases,
         needs_current_story=needs_current_story,
     )
 
@@ -194,5 +190,6 @@ def update_user_story(
             device_count_provided=device_count_provided,
             device_count_value=device_count_value,
             clear_camera_media=clear_camera_media,
+            in_app_purchases=in_app_purchases,
         )
     output(data, json_mode=json_mode)

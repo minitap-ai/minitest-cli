@@ -11,6 +11,7 @@ from minitest_cli.commands.user_story_criteria import apply_current_story_fields
 from minitest_cli.commands.user_story_criterion_edits import RevertCriterion, SetCriterion
 from minitest_cli.commands.user_story_device_count import describe_device_count_change
 from minitest_cli.commands.user_story_helpers import base_path, handle_response_error
+from minitest_cli.commands.user_story_iap import report_in_app_purchases
 from minitest_cli.commands.user_story_overrides import ClearOverride, SetOverride
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.core.config import Settings
@@ -30,6 +31,7 @@ def build_update_payload(
     device_count_value: int | None,
     camera_source: Path | str | None,
     clear_camera_media: bool,
+    in_app_purchases: bool | None,
     needs_current_story: bool,
 ) -> dict[str, Any]:
     """Assemble the PATCH body from scalar edits, erroring if nothing would change."""
@@ -49,7 +51,13 @@ def build_update_payload(
         test_profile_ids=test_profile_ids,
     )
     has_camera_change = camera_source is not None or clear_camera_media
-    if not (req.has_changes() or needs_current_story or device_count_provided or has_camera_change):
+    if not (
+        req.has_changes()
+        or needs_current_story
+        or device_count_provided
+        or has_camera_change
+        or in_app_purchases is not None
+    ):
         print_error("Provide at least one field to update.")
         raise typer.Exit(code=1)
 
@@ -61,6 +69,8 @@ def build_update_payload(
         payload["cameraMediaFileId"] = None
     elif isinstance(camera_source, str):
         payload["cameraMediaFileId"] = camera_source
+    if in_app_purchases is not None:
+        payload["requiresInAppPurchases"] = in_app_purchases
     return payload
 
 
@@ -117,6 +127,7 @@ def print_update_summary(
     device_count_provided: bool,
     device_count_value: int | None,
     clear_camera_media: bool,
+    in_app_purchases: bool | None,
 ) -> None:
     print_success(f"Scenario updated: {user_story_id}")
     if clear_profiles:
@@ -127,3 +138,4 @@ def print_update_summary(
         print_info(describe_device_count_change(data, device_count_value))
     if clear_camera_media:
         print_info("Camera media reset to the built-in default feed.")
+    report_in_app_purchases(data, in_app_purchases)

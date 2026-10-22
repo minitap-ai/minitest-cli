@@ -18,6 +18,7 @@ from minitest_cli.commands.tags_helpers import (
     resolve_tag_ids,
 )
 from minitest_cli.commands.user_story_device_count import effective_device_count
+from minitest_cli.commands.user_story_iap import requires_in_app_purchases
 from minitest_cli.commands.user_story_helpers import (
     USER_STORY_TABLE_HEADERS,
     base_path,
@@ -98,8 +99,13 @@ def list_user_stories(
     else:
         title, tip = "Scenarios", None
     show_devices = any(effective_device_count(s) > 1 for s in items)
-    headers = [*USER_STORY_TABLE_HEADERS, "Devices"] if show_devices else USER_STORY_TABLE_HEADERS
-    rows = [format_user_story_row(s, show_devices=show_devices) for s in items]
+    show_iap = any(requires_in_app_purchases(s) for s in items)
+    headers = [
+        *USER_STORY_TABLE_HEADERS,
+        *(["Devices"] if show_devices else []),
+        *(["IAP"] if show_iap else []),
+    ]
+    rows = [format_user_story_row(s, show_devices=show_devices, show_iap=show_iap) for s in items]
     print_table(headers, rows, title=title)
     if tip:
         print_info(tip)
@@ -127,6 +133,8 @@ def get_user_story(
         effective = effective_device_count(data)
         if effective > 1:
             print_info(f"Devices per run: {effective}")
+        if requires_in_app_purchases(data):
+            print_info("In-app purchases: on")
         permission = data.get("setupCommitPermission")
         if isinstance(permission, dict):
             print_info(f"Setup commit allowed: {permission.get('customerQuote')}")

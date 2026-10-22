@@ -3,7 +3,7 @@
 import mimetypes
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 
@@ -19,6 +19,16 @@ CAMERA_MEDIA_HELP = (
     "Camera media fed to the virtual webcam during web runs: a local video/image "
     "path to upload (video ≤ 50 MB, image ≤ 25 MB) or an existing test-file ID."
 )
+
+CameraMediaOption = Annotated[str | None, typer.Option("--camera-media", help=CAMERA_MEDIA_HELP)]
+
+ClearCameraMediaOption = Annotated[
+    bool,
+    typer.Option(
+        "--clear-camera-media",
+        help="Reset the camera media to the default feed. Excludes --camera-media.",
+    ),
+]
 
 
 def resolve_camera_source(camera_media: str | None) -> str | Path | None:

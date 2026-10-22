@@ -9,6 +9,7 @@ import typer
 
 from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands.user_story_device_count import effective_device_count
+from minitest_cli.commands.user_story_iap import requires_in_app_purchases
 from minitest_cli.commands.user_story_profiles import format_bound_profiles
 from minitest_cli.api.client import ApiClient
 from minitest_cli.core.config import Settings
@@ -113,7 +114,9 @@ def _criterion_label(criterion: CriterionVersionResponse) -> str:
     return f"{criterion.content} [{platforms}*]"
 
 
-def format_user_story_row(story: dict[str, Any], *, show_devices: bool = False) -> list[str]:
+def format_user_story_row(
+    story: dict[str, Any], *, show_devices: bool = False, show_iap: bool = False
+) -> list[str]:
     criteria_str = ""
     try:
         parsed = UserStoryDetailResponse.model_validate(story)
@@ -131,6 +134,8 @@ def format_user_story_row(story: dict[str, Any], *, show_devices: bool = False) 
     if show_devices:
         count = effective_device_count(story)
         row.append(str(count) if count > 1 else "")
+    if show_iap:
+        row.append("yes" if requires_in_app_purchases(story) else "")
     return row
 
 

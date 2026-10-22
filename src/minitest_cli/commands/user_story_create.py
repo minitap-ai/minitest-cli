@@ -7,12 +7,13 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.user_story_camera import (
-    CAMERA_MEDIA_HELP,
+    CameraMediaOption,
     resolve_camera_media_file_id,
     resolve_camera_source,
 )
 from minitest_cli.commands.tags_helpers import LegacyTypeOption, TagOption, collect_tag_names
 from minitest_cli.commands.user_story_device_count import DeviceCountCreateOption
+from minitest_cli.commands.user_story_iap import InAppPurchasesOption, report_in_app_purchases
 from minitest_cli.commands.user_story_helpers import (
     base_path,
     get_app_flag,
@@ -56,9 +57,8 @@ def create_user_story(
         ),
     ] = None,
     device_count: DeviceCountCreateOption = None,
-    camera_media: Annotated[
-        str | None, typer.Option("--camera-media", help=CAMERA_MEDIA_HELP)
-    ] = None,
+    camera_media: CameraMediaOption = None,
+    in_app_purchases: InAppPurchasesOption = None,
     idempotency_key: Annotated[
         str | None,
         typer.Option(
@@ -92,6 +92,8 @@ def create_user_story(
         payload["deviceCount"] = device_count
     if isinstance(camera_source, str):
         payload["camera_media_file_id"] = camera_source
+    if in_app_purchases is not None:
+        payload["requiresInAppPurchases"] = in_app_purchases
 
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
@@ -125,4 +127,5 @@ def create_user_story(
         if bound:
             label = "Default profile auto-assigned" if not profile else "Profiles bound"
             print_info(f"{label}: {bound}")
+        report_in_app_purchases(data, in_app_purchases)
     output(data, json_mode=json_mode)

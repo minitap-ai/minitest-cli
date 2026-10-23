@@ -279,6 +279,8 @@ class TestFires:
             "total": 18,
             "unchecked": 0,
             "issues": issues,
+            "fixed": [{"issueId": "i0", "title": "Weather widget"}],
+            "fixedCount": 1,
             "testedBuilds": [],
             "testedUrl": "https://startsiden.example.com",
             "testedUrlIsNew": False,
@@ -289,11 +291,16 @@ class TestFires:
         ]
 
         result = _invoke(tmp_path, backend, ["fires", "Nightly sanity check"])
+        as_json = _invoke(tmp_path, backend, ["fires", "Nightly sanity check"], json_mode=True)
 
         assert result.exit_code == 0, result.output
         night, skipped = [line for line in result.stdout.splitlines() if "Fri 23 Oct" in line]
-        assert [cell.strip() for cell in night.split("│")[2:6]] == ["critical", "15/18", "1", "2"]
+        cells = [cell.strip() for cell in night.split("│")[2:7]]
+        assert cells == ["critical", "15/18", "1", "2", "1"]
         assert "Didn't run: the workspace ran out of credits" in skipped
+        assert json.loads(as_json.stdout)[0]["summary"]["fixed"] == [
+            {"issueId": "i0", "title": "Weather widget"}
+        ]
 
 
 class TestBackendErrors:
@@ -303,6 +310,17 @@ class TestBackendErrors:
         assert result.exit_code == 4
         assert "Scheduled runs are not available on this workspace yet." in result.stderr
         assert "Traceback" not in result.output
+
+    def test_flag_off_404_gets_the_same_clean_message(self, tmp_path):
+        def flag_off(request: httpx.Request) -> httpx.Response:
+            body = {"message": "Scheduled runs are not available on this workspace yet"}
+            return httpx.Response(404, json={"error": "not_found", **body})
+
+        with cli_context(make_settings(tmp_path), json_mode=False), routed(flag_off):
+            result = runner.invoke(schedules.app, ["list"])
+
+        assert result.exit_code == 4
+        assert "Error: Scheduled runs are not available on this workspace yet." in result.stderr
 
     def test_unknown_schedule_id_is_a_plain_not_found(self, tmp_path):
         result = _invoke(tmp_path, FakeBackend(), ["restore", "nope"])

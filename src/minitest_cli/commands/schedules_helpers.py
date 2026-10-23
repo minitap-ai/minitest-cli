@@ -31,7 +31,8 @@ def check_response(resp: httpx.Response) -> None:
         return
     detail = extract_detail(resp).strip()
     if resp.status_code == 404:
-        known = _is_json(resp) and detail not in ("", _NO_ROUTE_DETAIL)
+        unavailable = ("", _NO_ROUTE_DETAIL, UNAVAILABLE_MESSAGE.rstrip("."))
+        known = _is_json(resp) and detail.rstrip(".") not in unavailable
         print_error(detail if known else UNAVAILABLE_MESSAGE)
         raise typer.Exit(code=EXIT_NOT_FOUND)
     print_error(f"API error ({resp.status_code}): {detail}")

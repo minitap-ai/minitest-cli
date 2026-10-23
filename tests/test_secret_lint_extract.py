@@ -44,7 +44,9 @@ class LintRouter(Router):
         refs = [{"name": "ADMIN_PASSWORD", "start": 0, "end": 1}] if "{{secret:" in text else []
         missing = ["GHOST"] if "GHOST" in text else []
         legacy = ["OLD"] if "$OLD" in text else []
+        pending = ["SANDBOX_KEY"] if "SANDBOX_KEY" in text else []
         body = {"references": refs, "missing": missing, "leaks": leaks, "legacy": legacy}
+        body |= {"pending": pending}
         return httpx.Response(200, json=body)
 
 
@@ -83,6 +85,18 @@ class TestLint:
         payload = json.loads(result.stdout)
         assert payload["ok"] is False
         assert [s["source"] for s in payload["sources"]] == ["description", "criterion 1"]
+
+    def test_lint_pending_warns_without_failing(self, tmp_path):
+        text = "use {{secret:SANDBOX_KEY}}"
+        result = invoke(app, ["lint", "--text", text], LintRouter({}), tmp_path)
+        assert result.exit_code == 0, result.output
+        assert "SANDBOX_KEY has no value yet" in result.output
+
+    def test_lint_pending_json(self, tmp_path):
+        text = "use {{secret:SANDBOX_KEY}}"
+        result = invoke(app, ["lint", "--text", text, "--json"], LintRouter({}), tmp_path)
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.stdout)["sources"][0]["pending"] == ["SANDBOX_KEY"]
 
     def test_lint_requires_exactly_one_source(self, tmp_path):
         assert invoke(app, ["lint"], LintRouter({}), tmp_path).exit_code == 1

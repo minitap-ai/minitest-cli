@@ -54,6 +54,11 @@ def render(label: str, text: str, result: dict[str, Any]) -> None:
         print_error(
             f"{prefix}{name} is referenced but not set: minitest secret set {name} --kind <kind>"
         )
+    for name in result.get("pending") or []:
+        print_warning(
+            f"{prefix}{name} has no value yet: runs that need it wait until a human sets it "
+            f"(minitest secret set {name} --kind <kind>)"
+        )
     for leak in result.get("leaks") or []:
         span = f"{position(text, int(leak['start']))}-{position(text, int(leak['end']))}"
         what = f"is the value of {leak['secret']}" if leak.get("secret") else "looks like a secret"
@@ -80,7 +85,7 @@ def register(app: typer.Typer) -> None:
         ] = None,
         json_flag: JsonOption = False,
     ) -> None:
-        """Report references, missing secrets, leaks and legacy $NAME (exit 1 on leak/missing)."""
+        """References, missing/pending secrets, leaks, legacy $NAME (exit 1 on leak or missing)."""
         if sum(x is not None for x in (file, text, scenario)) != 1:
             print_error("Give exactly one of --file, --text or --scenario.")
             raise typer.Exit(code=1)

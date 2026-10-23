@@ -63,6 +63,15 @@ class TestList:
         assert "generated" in result.output
         assert result.output.index("SANDBOX_KEY") < result.output.index("ADMIN_PASSWORD")
 
+    def test_list_does_not_repeat_empty_secrets_mirrored_as_requests(self, tmp_path):
+        mirrored = {**_REQUEST, "name": "SANDBOX_KEY"}
+        router = Router({("GET", SECRETS): vault([_EMPTY], [mirrored])})
+        result = invoke(app, ["list", "--missing", "--json"], router, tmp_path)
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.stdout) == {"secrets": [_EMPTY], "requests": []}
+        text = invoke(app, ["list"], router, tmp_path).output
+        assert "Requested (missing) secrets" not in text
+
     def test_list_missing_hides_secrets_with_a_value(self, tmp_path):
         # Older servers omit hasValue: those secrets count as set.
         router = Router({("GET", SECRETS): vault([secret_row()])})

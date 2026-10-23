@@ -22,7 +22,7 @@ SKIP_REASONS = {
     "no_phone_free": "no phone was free",
 }
 PLATFORM_LABELS = {"ios": "iOS", "android": "Android"}
-FIRE_HEADERS = ["Scheduled for", "Result", "Checks", "New", "Still open", "Tested", "Run"]
+FIRE_HEADERS = ["Scheduled for", "Result", "Checks", "New", "Still open", "Fixed", "Tested", "Run"]
 
 
 def _platform(platform: str) -> str:
@@ -48,15 +48,16 @@ def fire_row(fire: dict[str, Any], timezone: str) -> list[str]:
     run = str(fire.get("batchId") or "-")
     summary = fire.get("summary")
     if fire.get("status") == "skipped":
-        return [when, skip_label(fire.get("skipReason")), "-", "-", "-", "-", run]
+        return [when, skip_label(fire.get("skipReason")), "-", "-", "-", "-", "-", run]
     if not summary:
-        return [when, "started", "-", "-", "-", "-", run]
+        return [when, "started", "-", "-", "-", "-", "-", run]
     issues = summary.get("issues") or []
     new = sum(1 for issue in issues if issue.get("isNew"))
     checks = f"{summary.get('passed')}/{summary.get('total')}"
     if summary.get("unchecked"):
         checks += f" ({summary['unchecked']} unchecked)"
-    row = [when, str(summary.get("outcome")), checks, str(new), str(len(issues) - new)]
+    fixed = summary.get("fixedCount", len(summary.get("fixed") or []))
+    row = [when, str(summary.get("outcome")), checks, str(new), str(len(issues) - new), str(fixed)]
     return [*row, _tested(summary), run]
 
 

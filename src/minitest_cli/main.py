@@ -23,6 +23,7 @@ from minitest_cli.commands import (
     knowledge,
     knowledge_documents,
     run,
+    schedules,
     screens,
     secret,
     skill,
@@ -68,6 +69,7 @@ app.add_typer(screens.app)
 app.add_typer(build.app)
 app.add_typer(env.app)
 app.add_typer(run.app)
+app.add_typer(schedules.app)
 app.add_typer(issues.app)
 app.add_typer(batch.app)
 app.add_typer(skill.app)

@@ -17,8 +17,11 @@ from minitest_cli.commands import (
     draft_feature,
     env,
     flow_types,
+    glossary,
     init,
     issues,
+    knowledge,
+    knowledge_documents,
     run,
     screens,
     secret,
@@ -55,6 +58,10 @@ app.add_typer(test_file.app)
 app.add_typer(tags.app)
 app.add_typer(flow_types.app)
 app.add_typer(app_knowledge.app)
+app.add_typer(knowledge_documents.brief_app)
+app.add_typer(knowledge_documents.app_guide_app)
+app.add_typer(glossary.app)
+app.add_typer(knowledge.app)
 app.add_typer(app_skill.app)
 app.add_typer(secret.app)
 app.add_typer(screens.app)

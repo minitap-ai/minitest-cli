@@ -19,6 +19,17 @@ _REQUEST = {
     "createdAt": "2026-10-20T10:00:00Z",
 }
 _DISABLED = httpx.Response(404, json={"detail": "Not Found"})
+_EMPTY = secret_row(
+    name="SANDBOX_KEY",
+    kind="token",
+    version=0,
+    usages=[],
+    hasValue=False,
+    valueOrigin=None,
+    pendingReason="Checkout calls the sandbox",
+    requestedBy="Mini",
+    requestedForUserStoryId="s1",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -36,11 +47,29 @@ class TestList:
         assert "Admin login" in result.output
         assert "STRIPE_KEY" in result.output
 
-    def test_list_missing_json_returns_requests_only(self, tmp_path):
-        router = Router({("GET", SECRETS): vault([secret_row()], [_REQUEST])})
+    def test_list_missing_json_returns_empty_secrets_and_legacy_requests(self, tmp_path):
+        router = Router({("GET", SECRETS): vault([secret_row(), _EMPTY], [_REQUEST])})
         result = invoke(app, ["list", "--missing", "--json"], router, tmp_path)
         assert result.exit_code == 0, result.output
-        assert json.loads(result.stdout) == {"requests": [_REQUEST]}
+        assert json.loads(result.stdout) == {"secrets": [_EMPTY], "requests": [_REQUEST]}
+
+    def test_list_shows_state_with_reason(self, tmp_path):
+        generated = secret_row(name="QA_PASSWORD", hasValue=True, valueOrigin="generated")
+        router = Router({("GET", SECRETS): vault([secret_row(), generated, _EMPTY])})
+        result = invoke(app, ["list"], router, tmp_path)
+        assert result.exit_code == 0, result.output
+        assert "missing:" in result.output
+        assert "Checkout" in result.output
+        assert "generated" in result.output
+        assert result.output.index("SANDBOX_KEY") < result.output.index("ADMIN_PASSWORD")
+
+    def test_list_missing_hides_secrets_with_a_value(self, tmp_path):
+        # Older servers omit hasValue: those secrets count as set.
+        router = Router({("GET", SECRETS): vault([secret_row()])})
+        result = invoke(app, ["list", "--missing"], router, tmp_path)
+        assert result.exit_code == 0, result.output
+        assert "ADMIN_PASSWORD" not in result.output
+        assert "No missing secrets" in result.output
 
     def test_list_flag_off_prints_friendly_message(self, tmp_path):
         result = invoke(app, ["list"], Router({("GET", SECRETS): _DISABLED}), tmp_path)
@@ -71,6 +100,15 @@ class TestDescribe:
         result = invoke(app, ["describe", "STRIPE_KEY"], router, tmp_path)
         assert result.exit_code == 0, result.output
         assert "requested, not set yet" in result.output
+
+    def test_describe_empty_secret_shows_reason_and_how_to_set(self, tmp_path):
+        router = Router({("GET", SECRETS): vault([_EMPTY])})
+        result = invoke(app, ["describe", "SANDBOX_KEY"], router, tmp_path)
+        assert result.exit_code == 0, result.output
+        assert "State: missing: Checkout calls the sandbox" in result.output
+        assert "Requested by: Mini" in result.output
+        assert "For scenario: s1" in result.output
+        assert "minitest secret set SANDBOX_KEY --kind token" in result.output
 
     def test_describe_unknown_exits_4(self, tmp_path):
         router = Router({("GET", SECRETS): vault()})

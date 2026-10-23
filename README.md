@@ -238,7 +238,7 @@ minitest schedules create --from-file nightly.json --name "Nightly copy"   # JSO
 minitest schedules update "Nightly sanity check" --at 04:00 --android-branch main
 minitest schedules pause|resume "Nightly sanity check"
 minitest schedules run "Nightly sanity check"         # start one now (posts to Slack too)
-minitest schedules fires "Nightly sanity check"       # last runs: verdict, new / still open, or why it didn't run
+minitest schedules fires "Nightly sanity check"       # last runs: verdict, new / still open / fixed, or why it didn't run
 minitest schedules delete "Nightly sanity check" --yes   # `schedules restore <id>` undoes it
 ```
 

@@ -168,7 +168,7 @@ class TestSet:
         args = ["set", "ADMIN_PASSWORD", "--kind", "password"]
         result = invoke(app, args, router, tmp_path, stdin=FAKE, env={var: "x"})
         assert result.exit_code == 1
-        assert "secret request" in result.output
+        assert "secret create" in result.output
         assert not router.requests
 
     @pytest.mark.parametrize("name", ["lower", "MINITAP_KEY", "1ABC", "A" * 65])
@@ -217,31 +217,3 @@ class TestManage:
         assert result.exit_code == 0, result.output
         assert router.body("PATCH", f"{SECRETS}/OLD") == {"newName": "NEW"}
         assert "{{secret:NEW}}" in result.output
-
-    def test_request_posts_and_works_in_agent_context(self, tmp_path):
-        router = Router({("POST", f"{SECRETS}/requests"): httpx.Response(201, json=_REQUEST)})
-        args = [
-            "request",
-            "STRIPE_KEY",
-            "--kind",
-            "token",
-            "--reason",
-            "Checkout",
-            "--scenario",
-            "s1",
-        ]
-        result = invoke(app, args, router, tmp_path, env={"STORY_RUN_ID": "r1"})
-        assert result.exit_code == 0, result.output
-        assert router.body("POST", f"{SECRETS}/requests") == {
-            "name": "STRIPE_KEY",
-            "kind": "token",
-            "reason": "Checkout",
-            "storyId": "s1",
-        }
-
-    def test_request_flag_off(self, tmp_path):
-        router = Router({("POST", f"{SECRETS}/requests"): _DISABLED})
-        args = ["request", "STRIPE_KEY", "--kind", "token", "--reason", "x"]
-        result = invoke(app, args, router, tmp_path)
-        assert result.exit_code == 4
-        assert "not enabled" in result.output

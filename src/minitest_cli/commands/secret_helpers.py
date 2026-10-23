@@ -89,11 +89,12 @@ def validate_name(name: str) -> str:
 
 
 def refuse_agent_context() -> None:
-    """A test agent must never write a value: it asks a human through ``secret request``."""
+    """A test agent must never write a value: it uses ``secret create --generate|--empty``."""
     if any(os.environ.get(var) for var in AGENT_ENV_VARS):
         print_error(
-            "Secret values cannot be written from inside a test run. Ask a human for it with: "
-            "minitest secret request NAME --kind <kind> --reason '<why>'"
+            "Secret values cannot be written from inside a test run. Generate one with: minitest "
+            "secret create NAME --kind <kind> --generate, or ask a human for it with: "
+            "minitest secret create NAME --kind <kind> --empty --reason '<why>'"
         )
         raise typer.Exit(code=EXIT_GENERAL_ERROR)
 

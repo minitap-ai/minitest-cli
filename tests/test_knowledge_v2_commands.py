@@ -29,6 +29,7 @@ class FakeKnowledgeService:
             {"id": "term-pod", "term": "Pod", "meaning": "A group of five", "aliases": []}
         ]
         self.requests: list[httpx.Request] = []
+        self.reverted: list[str] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -54,6 +55,12 @@ class FakeKnowledgeService:
             return httpx.Response(200, json=term)
         if path.startswith("glossary/") and method == "DELETE":
             self.terms = [t for t in self.terms if t["id"] != path.split("/")[1]]
+            return httpx.Response(204)
+        if path.startswith("knowledge/history/") and path.endswith("/revert"):
+            version_id = path.split("/")[2]
+            if version_id not in {"v-9", "v-10"}:
+                return httpx.Response(404, json={"detail": "Knowledge version not found"})
+            self.reverted.append(version_id)
             return httpx.Response(204)
         if path == "knowledge/history":
             return self._history(request.url.params.get("element"))
@@ -254,6 +261,7 @@ class TestHistory:
         assert service.requests[0].url.params["element"] == "glossary"
         assert "Pod" in result.stdout
         assert "knowledge_maintenance" in result.stdout
+        assert "v-9" in result.stdout
 
     def test_history_without_element_merges_every_element_newest_first(self, tmp_path):
         service = FakeKnowledgeService()
@@ -268,3 +276,14 @@ class TestHistory:
             "app_guide",
             "glossary",
         }
+
+    def test_revert_restores_a_version_listed_by_history(self, tmp_path):
+        service = FakeKnowledgeService()
+
+        reverted = _invoke(tmp_path, service, ["knowledge", "revert", "v-10"])
+        unknown = _invoke(tmp_path, service, ["knowledge", "revert", "v-404"])
+
+        assert reverted.exit_code == 0, reverted.output
+        assert "v-10" in reverted.stderr
+        assert unknown.exit_code == 4
+        assert service.reverted == ["v-10"]

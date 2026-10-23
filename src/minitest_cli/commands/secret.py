@@ -56,7 +56,10 @@ def list_secrets(
     settings, json_mode, app_id = command_context(json_flag)
     vault = fetch_vault(settings, app_id)
     secrets: list[dict[str, Any]] = vault.get("secrets") or []
-    requests: list[dict[str, Any]] = vault.get("requests") or []
+    # v4 servers mirror every secret without a value in "requests" (deprecated): keep
+    # only the requests of older servers, which are not secrets yet.
+    names = {s.get("name") for s in secrets}
+    requests = [r for r in vault.get("requests") or [] if r.get("name") not in names]
     if missing:
         secrets = [s for s in secrets if not has_value(s)]
     if json_mode:

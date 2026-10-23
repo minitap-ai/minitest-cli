@@ -217,18 +217,26 @@ Workspaces without the feature get `Secrets are not enabled for this workspace y
 
 ```bash
 printf '%s' "$ADMIN_PW" | minitest secret set ADMIN_PASSWORD --kind password --note "Admin login"
-echo '{"number":"4242424242424242","expiry":"12/34","cvc":"123"}' \
+echo '{"number":"<number>","expiry":"<MM/YY>","cvc":"<cvc>"}' \
   | minitest secret set STRIPE_CARD --kind card          # optional holder_name, postal_code
-minitest secret list [--missing]                         # names, kinds, usages, requests
+minitest secret create QA_PASSWORD --kind password --generate [--length 24] [--charset default|alnum]
+minitest secret create SANDBOX_KEY --kind token --empty --reason "Checkout calls the sandbox" [--scenario <id>]
+minitest secret list [--missing]                         # names, kinds, state (set / missing + reason), usages
 minitest secret describe ADMIN_PASSWORD                  # usages + reference to copy
-minitest secret lint --scenario <id>                     # exit 1 on leaks or missing secrets
+minitest secret lint --scenario <id>                     # exit 1 on leaks or missing; warns on pending
 minitest secret extract <id> --as ADMIN_PASSWORD --kind password [--dry-run]
 minitest test-profile update <id> --password-secret ADMIN_PASSWORD
 ```
 
 `set` reads stdin only and refuses a terminal (`--interactive` opens a hidden
-prompt). Inside a test run (`MINITAP_SECRETS_SOCKET` or `STORY_RUN_ID` set) it
-refuses: use `minitest secret request NAME --kind <kind> --reason "…"` instead.
+prompt) and also fills a secret that is waiting for a value. Inside a test run
+(`MINITAP_SECRETS_SOCKET` or `STORY_RUN_ID` set) it refuses: use `secret create`
+instead, which never handles a value. `--generate` (password, token, text) lets
+the server pick a random value (default 24 chars, 12–64); `--empty --reason`
+creates the secret without a value for a human to fill, and runs that need it
+wait until then. Personas can point at either (`--password-secret` etc.).
+`secret request` is a deprecated alias of `create --empty`; on servers that
+predate `create`, `--empty` falls back to the old request endpoint.
 `extract` reads the leaked literal from the scenario on your machine, creates
 the secret with it, then rewrites every occurrence to `{{secret:NAME}}`. Older
 scenario versions and past run logs may still hold the literal: rotate it.

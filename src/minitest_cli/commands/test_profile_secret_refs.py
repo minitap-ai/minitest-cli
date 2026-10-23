@@ -7,7 +7,10 @@ import typer
 from minitest_cli.commands.secret_helpers import validate_name
 from minitest_cli.utils.output import print_error
 
-_CLEAR_HINT = " Pass an empty string on update to stop using it."
+_CLEAR_HINT = (
+    " It may still be waiting for a value (secret create --empty)."
+    " Pass an empty string on update to stop using it."
+)
 
 PasswordSecretOption = Annotated[
     str | None,

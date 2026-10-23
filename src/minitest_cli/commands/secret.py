@@ -18,6 +18,7 @@ from minitest_cli.commands.secret_helpers import (
     secrets_path,
     validate_name,
 )
+from minitest_cli.commands.secret_state import has_value, request_rows, secret_rows, state
 from minitest_cli.commands.secret_value import read_secret_body
 from minitest_cli.utils.output import (
     print_error,
@@ -44,55 +45,32 @@ def fetch_vault(settings: Any, app_id: str) -> dict[str, Any]:
     return call(settings, "GET", secrets_path(app_id), collection=True) or {}
 
 
-def _request_rows(requests: list[dict[str, Any]]) -> list[list[str]]:
-    return [
-        [
-            r.get("name", ""),
-            r.get("kind", ""),
-            r.get("storyName") or r.get("storyId") or "",
-            r.get("requestedBy", ""),
-            r.get("reason", ""),
-        ]
-        for r in requests
-    ]
-
-
 @app.command(name="list")
 def list_secrets(
     missing: Annotated[
-        bool, typer.Option("--missing", help="Only show requested secrets that do not exist yet.")
+        bool, typer.Option("--missing", help="Only show secrets still waiting for a value.")
     ] = False,
     json_flag: JsonOption = False,
 ) -> None:
-    """List secrets (name, kind, note, version, usages) and open secret requests."""
+    """List secrets (name, kind, state, version, usages, note); those without a value first."""
     settings, json_mode, app_id = command_context(json_flag)
     vault = fetch_vault(settings, app_id)
     secrets: list[dict[str, Any]] = vault.get("secrets") or []
     requests: list[dict[str, Any]] = vault.get("requests") or []
+    if missing:
+        secrets = [s for s in secrets if not has_value(s)]
     if json_mode:
-        print_json(
-            {"requests": requests} if missing else {"secrets": secrets, "requests": requests}
-        )
+        print_json({"secrets": secrets, "requests": requests})
         return
-    if not missing:
-        if secrets:
-            rows = [
-                [
-                    s.get("name", ""),
-                    s.get("kind", ""),
-                    str(s.get("version", "")),
-                    str(len(s.get("usages") or [])),
-                    s.get("note") or "",
-                ]
-                for s in secrets
-            ]
-            print_table(["Name", "Kind", "Version", "Usages", "Note"], rows, title="Secrets")
-        else:
-            print_info("No secrets yet. Add one with: minitest secret set NAME --kind <kind>")
+    if secrets:
+        headers = ["Name", "Kind", "State", "Version", "Usages", "Note"]
+        print_table(headers, secret_rows(secrets), title="Secrets")
+    elif not missing:
+        print_info("No secrets yet. Add one with: minitest secret set NAME --kind <kind>")
     if requests:
         headers = ["Name", "Kind", "Scenario", "Requested By", "Reason"]
-        print_table(headers, _request_rows(requests), title="Requested (missing) secrets")
-    elif missing:
+        print_table(headers, request_rows(requests), title="Requested (missing) secrets")
+    elif missing and not secrets:
         print_info("No missing secrets.")
 
 
@@ -113,22 +91,29 @@ def describe_secret(name: NameArg, json_flag: JsonOption = False) -> None:
         return
     if found is None:
         print(f"{name}: requested, not set yet")  # noqa: T201
-        print_table(["Name", "Kind", "Scenario", "Requested By", "Reason"], _request_rows(requests))
+        print_table(["Name", "Kind", "Scenario", "Requested By", "Reason"], request_rows(requests))
         print_info(f"Set it with: minitest secret set {name} --kind {requests[0].get('kind')}")
         return
-    for label, value in (
-        ("Name", name),
-        ("Kind", found.get("kind")),
-        ("Note", found.get("note") or "-"),
-        ("Version", found.get("version")),
-        ("Updated", f"{found.get('updatedAt', '-')} by {found.get('updatedBy') or '-'}"),
-        ("Reference", ", ".join(refs)),
-    ):
+    lines = [("Name", name), ("Kind", found.get("kind")), ("State", state(found))]
+    if not has_value(found):
+        lines += [
+            ("Requested by", found.get("requestedBy") or "-"),
+            ("For scenario", found.get("requestedForUserStoryId") or "-"),
+        ]
+    else:
+        lines += [
+            ("Version", found.get("version")),
+            ("Updated", f"{found.get('updatedAt', '-')} by {found.get('updatedBy') or '-'}"),
+        ]
+    lines += [("Note", found.get("note") or "-"), ("Reference", ", ".join(refs))]
+    for label, value in lines:
         print(f"{label}: {value}")  # noqa: T201
     usages = found.get("usages") or []
     print(f"Usages: {len(usages)}")  # noqa: T201
     for usage in usages:
         print(f"  - {format_usage(usage)}")  # noqa: T201
+    if not has_value(found):
+        print_info(f"Set it with: minitest secret set {name} --kind {found.get('kind')}")
 
 
 @app.command(name="set")

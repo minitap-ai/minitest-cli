@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 import typer
 
-from minitest_cli.commands import secret_extract, secret_lint, secret_manage
+from minitest_cli.commands import secret_create, secret_extract, secret_lint, secret_manage
 from minitest_cli.commands.secret_helpers import (
     CARD_FIELDS,
     EXIT_NOT_FOUND,
@@ -163,6 +163,7 @@ def set_secret(
     )
 
 
+secret_create.register(app)
 secret_manage.register(app)
 secret_lint.register(app)
 secret_extract.register(app)

@@ -181,6 +181,11 @@ app defaults.
 | `minitest df` | Low-level suite branches Mini writes (draft features) |
 | `minitest test-profile` | Test profiles (Test accounts in the webapp) |
 | `minitest tags`  | List, create, update and delete scenario tags |
+| `minitest brief` | Product brief: what the app is, who uses it, its core flows (Knowledge v2) |
+| `minitest app-guide` | App guide: how to use the app when testing it (Knowledge v2) |
+| `minitest glossary` | Glossary: product terms, their meaning and aliases (Knowledge v2) |
+| `minitest knowledge` | Change history of the brief, app guide and glossary |
+| `minitest app-knowledge` | The single Memory document of workspaces without Knowledge v2 |
 | `minitest app-skill` | App skills (Skills in the webapp): procedures Mini loads to arrange test state |
 | `minitest secret` | App secrets vault: passwords, OTP seeds, cards, API tokens referenced as `{{secret:NAME}}` (write-only values) |
 | `minitest screens` | Inspect the screens exploration mapped for an app |
@@ -206,6 +211,21 @@ stderr and leave `--json` stdout unchanged. Switch to the new names.
 | `batch list --user-story-id` | `batch list --scenario` |
 | `run cancel --srp`, `run recording --srp` | `--target-id` |
 | `--type` on `scenario create/update/list` | `--tag` |
+
+## Knowledge
+
+On workspaces with Knowledge v2, what Mini knows about an app is split by job:
+
+| Element | Holds | Commands |
+| ------- | ----- | -------- |
+| Product brief | What the app is, who uses it, its core flows. Short (max 2000 chars). | `brief get`, `brief update --content/--content-file` |
+| App guide | How to use the app when testing: navigation, quirks, test data. | `app-guide get`, `app-guide update --content/--content-file` |
+| Glossary | Product terms and what they mean, with aliases. | `glossary list`, `glossary add --term --meaning [--alias]`, `glossary update <id-or-term>`, `glossary remove <id-or-term> --yes` |
+
+Every change is versioned with its author and channel (`cli` for these
+commands): `minitest knowledge history [--element product_brief|app_guide|glossary]`.
+On a workspace without Knowledge v2, writes fail with a message pointing to
+`minitest app-knowledge`.
 
 ## Secrets
 

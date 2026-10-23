@@ -124,11 +124,15 @@ def set_secret(
     interactive: Annotated[bool, typer.Option("--interactive", hidden=True)] = False,
     json_flag: JsonOption = False,
 ) -> None:
-    """Create or replace a secret. The value is read from stdin only.
+    """Create or replace a secret, or fill one waiting for a value. Value from stdin only.
 
-    password/totp/token/text: the raw value, e.g. ``printf '%s' "$V" | minitest secret set X
-    --kind token``. card: a JSON object, e.g. ``echo '{"number":"4242…","expiry":"12/34",
-    "cvc":"123"}' | minitest secret set CARD --kind card`` (optional holder_name, postal_code).
+    password, totp, token, text: the raw value, e.g.
+    printf '%s' "$V" | minitest secret set X --kind token
+
+    card: a JSON object (optional holder_name, postal_code), e.g.
+    minitest secret set C --kind card <<< '{"number":"<number>","expiry":"<MM/YY>","cvc":"<cvc>"}'
+
+    Without a value at hand, see secret create.
     """
     refuse_agent_context()
     validate_name(name)

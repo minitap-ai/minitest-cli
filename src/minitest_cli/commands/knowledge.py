@@ -1,4 +1,4 @@
-"""`minitest knowledge history`: who changed the Product brief, App guide or Glossary."""
+"""`minitest knowledge history|revert`: who changed the Product brief, App guide or Glossary."""
 
 from enum import StrEnum
 from typing import Annotated, Any
@@ -13,11 +13,11 @@ from minitest_cli.commands.knowledge_helpers import (
     describe_actor,
 )
 from minitest_cli.commands.user_story_helpers import is_json_mode
-from minitest_cli.utils.output import output, print_info, print_table
+from minitest_cli.utils.output import output, print_info, print_success, print_table
 
 app = typer.Typer(
     name="knowledge",
-    help="Change history of the Product brief, App guide and Glossary.",
+    help="Change history of the Product brief, App guide and Glossary, and reverts.",
     no_args_is_help=True,
 )
 
@@ -84,3 +84,22 @@ def _subject(change: dict[str, Any]) -> str:
     before = change.get("before") if isinstance(change.get("before"), dict) else None
     snapshot = after or before or {}
     return str(snapshot.get("term") or change.get("termId") or "")
+
+
+@app.command(name="revert")
+def revert(
+    version_id: Annotated[
+        str, typer.Argument(help="Version ID from `minitest knowledge history`.")
+    ],
+) -> None:
+    """Restore an element to that version, recorded as a new 'reverted' change."""
+
+    async def _revert(client: ApiClient, app_id: str) -> None:
+        resp = await client.post(app_path(app_id, f"knowledge/history/{version_id}/revert"))
+        check_response(resp, resource="Knowledge version")
+
+    call_for_app(_revert)
+    if is_json_mode():
+        output({"versionId": version_id, "reverted": True}, json_mode=True)
+        return
+    print_success(f"Reverted to version {version_id}.")

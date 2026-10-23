@@ -184,7 +184,7 @@ app defaults.
 | `minitest brief` | Product brief: what the app is, who uses it, its core flows (Knowledge v2) |
 | `minitest app-guide` | App guide: how to use the app when testing it (Knowledge v2) |
 | `minitest glossary` | Glossary: product terms, their meaning and aliases (Knowledge v2) |
-| `minitest knowledge` | Change history of the brief, app guide and glossary |
+| `minitest knowledge` | Change history of the brief, app guide and glossary, and reverts |
 | `minitest app-knowledge` | The single Memory document of workspaces without Knowledge v2 |
 | `minitest app-skill` | App skills (Skills in the webapp): procedures Mini loads to arrange test state |
 | `minitest secret` | App secrets vault: passwords, OTP seeds, cards, API tokens referenced as `{{secret:NAME}}` (write-only values) |
@@ -223,7 +223,9 @@ On workspaces with Knowledge v2, what Mini knows about an app is split by job:
 | Glossary | Product terms and what they mean, with aliases. | `glossary list`, `glossary add --term --meaning [--alias]`, `glossary update <id-or-term>`, `glossary remove <id-or-term> --yes` |
 
 Every change is versioned with its author and channel (`cli` for these
-commands): `minitest knowledge history [--element product_brief|app_guide|glossary]`.
+commands): `minitest knowledge history [--element product_brief|app_guide|glossary]`
+lists each change with its version ID, and `minitest knowledge revert <version-id>`
+restores that version as a new `reverted` change.
 On a workspace without Knowledge v2, writes fail with a message pointing to
 `minitest app-knowledge`.
 

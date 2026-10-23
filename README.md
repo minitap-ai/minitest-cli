@@ -192,6 +192,7 @@ app defaults.
 | `minitest build` | Native iOS/Android build management |
 | `minitest run`   | Start runs and inspect their scenario runs |
 | `minitest batch` | List, inspect and cancel runs (a batch is a Run in the webapp) |
+| `minitest schedules` | Scheduled runs: run scenarios at a set time and post a Slack summary |
 | `minitest issues` | Read app issues and their fix prompts, mark them fixed |
 | `minitest skill` | Print the CLI skill for your AI coding agent (not app skills) |
 
@@ -211,6 +212,48 @@ stderr and leave `--json` stdout unchanged. Switch to the new names.
 | `batch list --user-story-id` | `batch list --scenario` |
 | `run cancel --srp`, `run recording --srp` | `--target-id` |
 | `--type` on `scenario create/update/list` | `--tag` |
+
+## Scheduled runs
+
+A schedule starts an ordinary run on its own at a wall-clock time on chosen
+weekdays, then posts one summary to a Slack channel. What runs (the whole suite,
+tags minus exclusions, or picked scenarios) is re-resolved at every start, so
+scenarios tagged later join on their own.
+
+```bash
+# Weekdays at 03:00 (this machine's timezone), tagged scenarios on desktop and Android Chrome
+minitest schedules create --name "Nightly sanity check" --at 03:00 \
+  --tag Navigation --exclude "Deals page opens" \
+  --url https://www.example.com --browser chrome --browser chrome:android \
+  --slack-channel C0123ABCD --slack-channel-name minitap
+
+# Native: newest installable build on Android, a fixed iOS build, every day in Oslo
+minitest schedules create --name "Monitoring" --at 05:00 --days every-day --timezone Europe/Oslo \
+  --android --ios-build <build-id> --slack-channel C0123ABCD
+
+minitest schedules preview "Nightly sanity check"     # duration, builds tonight would pick, next starts
+minitest schedules list                               # cadence, next run, scenario count
+minitest --json schedules get "Nightly sanity check" > nightly.json
+minitest schedules create --from-file nightly.json --name "Nightly copy"   # JSON or YAML
+minitest schedules update "Nightly sanity check" --at 04:00 --android-branch main
+minitest schedules pause|resume "Nightly sanity check"
+minitest schedules run "Nightly sanity check"         # start one now (posts to Slack too)
+minitest schedules fires "Nightly sanity check"       # last runs: verdict, new / still open / fixed, or why it didn't run
+minitest schedules delete "Nightly sanity check" --yes   # `schedules restore <id>` undoes it
+```
+
+Platforms: `--browser BROWSER[:SURFACE]` (`chrome`, `chrome:mobile`,
+`chrome:tablet`, `chrome:android`, `safari:ios`…) tests `--url` or builds
+`--web-branch` first. `--ios` / `--android` run the newest build that installs;
+`--<platform>-build <id>` pins one build, `--<platform>-branch <branch>` builds
+the branch before each run. On `update`, any `--<platform>-*` flag redefines that
+platform, `--browser` replaces the browsers, `--drop web|ios|android` removes one.
+
+A night that can't run is still a fire, with a reason (out of credits, no
+installable build, branch build failed, previous run still going, no phone
+free…); `fires` shows it and Slack gets a message. On a server without
+scheduled runs, every command exits 4 with `Scheduled runs are not available
+on this workspace yet.`
 
 ## Knowledge
 

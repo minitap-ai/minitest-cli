@@ -22,6 +22,7 @@ class FakeBackendApi:
             "authenticationSecretNames": ["BACKEND_DESK_API_KEY"],
             "skillId": NOTES["id"],
         }
+        self.openapi_auth: dict[str, Any] = {"type": "none"}
         self.puts: list[dict[str, Any]] = []
         self.batches: list[dict[str, Any]] = []
 
@@ -50,6 +51,12 @@ class FakeBackendApi:
                 return _rejected(f"{url} cannot be used as a backend URL: {reason}")
         if body["enabled"] and not (body["baseUrl"] and body["openapiUrl"]):
             return _rejected("Turning the backend API on needs a base URL and an OpenAPI URL")
+        auth = body.pop("openapiAuth", self.openapi_auth)
+        if auth.get("secretName", "BACKEND_DESK_API_KEY") not in self.vault:
+            return _rejected(
+                f"OpenAPI download secret not in this app's vault: {auth['secretName']}"
+            )
+        self.openapi_auth = auth
         self.saved = body
         return httpx.Response(200, json=self.view())
 
@@ -70,6 +77,9 @@ class FakeBackendApi:
             "authenticationSecretNames": names,
             "missingSecretNames": [n for n in names if n not in self.vault],
             "skill": skill,
+            "openapiAuth": self.openapi_auth,
+            "openapiAuthSecretMissing": self.openapi_auth.get("secretName", "") not in self.vault
+            and self.openapi_auth["type"] != "none",
         }
 
 

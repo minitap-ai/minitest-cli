@@ -354,6 +354,22 @@ Secrets are named references to the app vault (`minitest secret set`); `show`
 warns about names no longer in the vault. URLs must be public `http(s)`
 addresses: private, loopback and cloud-metadata addresses are rejected.
 
+When the OpenAPI document itself needs authentication, say how to download it.
+The credential comes from the app vault, is used for that download only, and is
+sent only to the saved OpenAPI URL's origin (a one-run OpenAPI URL on another
+origin gets none):
+
+```bash
+minitest --app <app-id> apps backend-api set --openapi-auth bearer --openapi-auth-secret API_TOKEN
+minitest --app <app-id> apps backend-api set --openapi-auth header \
+  --openapi-auth-header X-Api-Key --openapi-auth-secret API_TOKEN
+minitest --app <app-id> apps backend-api set --openapi-auth basic \
+  --openapi-auth-username docs-reader --openapi-auth-secret DOCS_PASSWORD
+minitest --app <app-id> apps backend-api set --openapi-auth query \
+  --openapi-auth-param api_key --openapi-auth-secret API_TOKEN
+minitest --app <app-id> apps backend-api set --openapi-auth none
+```
+
 To point one run at another backend, pass `--backend-base-url` and/or
 `--backend-openapi-url` to `run start`, `run all` or `run from-commit`. Only
 that run uses them; the saved settings do not change, and the app's backend API

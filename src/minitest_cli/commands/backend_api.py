@@ -7,7 +7,11 @@ import typer
 from minitest_cli.commands.app_network_helpers import call_api, fail, is_json_mode, resolve_target
 from minitest_cli.core.config import Settings
 from minitest_cli.commands.app_skill_helpers import skills_path
-from minitest_cli.commands.backend_api_helpers import merge_secret_names, render_config
+from minitest_cli.commands.backend_api_helpers import (
+    merge_secret_names,
+    openapi_auth_body,
+    render_config,
+)
 from minitest_cli.utils.output import print_success
 
 app = typer.Typer(
@@ -76,15 +80,45 @@ def set_config(
     clear_skill: Annotated[
         bool, typer.Option("--clear-skill", help="Stop pointing Mini at a skill.")
     ] = False,
+    openapi_auth: Annotated[
+        str | None,
+        typer.Option(
+            "--openapi-auth",
+            help=(
+                "How the OpenAPI document is downloaded when it needs authentication: none, "
+                "bearer, header, basic or query. Used for nothing else, and only sent to the "
+                "saved OpenAPI URL's origin."
+            ),
+        ),
+    ] = None,
+    openapi_auth_secret: Annotated[
+        str | None,
+        typer.Option("--openapi-auth-secret", help="App vault secret holding the credential."),
+    ] = None,
+    openapi_auth_header: Annotated[
+        str | None, typer.Option("--openapi-auth-header", help="Header name, for header.")
+    ] = None,
+    openapi_auth_username: Annotated[
+        str | None, typer.Option("--openapi-auth-username", help="Username, for basic.")
+    ] = None,
+    openapi_auth_param: Annotated[
+        str | None, typer.Option("--openapi-auth-param", help="Query parameter, for query.")
+    ] = None,
 ) -> None:
     """Change the app's backend API settings; options not passed stay as they are."""
     if skill and clear_skill:
         raise fail("Pass either --skill or --clear-skill, not both.")
     changes = [enable is not None, base_url, openapi_url, secret, remove_secret, clear_secrets]
-    if not any([*changes, skill, clear_skill]):
+    auth_names = {
+        "--openapi-auth-header": openapi_auth_header,
+        "--openapi-auth-username": openapi_auth_username,
+        "--openapi-auth-param": openapi_auth_param,
+    }
+    auth_given = any([openapi_auth, openapi_auth_secret, *auth_names.values()])
+    if not any([*changes, skill, clear_skill, auth_given]):
         raise fail(
             "Nothing to change: pass --enable/--disable, --base-url, --openapi-url, "
-            "a secret option or a skill option."
+            "a secret option, a skill option or an --openapi-auth option."
         )
     settings, app_id = resolve_target()
     current = _call(settings, "GET", _path(app_id))
@@ -100,6 +134,13 @@ def set_config(
         ),
         "skillId": current["skill"]["id"] if current["skill"] else None,
     }
+    if auth_given:
+        body["openapiAuth"] = openapi_auth_body(
+            current["openapiAuth"],
+            auth_type=openapi_auth,
+            secret=openapi_auth_secret,
+            names=auth_names,
+        )
     if clear_skill:
         body["skillId"] = None
     elif skill:

@@ -334,6 +334,37 @@ least one domain. Connectors cannot be created from the CLI: a workspace owner
 or admin creates them in the webapp, under **Workspace settings → Private
 network**.
 
+## Backend API
+
+Mini can read the OpenAPI document of a backend you own and call it during runs,
+authenticated with app vault secrets (it is off by default). `set` reads the
+current settings first and changes only what you pass.
+
+```bash
+minitest --app <app-id> apps backend-api show
+minitest --app <app-id> apps backend-api set --enable \
+  --base-url https://api.staging.example.com \
+  --openapi-url https://api.staging.example.com/openapi.json \
+  --secret API_TOKEN [--remove-secret <name> ...] [--clear-secrets] \
+  [--skill <name-or-id> | --clear-skill]
+minitest --app <app-id> apps backend-api set --disable
+```
+
+Secrets are named references to the app vault (`minitest secret set`); `show`
+warns about names no longer in the vault. URLs must be public `http(s)`
+addresses: private, loopback and cloud-metadata addresses are rejected.
+
+To point one run at another backend, pass `--backend-base-url` and/or
+`--backend-openapi-url` to `run start`, `run all` or `run from-commit`. Only
+that run uses them; the saved settings do not change, and the app's backend API
+must be on.
+
+```bash
+minitest --app <app-id> run all --web \
+  --backend-base-url https://pr-42.api.example.com \
+  --backend-openapi-url https://pr-42.api.example.com/openapi.json
+```
+
 ## Exit Codes
 
 | Code | Meaning                                            |

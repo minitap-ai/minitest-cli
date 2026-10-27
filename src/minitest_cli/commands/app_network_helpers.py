@@ -38,12 +38,12 @@ def fail(message: str, code: int = EXIT_GENERAL_ERROR) -> typer.Exit:
     return typer.Exit(code=code)
 
 
-def _raise_for_status(resp: httpx.Response) -> None:
+def _raise_for_status(resp: httpx.Response, forbidden: str) -> None:
     if resp.status_code < 400:
         return
     detail = extract_detail(resp)
     if resp.status_code == 403:
-        raise fail(f"{ADMIN_ONLY_MESSAGE} ({detail})", EXIT_AUTH_ERROR)
+        raise fail(f"{forbidden} ({detail})", EXIT_AUTH_ERROR)
     if resp.status_code == 401:
         raise fail(f"Authentication failed: {detail}", EXIT_AUTH_ERROR)
     if resp.status_code == 404:
@@ -54,12 +54,17 @@ def _raise_for_status(resp: httpx.Response) -> None:
 
 
 def call_api(
-    settings: Settings, method: str, path: str, body: dict[str, Any] | None = None
+    settings: Settings,
+    method: str,
+    path: str,
+    body: dict[str, Any] | None = None,
+    *,
+    forbidden: str = ADMIN_ONLY_MESSAGE,
 ) -> dict[str, Any]:
     async def _run() -> dict[str, Any]:
         async with ApiClient(settings) as client:
             resp = await client.request(method, path, json=body)
-        _raise_for_status(resp)
+        _raise_for_status(resp, forbidden)
         try:
             return resp.json()
         except ValueError as exc:

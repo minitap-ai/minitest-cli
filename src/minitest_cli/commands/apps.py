@@ -12,6 +12,7 @@ from minitest_cli.api.client import ApiClient
 from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands import (
     apps_dependencies,
+    backend_api,
     apps_get,
     private_network,
     residential_proxy,
@@ -38,6 +39,7 @@ app.command(name="dependencies")(apps_dependencies.dependencies)
 app.command(name="get")(apps_get.get_app)
 app.add_typer(residential_proxy.app)
 app.add_typer(private_network.app)
+app.add_typer(backend_api.app)
 
 
 @app.callback()

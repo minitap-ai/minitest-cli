@@ -77,6 +77,13 @@ class GitHubContextResponse(CamelModel):
     actor: str
 
 
+class BackendApiRunOverride(CamelModel):
+    """Backend API URLs used by one run instead of the app's saved ones."""
+
+    base_url: str | None = None
+    openapi_url: str | None = None
+
+
 class CreateBatchRequest(CamelModel):
     """Request body for POST /api/v1/apps/{app_id}/batches.
 
@@ -90,6 +97,7 @@ class CreateBatchRequest(CamelModel):
     platforms: list[str] | None = None
     commit_sha: str | None = None
     tag_name: str | None = None
+    backend_api_override: BackendApiRunOverride | None = None
 
 
 class UserStoryTypeBreakdownEntry(CamelModel):

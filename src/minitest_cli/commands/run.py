@@ -18,6 +18,11 @@ from minitest_cli.commands.run_helpers import (
     run_api_call,
     TERMINAL_STATUSES,
 )
+from minitest_cli.commands.run_backend_override import (
+    BackendBaseUrlOpt,
+    BackendOpenapiUrlOpt,
+    backend_api_override,
+)
 from minitest_cli.commands.run_cancel import cancel
 from minitest_cli.commands.run_commit import from_commit
 from minitest_cli.commands.run_targets import (
@@ -68,6 +73,8 @@ def start(
     android_device_type: AndroidDeviceTypeOpt = None,
     ios_physical: IosPhysicalOpt = False,
     android_physical: AndroidPhysicalOpt = False,
+    backend_base_url: BackendBaseUrlOpt = None,
+    backend_openapi_url: BackendOpenapiUrlOpt = None,
     watch: Annotated[
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
@@ -86,15 +93,18 @@ def start(
         ios_physical,
         android_physical,
     )
+    override = backend_api_override(backend_base_url, backend_openapi_url)
     if tag:
-        print_batch_started(start_tagged(settings, app_id, tag, targets), json_mode)
+        print_batch_started(start_tagged(settings, app_id, tag, targets, override), json_mode)
         return
     story_ref = user_story or ""
 
     async def _start() -> StoryRunResponse:
         async with ApiClient(settings) as client:
             user_story_id = await resolve_user_story_id(client, app_id, story_ref)
-            body = CreateBatchRequest(user_story_ids=[user_story_id], targets=targets)
+            body = CreateBatchRequest(
+                user_story_ids=[user_story_id], targets=targets, backend_api_override=override
+            )
             batch = await post_batch(client, app_id, body)
             if not batch.story_runs:
                 print_error("Batch created but no scenario runs were returned.")
@@ -147,6 +157,8 @@ def run_all(
     android_device_type: AndroidDeviceTypeOpt = None,
     ios_physical: IosPhysicalOpt = False,
     android_physical: AndroidPhysicalOpt = False,
+    backend_base_url: BackendBaseUrlOpt = None,
+    backend_openapi_url: BackendOpenapiUrlOpt = None,
 ) -> None:
     """Start a run covering every scenario of the app."""
     settings, app_id, json_mode = resolve_app()
@@ -162,7 +174,10 @@ def run_all(
 
     async def _run_all() -> BatchResponse:
         async with ApiClient(settings) as client:
-            body = CreateBatchRequest(targets=targets)
+            body = CreateBatchRequest(
+                targets=targets,
+                backend_api_override=backend_api_override(backend_base_url, backend_openapi_url),
+            )
             return await post_batch(client, app_id, body)
 
     print_batch_started(run_api_call(_run_all()), json_mode)

@@ -18,6 +18,11 @@ from minitest_cli.commands.run_commit_helpers import (
     batch_commit_payload,
     poll_batch,
 )
+from minitest_cli.commands.run_backend_override import (
+    BackendBaseUrlOpt,
+    BackendOpenapiUrlOpt,
+    backend_api_override,
+)
 from minitest_cli.commands.run_helpers import (
     resolve_app,
     resolve_user_story_id,
@@ -64,6 +69,8 @@ def from_commit(
     legacy_user_story: LegacyUserStoryOpt = None,
     watch: WatchOpt = True,
     timeout: TimeoutOpt = DEFAULT_TIMEOUT_SECONDS,
+    backend_base_url: BackendBaseUrlOpt = None,
+    backend_openapi_url: BackendOpenapiUrlOpt = None,
 ) -> None:
     """Build a GitHub commit and run the test suite against it."""
     settings, app_id, json_mode = resolve_app()
@@ -86,6 +93,7 @@ def from_commit(
                 commit_sha=sha,
                 platforms=platforms if targets is None else None,
                 targets=targets,
+                backend_api_override=backend_api_override(backend_base_url, backend_openapi_url),
             )
             batch = await post_batch(client, app_id, body)
             if not watch:

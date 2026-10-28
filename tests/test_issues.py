@@ -51,6 +51,16 @@ FAILURE = {
     "batchId": BATCH_ID,
     "rcaPrompt": "Apply the targeted fix.",
     "webappIssueUrl": f"https://dev.minitap.ai/issues?issueId={ISSUE_ID}",
+    "versionLabel": "1.35.0 (1)",
+}
+# Last seen in a run the run list does not return (cancelled CI run), and never classified.
+UNCLASSIFIED = {
+    "id": "ffffffff-0000-0000-0000-000000000001",
+    "status": "open",
+    "issueStatus": "review",
+    "criticality": None,
+    "platform": None,
+    "batchId": "99999999-9999-9999-9999-999999999999",
 }
 
 
@@ -81,9 +91,11 @@ def _api_server():
                 payload = {"count": 1 if params.get("batch_id") == BATCH_ID else 0}
             elif path == failures_path:
                 scoped = params.get("batch_id") == BATCH_ID or params.get("story_run_id") == RUN_ID
+                app_wide = "batch_id" not in params and "story_run_id" not in params
+                items = [FAILURE, UNCLASSIFIED] if app_wide else [FAILURE] if scoped else []
                 payload = {
-                    "items": [FAILURE] if scoped else [],
-                    "total": 1 if scoped else 0,
+                    "items": items,
+                    "total": len(items),
                     "page": 1,
                     "pageSize": 100,
                 }
@@ -153,6 +165,29 @@ class TestIssueScopes:
             result.issues[0].deeplink == f"https://dev.minitap.ai/issues?issueId={ISSUE_ID}"
             for result in (batch, run, issue)
         )
+
+    def test_list_all_runs_returns_every_issue_of_the_app(self):
+        """Like the webapp's Issues page: issues last seen in runs the run list
+        does not return, and unclassified ones, are included."""
+        with _api_server() as api_url:
+            result = CliRunner(env={"MINITEST_API_URL": api_url, "MINITEST_TOKEN": "token"}).invoke(
+                cli, ["--app", APP_ID, "issues", "list", "--all-runs"]
+            )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.stdout)
+        assert payload["scope"]["kind"] == "app"
+        assert payload["scope"]["batchId"] is None
+        assert [issue["id"] for issue in payload["issues"]] == [ISSUE_ID, UNCLASSIFIED["id"]]
+        assert payload["issues"][0]["lastSeenVersion"] == "1.35.0 (1)"
+        assert payload["issues"][1]["criticality"] is None
+        assert payload["issues"][1]["issueStatus"] == "review"
+
+    def test_all_runs_cannot_be_combined_with_another_scope(self):
+        result = CliRunner().invoke(cli, ["issues", "list", "--all-runs", "--batch", BATCH_ID])
+
+        assert result.exit_code == 1
+        assert "--all-runs" in result.stderr
 
     def test_list_rejects_multiple_scopes(self):
         result = CliRunner().invoke(cli, ["issues", "list", "--issue", ISSUE_ID, "--run", RUN_ID])

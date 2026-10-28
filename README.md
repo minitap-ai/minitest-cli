@@ -49,6 +49,22 @@ uv sync
 uv run minitest --help
 ```
 
+### Staying up to date
+
+A CLI installed with `uv tool install`, the one-liner or Homebrew keeps itself
+current. When a command sees a newer release on PyPI, it updates the CLI in the
+background and your next command runs the new version. The update waits until
+no other `minitest` command is running, and only installs releases that have
+been out for at least an hour. The same background job refreshes the agent
+skill (`npx skills update minitest-cli`) when it has changed. The next command
+prints one line saying what was updated; the details go to
+`~/.minitest/auto_update.log`.
+
+Auto-update never runs in CI (`CI` set), in containers, on Windows, or for
+`uvx` and source checkouts; those keep printing an "Update available" notice.
+Set `MINITEST_NO_AUTO_UPDATE=1` to turn it off, and run `minitest upgrade` to
+update by hand at any time.
+
 ## Quick Start
 
 ```bash
@@ -157,6 +173,7 @@ app defaults.
 | `MINITEST_WEBAPP_URL`         | Minitest webapp base URL (used for review links)            | No (defaults to production)        |
 | `MINITEST_SUPABASE_URL`       | Supabase project URL used for OAuth login                  | No (defaults to production)        |
 | `MINITEST_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key used for OAuth login | No (defaults to production)        |
+| `MINITEST_NO_AUTO_UPDATE`     | Set to `1` to stop the CLI and agent skill from updating themselves | No                        |
 
 > The recommended way to set these is to copy `.env.example` to `.env` — the CLI loads `.env` automatically. The shipped `.env.example` already targets the **dev** environment (see below).
 

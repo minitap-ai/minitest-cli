@@ -9,6 +9,8 @@ def _isolate_minitest_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in list(os.environ):
         if name.startswith("MINITEST_"):
             monkeypatch.delenv(name)
+    # Never upgrade the developer's real CLI from a test; auto-update tests opt back in.
+    monkeypatch.setenv("MINITEST_NO_AUTO_UPDATE", "1")
 
 
 @pytest.fixture(autouse=True)

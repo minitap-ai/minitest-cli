@@ -25,6 +25,7 @@ async def collect_issues(
     story_run_id: str | None,
     batch_id: str | None,
     platform: str | None,
+    all_runs: bool = False,
     criticality: str | None,
     include_resolved: bool,
 ) -> IssuesListResponse:
@@ -69,6 +70,21 @@ async def collect_issues(
                 kind=ScopeKind.run,
                 story_run_id=story_run_id,
                 batch_id=batch_id,
+                include_resolved=include_resolved,
+                platform=platform,
+                criticality=criticality,
+            )
+        elif all_runs:
+            # The whole app, like the webapp's Issues page: no run to anchor a build block.
+            failures = await fetch_failures(
+                client,
+                app_id,
+                platform=platform,
+                criticality=criticality,
+                include_resolved=include_resolved,
+            )
+            scope = IssuesScope(
+                kind=ScopeKind.app,
                 include_resolved=include_resolved,
                 platform=platform,
                 criticality=criticality,

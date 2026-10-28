@@ -83,6 +83,7 @@ def issue_item(failure: AppFailure) -> IssueItem:
         user_story_name=failure.user_story_name,
         story_run_id=failure.story_run_id,
         last_seen_batch_id=failure.batch_id,
+        last_seen_version=failure.version_label,
         is_new_regression=failure.is_new_regression,
         consecutive_failures=failure.consecutive_failures,
         fix_prompt=failure.rca_prompt,

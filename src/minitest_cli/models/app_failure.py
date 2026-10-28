@@ -16,6 +16,7 @@ class AppFailure(CamelModel):
     fail_reason: str | None = None
     story_run_id: str | None = None
     batch_id: str | None = None
+    version_label: str | None = None
     is_new_regression: bool = False
     consecutive_failures: int | None = None
     rca_prompt: str | None = None

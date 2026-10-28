@@ -8,6 +8,7 @@ from minitest_cli.models.base import CamelModel
 
 
 class ScopeKind(StrEnum):
+    app = "app"
     latest_batch = "latest_batch"
     batch = "batch"
     run = "run"
@@ -65,6 +66,7 @@ class IssueItem(CamelModel):
     user_story_name: str | None = None
     story_run_id: str | None = None
     last_seen_batch_id: str | None = None
+    last_seen_version: str | None = None
     is_new_regression: bool = False
     consecutive_failures: int | None = None
     fix_prompt: str | None = None

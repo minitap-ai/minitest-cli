@@ -37,6 +37,13 @@ def list_issues(
     batch: Annotated[
         str | None, typer.Option("--batch", help="Scope to one run (batch) ID.")
     ] = None,
+    all_runs: Annotated[
+        bool,
+        typer.Option(
+            "--all-runs",
+            help="Every issue of the app, whatever run it was last seen in (the Issues page).",
+        ),
+    ] = False,
     platform: Annotated[
         IssuePlatform | None, typer.Option(help="Filter by execution platform.")
     ] = None,
@@ -50,8 +57,8 @@ def list_issues(
     """Return scoped issues, build provenance, fix prompts, and deeplinks as JSON."""
     scopes = {"issue": issue, "run": run, "batch": batch}
     selected = [(kind, value) for kind, value in scopes.items() if value is not None]
-    if len(selected) > 1:
-        print_error("Choose only one scope: --issue, --run, or --batch.")
+    if len(selected) + int(all_runs) > 1:
+        print_error("Choose only one scope: --issue, --run, --batch, or --all-runs.")
         raise typer.Exit(1)
     for kind, value in selected:
         ensure_uuid(value, kind=kind)
@@ -64,6 +71,7 @@ def list_issues(
             issue_id=issue,
             story_run_id=run,
             batch_id=batch,
+            all_runs=all_runs,
             platform=platform.value if platform is not None else None,
             criticality=criticality.value if criticality is not None else None,
             include_resolved=include_resolved,

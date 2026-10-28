@@ -8,11 +8,13 @@ import httpx
 import typer
 
 from minitest_cli import __version__
+from minitest_cli.commands.upgrade_auto import auto
 from minitest_cli.utils.output import err_console, print_error, print_success
 from minitest_cli.utils.skill_refresh import UpgradeStatus, check_and_refresh
 from minitest_cli.utils.update_check import CHECK_TIMEOUT_SECONDS, PYPI_URL, _is_newer
 
 app = typer.Typer(name="upgrade", help="Upgrade the CLI and refresh the agent skill.")
+app.command("auto")(auto)
 
 
 def _get_latest_pypi_version() -> str | None:

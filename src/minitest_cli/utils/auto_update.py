@@ -20,6 +20,7 @@ from minitest_cli.core.config import Settings
 from minitest_cli.utils.auto_update_state import (
     LOG_MAX_BYTES,
     acquire_lock,
+    auto_update_enabled,
     hand_lock_to,
     log_path,
     read_state,
@@ -30,6 +31,7 @@ from minitest_cli.utils.auto_update_state import (
 from minitest_cli.utils.versions import is_newer
 
 ENV_OPT_OUT = "MINITEST_NO_AUTO_UPDATE"
+OFF_COMMAND = "minitest upgrade auto off"
 RELEASE_COOLDOWN_SECONDS = 3600
 RETRY_AFTER_SECONDS = 24 * 3600
 SKILL_CHECK_INTERVAL_SECONDS = 6 * 3600
@@ -60,6 +62,14 @@ def environment_blocker() -> str | None:
     if sys.platform == "win32":
         return "not supported on Windows"
     return None
+
+
+def blocker(settings: Settings) -> str | None:
+    """Why auto-update is off for this user/environment, or None when it is on."""
+    reason = environment_blocker()
+    if reason is None and not auto_update_enabled(settings):
+        reason = f"turned off with `{OFF_COMMAND}`"
+    return reason
 
 
 def is_uv_tool_install() -> bool:

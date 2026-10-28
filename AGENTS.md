@@ -23,7 +23,7 @@ uv add <package>                                   # Add new dependency (always 
 - `utils/`
   - `output.py` - --json helpers: stdout=data, stderr=diagnostics
   - `update_check.py` - PyPI version check (cached 1h, non-blocking); hands newer releases to auto-update
-  - `auto_update*.py` - background self-update of the CLI and agent skill: eligibility and plan (`auto_update.py`), lock/state/running-command registry (`auto_update_state.py`), one-time notices, and the detached worker (`python -m minitest_cli.utils.auto_update_worker`). Tests run with `MINITEST_NO_AUTO_UPDATE=1` (conftest) so they never touch the real install.
+  - `auto_update*.py` - background self-update of the CLI and agent skill: eligibility and plan (`auto_update.py`), lock/state/running-command registry and the saved on/off preference (`auto_update_state.py`, toggled by `minitest upgrade auto`, `commands/upgrade_auto.py`), one-time notices, and the detached worker (`python -m minitest_cli.utils.auto_update_worker`). Tests run with `MINITEST_NO_AUTO_UPDATE=1` (conftest) so they never touch the real install.
 - `main.py` - Typer app entry point, global flags, command group registration
 - `tests/` - Unit tests
 

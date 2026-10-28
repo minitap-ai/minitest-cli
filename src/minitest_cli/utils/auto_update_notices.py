@@ -2,7 +2,7 @@
 
 from minitest_cli import __version__
 from minitest_cli.core.config import Settings
-from minitest_cli.utils.auto_update import ENV_OPT_OUT
+from minitest_cli.utils.auto_update import OFF_COMMAND
 from minitest_cli.utils.auto_update_state import log_path, read_state, section, update_section
 from minitest_cli.utils.versions import is_newer
 
@@ -21,7 +21,7 @@ def pending_notices(settings: Settings) -> list[str]:
             notices.append(
                 f"minitest-cli could not update itself to {target} "
                 f"(details: {log_path(settings)}). Run `minitest upgrade`, "
-                f"or set {ENV_OPT_OUT}=1 to turn auto-update off."
+                f"or `{OFF_COMMAND}` to stop trying."
             )
         else:
             notices.append(f"minitest-cli updated itself to {__version__}.")

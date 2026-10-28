@@ -56,8 +56,15 @@ prints one line saying what was updated; the details go to
 
 Auto-update never runs in CI (`CI` set), in containers, on Windows, or for
 `uvx` and source checkouts; those keep printing an "Update available" notice.
-Set `MINITEST_NO_AUTO_UPDATE=1` to turn it off, and run `minitest upgrade` to
-update by hand at any time.
+
+```bash
+minitest upgrade auto        # show the setting, why it is off, the last update
+minitest upgrade auto off    # turn it off for this user (saved in ~/.minitest/preferences.json)
+minitest upgrade auto on     # turn it back on
+minitest upgrade             # update by hand at any time
+```
+
+`MINITEST_NO_AUTO_UPDATE=1` also turns it off, and wins over the saved setting.
 
 > **Installed with Homebrew?** The `minitap-ai/tap/minitest-cli` formula is
 > retired: it stopped at 0.24.0 and is now disabled. Switch to uv with
@@ -171,7 +178,7 @@ app defaults.
 | `MINITEST_WEBAPP_URL`         | Minitest webapp base URL (used for review links)            | No (defaults to production)        |
 | `MINITEST_SUPABASE_URL`       | Supabase project URL used for OAuth login                  | No (defaults to production)        |
 | `MINITEST_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key used for OAuth login | No (defaults to production)        |
-| `MINITEST_NO_AUTO_UPDATE`     | Set to `1` to stop the CLI and agent skill from updating themselves | No                        |
+| `MINITEST_NO_AUTO_UPDATE`     | Set to `1` to stop the CLI and agent skill from updating themselves (or run `minitest upgrade auto off`) | No |
 
 > The recommended way to set these is to copy `.env.example` to `.env` — the CLI loads `.env` automatically. The shipped `.env.example` already targets the **dev** environment (see below).
 

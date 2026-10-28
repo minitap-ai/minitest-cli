@@ -210,4 +210,4 @@ class TestCheckForUpdates:
         with patch.object(auto_update, "start") as start:
             update_check.check_for_updates(settings, allow_auto_update=False)
         start.assert_not_called()
-        assert "minitest upgrade" in capsys.readouterr().err
+        assert capsys.readouterr().err == ""

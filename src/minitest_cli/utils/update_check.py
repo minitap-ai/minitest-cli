@@ -85,7 +85,7 @@ def check_for_updates(settings: Settings, *, allow_auto_update: bool = True) -> 
     This function never raises exceptions or blocks the CLI for more than 2 seconds.
     """
     try:
-        blocker = auto_update.environment_blocker()
+        blocker = auto_update.blocker(settings)
         auto = blocker is None and allow_auto_update
         if blocker is None:
             register_running(settings)
@@ -101,7 +101,7 @@ def check_for_updates(settings: Settings, *, allow_auto_update: bool = True) -> 
                 err_console.print(
                     f"[dim]Updating minitest-cli {__version__} → {todo.cli_target} in the "
                     f"background; your next command uses it "
-                    f"({auto_update.ENV_OPT_OUT}=1 turns this off).[/dim]"
+                    f"(`{auto_update.OFF_COMMAND}` turns this off).[/dim]"
                 )
             if auto_update.cli_upgrade_supported():
                 return

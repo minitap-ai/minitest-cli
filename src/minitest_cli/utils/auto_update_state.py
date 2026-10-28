@@ -2,6 +2,7 @@
 
 Everything lives in the config dir (~/.minitest):
 
+- ``preferences.json``: the saved `minitest upgrade auto on|off` choice.
 - ``auto_update.json``: what the last background update did, so the next
   command can say so once.
 - ``auto_update.lock``: held by the one worker allowed to update at a time.
@@ -22,6 +23,7 @@ from typing import Any
 from minitest_cli.core.config import Settings
 
 STATE_FILE_NAME = "auto_update.json"
+PREFERENCES_FILE_NAME = "preferences.json"
 LOCK_FILE_NAME = "auto_update.lock"
 LOG_FILE_NAME = "auto_update.log"
 RUNNING_DIR_NAME = "running"
@@ -55,6 +57,25 @@ def update_section(settings: Settings, name: str, **fields: Any) -> None:
     tmp = path.with_name(f"{STATE_FILE_NAME}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(state))
     os.replace(tmp, path)
+
+
+def auto_update_enabled(settings: Settings) -> bool:
+    """The saved `minitest upgrade auto on|off` choice; on unless turned off."""
+    try:
+        data = json.loads((settings.ensure_config_dir() / PREFERENCES_FILE_NAME).read_text())
+    except (OSError, ValueError):
+        return True
+    return not (isinstance(data, dict) and data.get("autoUpdate") is False)
+
+
+def save_auto_update_enabled(settings: Settings, enabled: bool) -> None:
+    path = settings.ensure_config_dir() / PREFERENCES_FILE_NAME
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        data = {}
+    data = {**(data if isinstance(data, dict) else {}), "autoUpdate": enabled}
+    path.write_text(json.dumps(data, indent=2) + "\n")
 
 
 def pid_alive(pid: int) -> bool:

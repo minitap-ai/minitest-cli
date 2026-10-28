@@ -19,7 +19,7 @@ uv add <package>                                   # Add new dependency (always 
   - `config.py` - pydantic-settings: MINITEST_API_URL, MINITEST_TOKEN, config dir
   - `app_context.py` - --app flag / MINITEST_APP_ID resolution
   - `auth.py` - Token storage (read/write ~/.minitest/credentials.json)
-- `api/client.py` - httpx async client with auto auth + X-Minitest-Channel header
+- `api/client.py` - httpx async client with auto auth + X-Minitest-Channel and X-Minitap-Cli (minitest/<version>) headers
 - `utils/`
   - `output.py` - --json helpers: stdout=data, stderr=diagnostics
   - `update_check.py` - PyPI version check (cached 1h, non-blocking); hands newer releases to auto-update

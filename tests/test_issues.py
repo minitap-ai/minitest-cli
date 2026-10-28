@@ -52,6 +52,7 @@ FAILURE = {
     "rcaPrompt": "Apply the targeted fix.",
     "webappIssueUrl": f"https://dev.minitap.ai/issues?issueId={ISSUE_ID}",
     "versionLabel": "1.35.0 (1)",
+    "criterionId": "12121212-1212-1212-1212-121212121212",
 }
 # Last seen in a run the run list does not return (cancelled CI run), and never classified.
 UNCLASSIFIED = {
@@ -180,6 +181,8 @@ class TestIssueScopes:
         assert payload["scope"]["batchId"] is None
         assert [issue["id"] for issue in payload["issues"]] == [ISSUE_ID, UNCLASSIFIED["id"]]
         assert payload["issues"][0]["lastSeenVersion"] == "1.35.0 (1)"
+        # Joins a finding to the `criterionId` of `run verdicts` criteria.
+        assert payload["issues"][0]["criterionId"] == "12121212-1212-1212-1212-121212121212"
         assert payload["issues"][1]["criticality"] is None
         assert payload["issues"][1]["issueStatus"] == "review"
 

@@ -6,8 +6,6 @@ installed in the background. Elsewhere, the user is told to run
 """
 
 import json
-import shutil
-import sys
 import time
 from datetime import datetime
 
@@ -63,14 +61,6 @@ def _latest_release(settings: Settings) -> tuple[str, float | None]:
     except OSError:
         pass
     return latest, released_at
-
-
-def _is_brew_install() -> bool:
-    """Detect if the running minitest binary was installed via Homebrew."""
-    exe = shutil.which("minitest")
-    if exe is None:
-        exe = sys.executable
-    return "/Cellar/" in exe or "/homebrew/" in exe.lower()
 
 
 def _print_upgrade_panel(latest: str) -> None:

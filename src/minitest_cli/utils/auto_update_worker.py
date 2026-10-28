@@ -7,7 +7,6 @@ loaded from it.
 """
 
 import argparse
-import os
 import subprocess
 import sys
 import time
@@ -15,7 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from minitest_cli.core.config import Settings, get_settings
-from minitest_cli.utils.auto_update import RELEASE_COOLDOWN_SECONDS, InstallMethod, upgrade_command
+from minitest_cli.utils.auto_update import RELEASE_COOLDOWN_SECONDS, upgrade_command
 from minitest_cli.utils.auto_update_state import (
     other_commands_running,
     release_lock,
@@ -54,14 +53,14 @@ def _release_is_settled(target: str) -> bool:
     return released_at is not None and time.time() - released_at >= RELEASE_COOLDOWN_SECONDS
 
 
-def _upgrade_cli(settings: Settings, target: str, method: InstallMethod) -> None:
+def _upgrade_cli(settings: Settings, target: str) -> None:
     if not _release_is_settled(target):
         _log(f"A newer release than {target} is too fresh; trying again later.")
         update_section(settings, "cli", status="deferred", finishedAt=time.time())
         return
-    command = upgrade_command(method)
+    command = upgrade_command()
     if command is None:
-        _log(f"No {method} binary found; cannot upgrade.")
+        _log("No uv binary found; cannot upgrade.")
         update_section(settings, "cli", status="failed", finishedAt=time.time())
         return
     _log(f"Upgrading minitest-cli to {target}: {' '.join(command)}")
@@ -73,7 +72,6 @@ def _upgrade_cli(settings: Settings, target: str, method: InstallMethod) -> None
             text=True,
             timeout=UPGRADE_TIMEOUT_SECONDS,
             check=False,
-            env={**os.environ, "HOMEBREW_NO_ENV_HINTS": "1"},
         )
     except (OSError, subprocess.SubprocessError) as exc:
         _log(f"Upgrade failed to run: {exc}")
@@ -113,7 +111,6 @@ def _refresh_skill(settings: Settings) -> None:
 def run(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="minitest-auto-update")
     parser.add_argument("--cli-target")
-    parser.add_argument("--method", choices=[m.value for m in InstallMethod])
     parser.add_argument("--skill", action="store_true")
     args = parser.parse_args(argv)
     settings = get_settings()
@@ -125,8 +122,8 @@ def run(argv: list[str] | None = None) -> int:
             if args.skill:
                 update_section(settings, "skill", checkedAt=0)
             return 0
-        if args.cli_target and args.method:
-            _upgrade_cli(settings, args.cli_target, InstallMethod(args.method))
+        if args.cli_target:
+            _upgrade_cli(settings, args.cli_target)
         if args.skill:
             _refresh_skill(settings)
     finally:

@@ -65,7 +65,7 @@ class TestWorker:
         self, worker_settings: Settings, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            auto_update_worker, "upgrade_command", lambda _m: [sys.executable, "-c", "print(1)"]
+            auto_update_worker, "upgrade_command", lambda: [sys.executable, "-c", "print(1)"]
         )
         monkeypatch.setattr(auto_update_worker, "fetch_latest_release", lambda: ("0.42.0", 0.0))
         skill_versions = iter(["old", "new"])
@@ -76,9 +76,7 @@ class TestWorker:
         with patch.object(
             auto_update_worker, "check_and_refresh", return_value=UpgradeStatus.UPGRADED
         ):
-            assert (
-                auto_update_worker.run(["--cli-target", "0.42.0", "--method", "uv", "--skill"]) == 0
-            )
+            assert auto_update_worker.run(["--cli-target", "0.42.0", "--skill"]) == 0
 
         state = read_state(worker_settings)
         assert section(state, "cli")["status"] == "done"
@@ -102,10 +100,10 @@ class TestWorker:
         self, worker_settings: Settings, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            auto_update_worker, "upgrade_command", lambda _m: [sys.executable, "-c", "exit(2)"]
+            auto_update_worker, "upgrade_command", lambda: [sys.executable, "-c", "exit(2)"]
         )
         monkeypatch.setattr(auto_update_worker, "fetch_latest_release", lambda: ("0.42.0", 0.0))
-        auto_update_worker.run(["--cli-target", "0.42.0", "--method", "uv"])
+        auto_update_worker.run(["--cli-target", "0.42.0"])
         assert section(read_state(worker_settings), "cli")["status"] == "failed"
 
     def test_worker_defers_when_newer_release_is_too_fresh(
@@ -115,7 +113,7 @@ class TestWorker:
             auto_update_worker, "fetch_latest_release", lambda: ("0.43.0", time.time())
         )
         with patch.object(auto_update_worker.subprocess, "run") as run:
-            auto_update_worker.run(["--cli-target", "0.42.0", "--method", "uv"])
+            auto_update_worker.run(["--cli-target", "0.42.0"])
         run.assert_not_called()
         assert section(read_state(worker_settings), "cli")["status"] == "deferred"
 
@@ -126,7 +124,7 @@ class TestWorker:
         monkeypatch.setattr(auto_update_worker, "other_commands_running", lambda _s: True)
         update_section(worker_settings, "skill", checkedAt=123.0)
         with patch.object(auto_update_worker.subprocess, "run") as run:
-            auto_update_worker.run(["--cli-target", "0.42.0", "--method", "uv", "--skill"])
+            auto_update_worker.run(["--cli-target", "0.42.0", "--skill"])
         run.assert_not_called()
         state = read_state(worker_settings)
         assert section(state, "cli")["status"] == "deferred"
@@ -184,7 +182,7 @@ class TestCheckForUpdates:
     def test_starts_background_update_without_panel(
         self, settings: Settings, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        todo = Plan(cli_target="0.42.0", method=auto_update.InstallMethod.UV, skill=True)
+        todo = Plan(cli_target="0.42.0", skill=True)
         with (
             patch.object(auto_update, "plan", return_value=todo),
             patch.object(auto_update, "start", return_value=True) as start,

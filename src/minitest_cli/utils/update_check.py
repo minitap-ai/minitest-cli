@@ -86,9 +86,12 @@ def check_for_updates(settings: Settings, *, allow_auto_update: bool = True) -> 
     """
     try:
         blocker = auto_update.blocker(settings)
-        auto = blocker is None and allow_auto_update
         if blocker is None:
             register_running(settings)
+        if not allow_auto_update:
+            # `minitest upgrade …` updates or configures updates itself: no notice.
+            return
+        auto = blocker is None
         if auto:
             for notice in pending_notices(settings):
                 err_console.print(f"[dim]{notice}[/dim]")

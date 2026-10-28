@@ -43,14 +43,13 @@ class TestUpgradeCLI:
         assert "already up to date" in result.output
 
     def test_cli_upgrade_uv(self) -> None:
-        """When newer version exists and not installed via brew, use uv."""
+        """When a newer version exists, upgrade with uv."""
         pypi_resp = _mock_response(200, json_data={"info": {"version": "0.6.0"}})
 
         with (
             _patch_update_check(),
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.commands.upgrade._is_brew_install", return_value=False),
             patch("minitest_cli.commands.upgrade.shutil.which", return_value="/usr/local/bin/uv"),
             patch("minitest_cli.commands.upgrade.subprocess.run") as mock_run,
             patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
@@ -63,8 +62,8 @@ class TestUpgradeCLI:
         cmd = first_call_args[0][0]
         assert cmd == ["/usr/local/bin/uv", "tool", "upgrade", "--reinstall", "minitest-cli"]
 
-    def test_cli_upgrade_brew_install(self) -> None:
-        """When installed via brew, use brew upgrade."""
+    def test_cli_upgrade_falls_back_to_python_uv(self) -> None:
+        """Without uv on PATH, run uv as a module (Homebrew is no longer used)."""
         pypi_resp = _mock_response(200, json_data={"info": {"version": "0.6.0"}})
 
         with (
@@ -72,7 +71,6 @@ class TestUpgradeCLI:
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
             patch("minitest_cli.commands.upgrade.shutil.which", return_value=None),
-            patch("minitest_cli.commands.upgrade._is_brew_install", return_value=True),
             patch("minitest_cli.commands.upgrade.subprocess.run") as mock_run,
             patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
         ):
@@ -80,30 +78,8 @@ class TestUpgradeCLI:
             result = runner.invoke(app, ["upgrade"])
 
         assert result.exit_code == 0
-        first_call_args = mock_run.call_args_list[0]
-        cmd = first_call_args[0][0]
-        assert cmd == ["brew", "upgrade", "minitest-cli"]
-
-    def test_cli_upgrade_brew_takes_priority_over_uv(self) -> None:
-        """When installed via brew, brew is used even if uv is on PATH."""
-        pypi_resp = _mock_response(200, json_data={"info": {"version": "0.6.0"}})
-
-        with (
-            _patch_update_check(),
-            patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
-            patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.commands.upgrade.shutil.which", return_value="/opt/bin/uv"),
-            patch("minitest_cli.commands.upgrade._is_brew_install", return_value=True),
-            patch("minitest_cli.commands.upgrade.subprocess.run") as mock_run,
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
-        ):
-            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-            result = runner.invoke(app, ["upgrade"])
-
-        assert result.exit_code == 0
-        first_call_args = mock_run.call_args_list[0]
-        cmd = first_call_args[0][0]
-        assert cmd == ["brew", "upgrade", "minitest-cli"]
+        cmd = mock_run.call_args_list[0][0][0]
+        assert cmd[1:] == ["-m", "uv", "tool", "upgrade", "--reinstall", "minitest-cli"]
 
     def test_cli_nothing_to_upgrade(self) -> None:
         """When upgrade tool reports 'Nothing to upgrade', treat as failure."""
@@ -113,7 +89,6 @@ class TestUpgradeCLI:
             _patch_update_check(),
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.commands.upgrade._is_brew_install", return_value=False),
             patch("minitest_cli.commands.upgrade.shutil.which", return_value="/usr/local/bin/uv"),
             patch("minitest_cli.commands.upgrade.subprocess.run") as mock_run,
             patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),

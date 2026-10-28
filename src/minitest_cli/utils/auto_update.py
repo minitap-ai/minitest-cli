@@ -2,7 +2,8 @@
 
 When a command sees a newer release on PyPI, it starts a detached worker
 (``auto_update_worker``) and carries on: the worker waits until no minitest
-command is running, upgrades the CLI the way it was installed (uv or Homebrew),
+command is running, upgrades the CLI with `uv tool upgrade` (uv is the only
+distribution channel),
 then refreshes the agent skill. The next command runs the new version.
 """
 
@@ -12,7 +13,6 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
 from minitest_cli import __version__
@@ -37,18 +37,11 @@ WORKER_MODULE = "minitest_cli.utils.auto_update_worker"
 DOCKERENV_PATH = Path("/.dockerenv")
 _HOME = Path.home()
 _UV_FALLBACKS = (_HOME / ".local/bin/uv", _HOME / ".cargo/bin/uv", Path("/opt/homebrew/bin/uv"))
-_BREW_FALLBACKS = (Path("/opt/homebrew/bin/brew"), Path("/usr/local/bin/brew"))
-
-
-class InstallMethod(StrEnum):
-    UV = "uv"
-    BREW = "brew"
 
 
 @dataclass(frozen=True)
 class Plan:
     cli_target: str | None
-    method: InstallMethod | None
     skill: bool
 
 
@@ -69,40 +62,33 @@ def environment_blocker() -> str | None:
     return None
 
 
-def install_method() -> InstallMethod | None:
-    """How this CLI was installed; None for dev checkouts, uvx, pip and the like."""
-    prefix = Path(sys.prefix)
-    if (prefix / "uv-receipt.toml").exists():
-        return InstallMethod.UV
-    if "Cellar" in prefix.parts and "minitest-cli" in prefix.parts:
-        return InstallMethod.BREW
-    return None
+def is_uv_tool_install() -> bool:
+    """True for `uv tool install` (and the one-line installers, which use it).
+
+    uvx, pip and source checkouts are left alone: they have no receipt.
+    """
+    return (Path(sys.prefix) / "uv-receipt.toml").exists()
 
 
-def _find_binary(name: str, fallbacks: tuple[Path, ...]) -> str | None:
-    found = shutil.which(name)
+def _find_uv() -> str | None:
+    found = shutil.which("uv")
     if found:
         return found
-    return next((str(path) for path in fallbacks if path.exists()), None)
+    return next((str(path) for path in _UV_FALLBACKS if path.exists()), None)
 
 
-def upgrade_command(method: InstallMethod) -> list[str] | None:
-    if method is InstallMethod.BREW:
-        brew = _find_binary("brew", _BREW_FALLBACKS)
-        return [brew, "upgrade", "minitest-cli"] if brew else None
-    uv = _find_binary("uv", _UV_FALLBACKS)
+def upgrade_command() -> list[str] | None:
+    uv = _find_uv()
     return [uv, "tool", "upgrade", "minitest-cli"] if uv else None
 
 
 def cli_upgrade_supported() -> bool:
-    method = install_method()
-    return method is not None and upgrade_command(method) is not None
+    return is_uv_tool_install() and upgrade_command() is not None
 
 
 def plan(settings: Settings, latest: str, released_at: float | None, now: float) -> Plan:
     """Decide what the background worker should do on this command."""
     state = read_state(settings)
-    method = install_method()
     cli = section(state, "cli")
     attempted = (
         cli.get("target") == latest
@@ -116,7 +102,7 @@ def plan(settings: Settings, latest: str, released_at: float | None, now: float)
     skill_checked_at = float(section(state, "skill").get("checkedAt") or 0)
     skill_due = now - skill_checked_at >= SKILL_CHECK_INTERVAL_SECONDS
     target = latest if upgrade else None
-    return Plan(cli_target=target, method=method if upgrade else None, skill=skill_due or upgrade)
+    return Plan(cli_target=target, skill=skill_due or upgrade)
 
 
 def start(settings: Settings, todo: Plan, now: float) -> bool:
@@ -124,8 +110,8 @@ def start(settings: Settings, todo: Plan, now: float) -> bool:
     if not (todo.cli_target or todo.skill) or not acquire_lock(settings):
         return False
     args = [sys.executable, "-m", WORKER_MODULE]
-    if todo.cli_target and todo.method:
-        args += ["--cli-target", todo.cli_target, "--method", str(todo.method)]
+    if todo.cli_target:
+        args += ["--cli-target", todo.cli_target]
         update_section(
             settings,
             "cli",

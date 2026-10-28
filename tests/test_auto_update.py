@@ -10,7 +10,7 @@ import pytest
 
 from minitest_cli.core.config import Settings
 from minitest_cli.utils import auto_update
-from minitest_cli.utils.auto_update import InstallMethod, Plan
+from minitest_cli.utils.auto_update import Plan
 from minitest_cli.utils.auto_update_state import read_state, section, update_section
 
 NOW = 1_800_000_000.0
@@ -38,7 +38,7 @@ def uv_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     prefix.mkdir(parents=True)
     (prefix / "uv-receipt.toml").write_text("[tool]\n")
     monkeypatch.setattr(sys, "prefix", str(prefix))
-    monkeypatch.setattr(auto_update, "_find_binary", lambda name, _fallbacks: f"/bin/{name}")
+    monkeypatch.setattr(auto_update, "_find_uv", lambda: "/bin/uv")
 
 
 class TestEnvironmentBlocker:
@@ -76,30 +76,29 @@ class TestEnvironmentBlocker:
 
 
 class TestInstallMethod:
-    def test_install_method_uv_tool(self, uv_install: None) -> None:
-        assert auto_update.install_method() is InstallMethod.UV
+    def test_uv_tool_install_detected(self, uv_install: None) -> None:
+        assert auto_update.is_uv_tool_install() is True
+        assert auto_update.cli_upgrade_supported() is True
 
-    def test_install_method_homebrew(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(sys, "prefix", "/opt/homebrew/Cellar/minitest-cli/0.41.0/libexec")
-        assert auto_update.install_method() is InstallMethod.BREW
+    def test_homebrew_install_not_upgraded(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "prefix", "/opt/homebrew/Cellar/minitest-cli/0.24.0/libexec")
+        assert auto_update.cli_upgrade_supported() is False
 
-    def test_install_method_unknown_for_dev_checkout(
+    def test_dev_checkout_not_upgraded(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setattr(sys, "prefix", str(tmp_path / ".venv"))
-        assert auto_update.install_method() is None
+        assert auto_update.is_uv_tool_install() is False
 
     def test_upgrade_command_uses_uv_tool_upgrade(self, uv_install: None) -> None:
-        assert auto_update.upgrade_command(InstallMethod.UV) == [
-            "/bin/uv",
-            "tool",
-            "upgrade",
-            "minitest-cli",
-        ]
+        assert auto_update.upgrade_command() == ["/bin/uv", "tool", "upgrade", "minitest-cli"]
 
-    def test_upgrade_command_none_without_binary(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(auto_update, "_find_binary", lambda _name, _fallbacks: None)
-        assert auto_update.upgrade_command(InstallMethod.BREW) is None
+    def test_upgrade_command_none_without_uv(
+        self, uv_install: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(auto_update, "_find_uv", lambda: None)
+        assert auto_update.upgrade_command() is None
+        assert auto_update.cli_upgrade_supported() is False
 
 
 class TestPlan:
@@ -109,7 +108,7 @@ class TestPlan:
 
     def test_plan_upgrades_settled_release(self, settings: Settings) -> None:
         todo = auto_update.plan(settings, "0.42.0", SETTLED, NOW)
-        assert todo == Plan(cli_target="0.42.0", method=InstallMethod.UV, skill=True)
+        assert todo == Plan(cli_target="0.42.0", skill=True)
 
     def test_plan_waits_for_fresh_release(self, settings: Settings) -> None:
         assert auto_update.plan(settings, "0.42.0", FRESH, NOW).cli_target is None
@@ -148,7 +147,7 @@ class TestPlan:
 class TestStart:
     def test_start_spawns_detached_worker(self, settings: Settings) -> None:
         worker = MagicMock(pid=os.getpid())
-        todo = Plan(cli_target="0.42.0", method=InstallMethod.UV, skill=True)
+        todo = Plan(cli_target="0.42.0", skill=True)
         with patch("minitest_cli.utils.auto_update.subprocess.Popen", return_value=worker) as popen:
             assert auto_update.start(settings, todo, NOW) is True
 
@@ -158,8 +157,6 @@ class TestStart:
             auto_update.WORKER_MODULE,
             "--cli-target",
             "0.42.0",
-            "--method",
-            "uv",
             "--skill",
         ]
         assert popen.call_args.kwargs["start_new_session"] is True
@@ -170,7 +167,7 @@ class TestStart:
         assert (settings.config_dir / "auto_update.lock").read_text() == str(os.getpid())
 
     def test_start_refuses_while_another_update_runs(self, settings: Settings) -> None:
-        todo = Plan(cli_target=None, method=None, skill=True)
+        todo = Plan(cli_target=None, skill=True)
         with patch(
             "minitest_cli.utils.auto_update.subprocess.Popen",
             return_value=MagicMock(pid=os.getpid()),
@@ -181,11 +178,11 @@ class TestStart:
 
     def test_start_nothing_to_do(self, settings: Settings) -> None:
         with patch("minitest_cli.utils.auto_update.subprocess.Popen") as popen:
-            assert auto_update.start(settings, Plan(None, None, False), NOW) is False
+            assert auto_update.start(settings, Plan(None, False), NOW) is False
         popen.assert_not_called()
 
     def test_start_failure_releases_lock(self, settings: Settings) -> None:
-        todo = Plan(cli_target="0.42.0", method=InstallMethod.UV, skill=False)
+        todo = Plan(cli_target="0.42.0", skill=False)
         with patch("minitest_cli.utils.auto_update.subprocess.Popen", side_effect=OSError):
             assert auto_update.start(settings, todo, time.time()) is False
         assert not (settings.config_dir / "auto_update.lock").exists()

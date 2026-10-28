@@ -28,12 +28,6 @@ Both scripts use `uv` if available, or install it automatically.
 uv tool install minitest-cli
 ```
 
-**Homebrew** (macOS):
-
-```bash
-brew install minitap-ai/tap/minitest-cli
-```
-
 **uvx** (zero-install, all platforms):
 
 ```bash
@@ -51,7 +45,7 @@ uv run minitest --help
 
 ### Staying up to date
 
-A CLI installed with `uv tool install`, the one-liner or Homebrew keeps itself
+A CLI installed with `uv tool install` or the one-liner keeps itself
 current. When a command sees a newer release on PyPI, it updates the CLI in the
 background and your next command runs the new version. The update waits until
 no other `minitest` command is running, and only installs releases that have
@@ -64,6 +58,10 @@ Auto-update never runs in CI (`CI` set), in containers, on Windows, or for
 `uvx` and source checkouts; those keep printing an "Update available" notice.
 Set `MINITEST_NO_AUTO_UPDATE=1` to turn it off, and run `minitest upgrade` to
 update by hand at any time.
+
+> **Installed with Homebrew?** The `minitap-ai/tap/minitest-cli` formula is
+> retired: it stopped at 0.24.0 and is now disabled. Switch to uv with
+> `brew uninstall minitest-cli && uv tool install minitest-cli`.
 
 ## Quick Start
 

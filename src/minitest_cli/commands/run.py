@@ -39,7 +39,7 @@ from minitest_cli.commands.run_feedback import feedback
 from minitest_cli.commands.run_list import list_runs
 from minitest_cli.commands.run_logs import register_logs_command
 from minitest_cli.commands.run_recording import register_recording_commands
-from minitest_cli.commands.run_tagged import print_batch_started, start_tagged
+from minitest_cli.commands.run_tagged import print_batch_started, start_selected, start_tagged
 from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.models.story_run import (
@@ -59,8 +59,9 @@ app = typer.Typer(
 
 @app.command()
 def start(
-    user_story: Annotated[
-        str | None, typer.Argument(help="Scenario name or UUID to run. Excludes --tag.")
+    user_stories: Annotated[
+        list[str] | None,
+        typer.Argument(help="Scenario names or UUIDs to run (one or more). Excludes --tag."),
     ] = None,
     tag: Annotated[
         list[str] | None,
@@ -79,9 +80,12 @@ def start(
         bool, typer.Option("--watch/--no-watch", help="Poll for results (default: watch).")
     ] = True,
 ) -> None:
-    """Start a run for one scenario, or for every scenario carrying --tag."""
-    if (user_story is None) == (not tag):
-        print_error("Pass either a scenario or --tag, not both or neither.")
+    """Start a run for one or more scenarios, or for every scenario carrying --tag.
+
+    Several scenarios, like --tag, start one run and print its summary without polling.
+    """
+    if bool(user_stories) == bool(tag):
+        print_error("Pass either scenarios or --tag, not both or neither.")
         raise typer.Exit(code=1)
     settings, app_id, json_mode = resolve_app()
     targets = build_targets(
@@ -94,10 +98,14 @@ def start(
         android_physical,
     )
     override = backend_api_override(backend_base_url, backend_openapi_url)
-    if tag:
-        print_batch_started(start_tagged(settings, app_id, tag, targets, override), json_mode)
+    story_refs = list(dict.fromkeys(user_stories or []))
+    if tag or len(story_refs) > 1:
+        start_batch = start_tagged if tag else start_selected
+        print_batch_started(
+            start_batch(settings, app_id, tag or story_refs, targets, override), json_mode
+        )
         return
-    story_ref = user_story or ""
+    story_ref = story_refs[0]
 
     async def _start() -> StoryRunResponse:
         async with ApiClient(settings) as client:

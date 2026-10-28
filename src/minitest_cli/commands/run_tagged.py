@@ -1,10 +1,16 @@
-"""Batch launch over every scenario carrying a tag, and the shared batch summary output."""
+"""Batch launch over a scenario selection (several scenarios, or every scenario carrying a
+tag), and the shared batch summary output."""
 
 import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.batch_helpers import batch_summary_payload, post_batch
-from minitest_cli.commands.run_helpers import RUN_TABLE_HEADERS, format_run_row, run_api_call
+from minitest_cli.commands.run_helpers import (
+    RUN_TABLE_HEADERS,
+    format_run_row,
+    resolve_user_story_id,
+    run_api_call,
+)
 from minitest_cli.commands.tags_helpers import resolve_tag_ids
 from minitest_cli.commands.user_story_helpers import EXIT_NOT_FOUND, fetch_all_user_stories
 from minitest_cli.core.config import Settings
@@ -42,6 +48,32 @@ def start_tagged(
                 raise typer.Exit(code=EXIT_NOT_FOUND)
             body = CreateBatchRequest(
                 user_story_ids=[str(s["id"]) for s in stories],
+                targets=targets,
+                backend_api_override=backend_api_override,
+            )
+            return await post_batch(client, app_id, body)
+
+    return run_api_call(_start())
+
+
+def start_selected(
+    settings: Settings,
+    app_id: str,
+    story_refs: list[str],
+    targets: list[BatchTarget],
+    backend_api_override: BackendApiRunOverride | None = None,
+) -> BatchResponse:
+    """Start one batch covering the given scenarios (names or UUIDs).
+
+    Only the selected scenarios run: dependencies between them are kept, and a
+    scenario whose parent is not selected starts on its own.
+    """
+
+    async def _start() -> BatchResponse:
+        async with ApiClient(settings) as client:
+            story_ids = [await resolve_user_story_id(client, app_id, ref) for ref in story_refs]
+            body = CreateBatchRequest(
+                user_story_ids=list(dict.fromkeys(story_ids)),
                 targets=targets,
                 backend_api_override=backend_api_override,
             )

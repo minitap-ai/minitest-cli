@@ -746,6 +746,107 @@ class TestStartCommand:
         assert body["targets"] == [{"platform": "android", "buildId": _ANDROID_BUILD_UUID}]
 
 
+_CHECKOUT_UUID = "ff000000-0000-0000-0000-000000000001"
+
+
+class TestStartSeveralScenarios:
+    def test_several_scenarios_start_one_batch(self, tmp_path) -> None:
+        """Names and UUIDs mix; one batch covers them and its summary is printed."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
+        client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run_tagged.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, "checkout story", *_BUILD_FLAGS],
+                settings,
+                json_mode=True,
+            )
+
+        assert result.exit_code == 0, result.output
+        assert client.post.call_count == 1
+        body = client.post.call_args[1]["json"]
+        assert body["userStoryIds"] == [_USER_STORY_UUID, _CHECKOUT_UUID]
+        assert body["targets"] == [
+            {"platform": "ios", "buildId": _IOS_BUILD_UUID},
+            {"platform": "android", "buildId": _ANDROID_BUILD_UUID},
+        ]
+        data = json.loads(result.output)
+        assert data["batchId"] == _BATCH_UUID
+        assert [r["userStory"] for r in data["storyRuns"]] == ["Login Story", "Checkout Story"]
+
+    def test_same_scenario_named_twice_runs_once(self, tmp_path) -> None:
+        """A scenario given by name and by UUID is sent once."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
+        client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run_tagged.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", "Login Story", _USER_STORY_UUID, "Checkout Story", *_BUILD_FLAGS],
+                settings,
+                json_mode=True,
+            )
+
+        assert result.exit_code == 0, result.output
+        body = client.post.call_args[1]["json"]
+        assert body["userStoryIds"] == [_USER_STORY_UUID, _CHECKOUT_UUID]
+
+    def test_unknown_scenario_never_starts_a_batch(self, tmp_path) -> None:
+        """One unknown name exits 4 before anything runs."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.get = AsyncMock(return_value=_mock_response(200, _USER_STORY_LIST))
+
+        with patch("minitest_cli.commands.run_tagged.ApiClient", return_value=client):
+            result = _run_with_context(
+                [
+                    "start",
+                    "Login Story",
+                    "Nonexistent Story",
+                    "--android-build",
+                    _ANDROID_BUILD_UUID,
+                ],
+                settings,
+            )
+
+        assert result.exit_code == 4
+        client.post.assert_not_called()
+
+    def test_several_scenarios_human_output_lists_runs(self, tmp_path) -> None:
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run_tagged.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, _CHECKOUT_UUID, "--ios-build", _IOS_BUILD_UUID],
+                settings,
+            )
+
+        assert result.exit_code == 0, result.output
+        assert _BATCH_UUID in result.output
+        assert "Checkout Story" in result.output
+
+    def test_repeated_single_scenario_keeps_single_run_output(self, tmp_path) -> None:
+        """The same reference twice is still a one-scenario run."""
+        settings = _make_settings(tmp_path)
+        client = _mock_client()
+        client.post = AsyncMock(return_value=_mock_response(200, _SINGLE_BATCH_RESPONSE))
+
+        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["start", _USER_STORY_UUID, _USER_STORY_UUID, "--no-watch", *_BUILD_FLAGS],
+                settings,
+                json_mode=True,
+            )
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["runId"] == _RUN_UUID
+
+
 # ---------------------------------------------------------------------------
 # status command
 # ---------------------------------------------------------------------------

@@ -11,7 +11,6 @@ import subprocess
 import sys
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 from minitest_cli.core.config import Settings, get_settings
 from minitest_cli.utils.auto_update import RELEASE_COOLDOWN_SECONDS, upgrade_command
@@ -20,7 +19,7 @@ from minitest_cli.utils.auto_update_state import (
     release_lock,
     update_section,
 )
-from minitest_cli.utils.skill_refresh import UpgradeStatus, check_and_refresh, find_skill_path
+from minitest_cli.utils.skill_refresh import UpgradeStatus
 from minitest_cli.utils.update_check import fetch_latest_release
 
 IDLE_TIMEOUT_SECONDS = 15 * 60
@@ -83,25 +82,32 @@ def _upgrade_cli(settings: Settings, target: str) -> None:
     update_section(settings, "cli", status=status, finishedAt=time.time())
 
 
-def _local_skill_content() -> str | None:
-    path = find_skill_path()
+def _check_and_refresh_in_fresh_process() -> UpgradeStatus:
+    """Refresh the agent skill from the installed CLI, not from this (maybe outdated) process.
+
+    The CLI may have just been replaced on disk while this interpreter still holds the old
+    version, so the refresh runs in a new interpreter that imports the new one.
+    """
+    result = subprocess.run(  # noqa: S603 - fixed argv, no shell
+        [sys.executable, "-m", "minitest_cli.utils.skill_refresh"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=UPGRADE_TIMEOUT_SECONDS,
+        check=False,
+    )
+    if result.stderr.strip():
+        _log(result.stderr.strip())
     try:
-        return (Path(path) / "SKILL.md").read_text(encoding="utf-8") if path else None
-    except OSError:
-        return None
+        return UpgradeStatus(result.stdout.strip())
+    except ValueError:
+        return UpgradeStatus.FAILED
 
 
 def _refresh_skill(settings: Settings) -> None:
     _log("Checking the agent skill.")
     try:
-        before = _local_skill_content()
-        status = check_and_refresh()
-        # `npx skills update` exits 0 even when it decides there is nothing to
-        # change; only report a refresh the user can actually see.
-        if status is UpgradeStatus.UPGRADED and before is not None:
-            if _local_skill_content() == before:
-                _log("The skills tool left SKILL.md unchanged.")
-                status = UpgradeStatus.UP_TO_DATE
+        status = _check_and_refresh_in_fresh_process()
     except Exception as exc:  # noqa: BLE001 - never let a skill failure crash the worker
         _log(f"Skill refresh failed: {exc}")
         status = UpgradeStatus.FAILED

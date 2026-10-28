@@ -31,8 +31,16 @@ jobs:
           print(f"Version {version} matches tag")
           PY
 
+      # The reference files are rendered by testing-service and published to
+      # agent-skills; take the newest so the wheel's skill is current at release.
+      - name: Refresh skill references
+        run: scripts/sync-skill-references.sh
+
       - name: Build package
         run: uv build
+
+      - name: Check the wheel and sdist carry the agent skill
+        run: python3 scripts/check-dist-skill.py
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

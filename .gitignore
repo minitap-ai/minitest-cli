@@ -109,5 +109,6 @@ dmypy.json
 .trae/
 .windsurf/
 .zencoder/
-skills/
+/skills/*
+!/skills/minitest-cli/
 skills-lock.json

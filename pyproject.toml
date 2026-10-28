@@ -58,6 +58,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/minitest_cli"]
 
+# The agent skill ships inside the wheel so it is always the version of the CLI it
+# documents. Read at runtime by minitest_cli.utils.skill_bundle.
+[tool.hatch.build.targets.wheel.force-include]
+"skills/minitest-cli" = "minitest_cli/_skills/minitest-cli"
+
 [tool.ruff]
 exclude = [
     ".bzr",

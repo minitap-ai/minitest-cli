@@ -35,7 +35,7 @@ class TestUpgradeCLI:
             _patch_update_check(),
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
+            patch("minitest_cli.utils.skill_refresh.find_skill_paths", return_value=[]),
         ):
             result = runner.invoke(app, ["upgrade"])
 
@@ -52,7 +52,7 @@ class TestUpgradeCLI:
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
             patch("minitest_cli.commands.upgrade.shutil.which", return_value="/usr/local/bin/uv"),
             patch("minitest_cli.commands.upgrade.subprocess.run") as mock_run,
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
+            patch("minitest_cli.utils.skill_refresh.find_skill_paths", return_value=[]),
         ):
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             result = runner.invoke(app, ["upgrade"])
@@ -72,7 +72,7 @@ class TestUpgradeCLI:
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
             patch("minitest_cli.commands.upgrade.shutil.which", return_value=None),
             patch("minitest_cli.commands.upgrade.subprocess.run") as mock_run,
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
+            patch("minitest_cli.utils.skill_refresh.find_skill_paths", return_value=[]),
         ):
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             result = runner.invoke(app, ["upgrade"])
@@ -91,7 +91,7 @@ class TestUpgradeCLI:
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
             patch("minitest_cli.commands.upgrade.shutil.which", return_value="/usr/local/bin/uv"),
             patch("minitest_cli.commands.upgrade.subprocess.run") as mock_run,
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
+            patch("minitest_cli.utils.skill_refresh.find_skill_paths", return_value=[]),
         ):
             mock_run.return_value = MagicMock(
                 returncode=0, stdout="Nothing to upgrade\n", stderr=""
@@ -109,7 +109,7 @@ class TestUpgradeCLI:
                 "minitest_cli.commands.upgrade.httpx.get",
                 side_effect=httpx.ConnectError("Connection refused"),
             ),
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
+            patch("minitest_cli.utils.skill_refresh.find_skill_paths", return_value=[]),
         ):
             result = runner.invoke(app, ["upgrade"])
 
@@ -127,30 +127,28 @@ class TestUpgradeSkill:
             _patch_update_check(),
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
+            patch("minitest_cli.utils.skill_refresh.find_skill_paths", return_value=[]),
         ):
             result = runner.invoke(app, ["upgrade"])
 
         assert "not installed" in result.output
 
     def test_skill_up_to_date(self, tmp_path) -> None:
-        """When local and remote SKILL.md match, report up to date."""
-        skill_content = "# Minitest CLI Skill\n\nInstructions here."
+        """An installed skill identical to the bundled one is reported up to date."""
+        from minitest_cli.utils import skill_bundle
+
         skill_dir = tmp_path / "minitest-cli"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(skill_content)
+        skill_bundle.install_into(skill_dir)
 
         pypi_resp = _mock_response(200, json_data={"info": {"version": "0.5.1"}})
-        skill_resp = _mock_response(200, text=skill_content)
 
         with (
             _patch_update_check(),
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.utils.skill_refresh.httpx.get", return_value=skill_resp),
             patch(
-                "minitest_cli.utils.skill_refresh.find_skill_path",
-                return_value=str(skill_dir),
+                "minitest_cli.utils.skill_refresh.find_skill_paths",
+                return_value=[str(skill_dir)],
             ),
         ):
             result = runner.invoke(app, ["upgrade"])
@@ -158,52 +156,27 @@ class TestUpgradeSkill:
         assert "skill is already up to date" in result.output.lower()
 
     def test_skill_outdated(self, tmp_path) -> None:
-        """When local and remote SKILL.md differ, trigger reinstall."""
+        """An installed skill that differs from the bundled one is refreshed in place."""
         skill_dir = tmp_path / "minitest-cli"
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text("old content")
 
         pypi_resp = _mock_response(200, json_data={"info": {"version": "0.5.1"}})
-        skill_resp = _mock_response(200, text="new content with changes")
 
         with (
             _patch_update_check(),
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.utils.skill_refresh.httpx.get", return_value=skill_resp),
             patch(
-                "minitest_cli.utils.skill_refresh.find_skill_path",
-                return_value=str(skill_dir),
-            ),
-            patch("minitest_cli.utils.skill_refresh.subprocess.run") as mock_run,
-        ):
-            mock_run.return_value = MagicMock(returncode=0)
-            result = runner.invoke(app, ["upgrade"])
-
-        assert "has changed" in result.output or "updated" in result.output.lower()
-
-    def test_skill_remote_fetch_fails(self, tmp_path) -> None:
-        """When remote SKILL.md fetch fails, show error."""
-        skill_dir = tmp_path / "minitest-cli"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text("some content")
-
-        pypi_resp = _mock_response(200, json_data={"info": {"version": "0.5.1"}})
-        skill_resp = _mock_response(500)
-
-        with (
-            _patch_update_check(),
-            patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
-            patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.utils.skill_refresh.httpx.get", return_value=skill_resp),
-            patch(
-                "minitest_cli.utils.skill_refresh.find_skill_path",
-                return_value=str(skill_dir),
+                "minitest_cli.utils.skill_refresh.find_skill_paths",
+                return_value=[str(skill_dir)],
             ),
         ):
             result = runner.invoke(app, ["upgrade"])
 
-        assert "HTTP 500" in result.output
+        assert "updated" in result.output.lower()
+        assert (skill_dir / "SKILL.md").read_text() != "old content"
+        assert (skill_dir / "reference").is_dir()
 
 
 class TestUpgradeStatus:
@@ -211,22 +184,20 @@ class TestUpgradeStatus:
 
     def test_shows_banner_when_both_up_to_date(self, tmp_path) -> None:
         """Banner shown when CLI and skill are both already current."""
-        skill_content = "# Skill"
+        from minitest_cli.utils import skill_bundle
+
         skill_dir = tmp_path / "minitest-cli"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(skill_content)
+        skill_bundle.install_into(skill_dir)
 
         pypi_resp = _mock_response(200, json_data={"info": {"version": "0.5.1"}})
-        skill_resp = _mock_response(200, text=skill_content)
 
         with (
             _patch_update_check(),
             patch("minitest_cli.commands.upgrade.httpx.get", return_value=pypi_resp),
             patch("minitest_cli.commands.upgrade.__version__", "0.5.1"),
-            patch("minitest_cli.utils.skill_refresh.httpx.get", return_value=skill_resp),
             patch(
-                "minitest_cli.utils.skill_refresh.find_skill_path",
-                return_value=str(skill_dir),
+                "minitest_cli.utils.skill_refresh.find_skill_paths",
+                return_value=[str(skill_dir)],
             ),
         ):
             result = runner.invoke(app, ["upgrade"])
@@ -241,7 +212,7 @@ class TestUpgradeStatus:
                 "minitest_cli.commands.upgrade.httpx.get",
                 side_effect=httpx.ConnectError("Connection refused"),
             ),
-            patch("minitest_cli.utils.skill_refresh.find_skill_path", return_value=None),
+            patch("minitest_cli.utils.skill_refresh.find_skill_paths", return_value=[]),
         ):
             result = runner.invoke(app, ["upgrade"])
 

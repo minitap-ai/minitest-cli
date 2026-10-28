@@ -26,3 +26,13 @@ def _app_names_resolve_to_themselves(
     monkeypatch.setattr(
         "minitest_cli.core.app_context._app_id_by_name", lambda _settings, name: name
     )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_skill_installs(monkeypatch: pytest.MonkeyPatch, tmp_path_factory) -> None:
+    """Keep tests off the developer's real agent skill installs and their `npx`."""
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.chdir(home)
+    monkeypatch.setattr("minitest_cli.utils.skill_refresh._skills_ls_paths", lambda: [])

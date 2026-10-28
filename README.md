@@ -50,7 +50,7 @@ current. When a command sees a newer release on PyPI, it updates the CLI in the
 background and your next command runs the new version. The update waits until
 no other `minitest` command is running, and only installs releases that have
 been out for at least an hour. The same background job refreshes the agent
-skill (`npx skills update minitest-cli`) when it has changed. The next command
+skill (the copy bundled with the new CLI version, no network needed) when it has changed. The next command
 prints one line saying what was updated; the details go to
 `~/.minitest/auto_update.log`.
 

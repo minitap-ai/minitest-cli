@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 from typer.testing import CliRunner
 
-from minitest_cli.commands.skill import SKILL_URL
+from minitest_cli import __version__
 from minitest_cli.main import app
 
 runner = CliRunner()
@@ -19,11 +19,23 @@ def _mock_response(status_code: int, text: str) -> MagicMock:
 
 
 class TestSkillCommand:
-    """Tests for `minitest skill`."""
+    """`minitest skill` prints the skill bundled with this CLI version."""
 
-    def test_fetch_success(self) -> None:
-        content = "# Minitest Skill\n\nSome instructions."
-        resp = _mock_response(200, content)
+    def test_prints_bundled_skill_without_network(self) -> None:
+        with (
+            patch("minitest_cli.main.check_for_updates", return_value=None),
+            patch("minitest_cli.commands.skill.httpx.get") as mock,
+        ):
+            result = runner.invoke(app, ["skill"])
+
+        assert result.exit_code == 0
+        assert result.output.startswith("---\nname: minitest-cli\n")
+        assert f'cli-version: "{__version__}"' in result.output
+        mock.assert_not_called()
+
+    def test_override_url_is_fetched(self, monkeypatch) -> None:
+        monkeypatch.setenv("MINITEST_SKILL_URL", "https://example.test/SKILL.md")
+        resp = _mock_response(200, "# Fork skill")
 
         with (
             patch("minitest_cli.main.check_for_updates", return_value=None),
@@ -32,10 +44,13 @@ class TestSkillCommand:
             result = runner.invoke(app, ["skill"])
 
         assert result.exit_code == 0
-        assert content in result.output
-        mock.assert_called_once_with(SKILL_URL, timeout=15, follow_redirects=True)
+        assert "# Fork skill" in result.output
+        mock.assert_called_once_with(
+            "https://example.test/SKILL.md", timeout=15, follow_redirects=True
+        )
 
-    def test_fetch_http_error(self) -> None:
+    def test_override_network_error(self, monkeypatch) -> None:
+        monkeypatch.setenv("MINITEST_SKILL_URL", "https://example.test/SKILL.md")
         with patch(
             "minitest_cli.commands.skill.httpx.get",
             side_effect=httpx.ConnectError("Connection refused"),
@@ -45,17 +60,8 @@ class TestSkillCommand:
         assert result.exit_code == 3
         assert "Network error" in result.output
 
-    def test_fetch_timeout(self) -> None:
-        with patch(
-            "minitest_cli.commands.skill.httpx.get",
-            side_effect=httpx.ReadTimeout("Timed out"),
-        ):
-            result = runner.invoke(app, ["skill"])
-
-        assert result.exit_code == 3
-        assert "Network error" in result.output
-
-    def test_fetch_non_200(self) -> None:
+    def test_override_non_200(self, monkeypatch) -> None:
+        monkeypatch.setenv("MINITEST_SKILL_URL", "https://example.test/SKILL.md")
         resp = _mock_response(404, "Not Found")
 
         with patch("minitest_cli.commands.skill.httpx.get", return_value=resp):
@@ -63,17 +69,3 @@ class TestSkillCommand:
 
         assert result.exit_code == 3
         assert "HTTP 404" in result.output
-
-    def test_fetch_server_error(self) -> None:
-        resp = _mock_response(500, "Internal Server Error")
-
-        with patch("minitest_cli.commands.skill.httpx.get", return_value=resp):
-            result = runner.invoke(app, ["skill"])
-
-        assert result.exit_code == 3
-        assert "HTTP 500" in result.output
-
-    def test_skill_url_points_to_raw_github(self) -> None:
-        assert "raw.githubusercontent.com" in SKILL_URL
-        assert "minitap-ai/agent-skills" in SKILL_URL
-        assert "skills/minitest-cli/SKILL.md" in SKILL_URL

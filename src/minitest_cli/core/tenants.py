@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import httpx
 import typer
 
+from minitest_cli.api.client import CLI_HEADER, CLI_HEADER_VALUE
 from minitest_cli.core.auth import load_token
 from minitest_cli.core.config import Settings
 from minitest_cli.models.app import TenantResponse
@@ -57,6 +58,7 @@ async def fetch_user_tenants(settings: Settings) -> list[TenantResponse]:
         headers={
             "Authorization": f"Bearer {token}",
             CHANNEL_HEADER: settings.channel,
+            CLI_HEADER: CLI_HEADER_VALUE,
         },
         timeout=DEFAULT_TIMEOUT,
     ) as client:

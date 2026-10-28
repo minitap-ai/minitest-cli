@@ -5,10 +5,14 @@ from typing import Any
 
 import httpx
 
+from minitest_cli import __version__
 from minitest_cli.core.auth import load_token
 from minitest_cli.core.config import Settings
 
 CHANNEL_HEADER = "X-Minitest-Channel"
+# Tells backends which CLI and version is calling. Informational only: never rejected on.
+CLI_HEADER = "X-Minitap-Cli"
+CLI_HEADER_VALUE = f"minitest/{__version__}"
 CONVERSATION_ID_HEADER = "X-Minitest-Conversation-Id"
 CAUSE_HEADER = "X-Minitest-Cause"
 DEFAULT_TIMEOUT = 30.0
@@ -54,6 +58,7 @@ class ApiClient:
     async def __aenter__(self) -> "ApiClient":
         headers: dict[str, str] = {
             CHANNEL_HEADER: self._settings.channel,
+            CLI_HEADER: CLI_HEADER_VALUE,
         }
         if self._settings.conversation_id is not None:
             headers[CONVERSATION_ID_HEADER] = self._settings.conversation_id

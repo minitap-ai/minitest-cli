@@ -84,6 +84,7 @@ def _version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
+    context: typer.Context,
     _version: Annotated[
         bool,
         typer.Option(
@@ -118,5 +119,5 @@ def main(
     ctx.app_flag = app_id  # type: ignore[attr-defined]
     ctx.settings = settings  # type: ignore[attr-defined]
 
-    # Non-blocking update check
-    check_for_updates(settings)
+    # Non-blocking update check; `minitest upgrade` does the update itself.
+    check_for_updates(settings, allow_auto_update=context.invoked_subcommand != "upgrade")

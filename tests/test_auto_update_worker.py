@@ -68,13 +68,11 @@ class TestWorker:
             auto_update_worker, "upgrade_command", lambda: [sys.executable, "-c", "print(1)"]
         )
         monkeypatch.setattr(auto_update_worker, "fetch_latest_release", lambda: ("0.42.0", 0.0))
-        skill_versions = iter(["old", "new"])
-        monkeypatch.setattr(
-            auto_update_worker, "_local_skill_content", lambda: next(skill_versions)
-        )
         acquire_lock(worker_settings)
         with patch.object(
-            auto_update_worker, "check_and_refresh", return_value=UpgradeStatus.UPGRADED
+            auto_update_worker,
+            "_check_and_refresh_in_fresh_process",
+            return_value=UpgradeStatus.UPGRADED,
         ):
             assert auto_update_worker.run(["--cli-target", "0.42.0", "--skill"]) == 0
 
@@ -83,18 +81,25 @@ class TestWorker:
         assert section(state, "skill")["status"] == "upgraded"
         assert not (worker_settings.config_dir / "auto_update.lock").exists()
 
-    def test_worker_does_not_claim_refresh_when_skill_unchanged(
-        self, worker_settings: Settings, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    def test_worker_refreshes_the_skill_in_a_fresh_interpreter(
+        self, worker_settings: Settings
     ) -> None:
-        skill_dir = tmp_path / "skill"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text("same")
-        monkeypatch.setattr(auto_update_worker, "find_skill_path", lambda: str(skill_dir))
-        with patch.object(
-            auto_update_worker, "check_and_refresh", return_value=UpgradeStatus.UPGRADED
-        ):
+        done = type("Done", (), {"stdout": "upgraded\n", "stderr": ""})()
+        with patch.object(auto_update_worker.subprocess, "run", return_value=done) as run:
             auto_update_worker.run(["--skill"])
-        assert section(read_state(worker_settings), "skill")["status"] == "up_to_date"
+
+        argv = run.call_args.args[0]
+        assert argv[1:] == ["-m", "minitest_cli.utils.skill_refresh"]
+        assert section(read_state(worker_settings), "skill")["status"] == "upgraded"
+
+    def test_worker_records_failed_skill_refresh_on_unreadable_status(
+        self, worker_settings: Settings
+    ) -> None:
+        done = type("Done", (), {"stdout": "", "stderr": "Traceback"})()
+        with patch.object(auto_update_worker.subprocess, "run", return_value=done):
+            auto_update_worker.run(["--skill"])
+
+        assert section(read_state(worker_settings), "skill")["status"] == "failed"
 
     def test_worker_records_failed_upgrade(
         self, worker_settings: Settings, monkeypatch: pytest.MonkeyPatch

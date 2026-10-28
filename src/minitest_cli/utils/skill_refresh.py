@@ -1,16 +1,20 @@
-"""Helpers for refreshing the locally-installed agent skill."""
+"""Helpers for refreshing the locally-installed agent skill.
 
-import hashlib
+The skill that matches this CLI version ships inside the CLI itself (see
+``skill_bundle``), so a refresh is offline: it makes every installed copy identical to
+the bundled one. No network and no ``npx`` are needed to refresh, only to find a copy
+installed through the ``skills`` tool.
+"""
+
 import json
 import shutil
+import sys
 import subprocess
 from enum import StrEnum
 from pathlib import Path
 
-import httpx
-
-from minitest_cli.commands.skill import SKILL_URL
-from minitest_cli.utils.output import err_console, print_error, print_info, print_success
+from minitest_cli.utils import skill_bundle
+from minitest_cli.utils.output import print_error, print_info, print_success
 
 
 class UpgradeStatus(StrEnum):
@@ -22,16 +26,7 @@ class UpgradeStatus(StrEnum):
     SKIPPED = "skipped"
 
 
-SKILL_NAME = "minitest-cli"
-SKILL_INSTALL_CMD = [
-    "npx",
-    "skills",
-    "add",
-    "minitap-ai/agent-skills",
-    "--skill",
-    "minitest-cli",
-]
-SKILL_UPDATE_CMD = ["npx", "skills", "update", "minitest-cli", "-y"]
+SKILL_NAME = skill_bundle.SKILL_NAME
 
 
 def _find_npx() -> str | None:
@@ -39,15 +34,12 @@ def _find_npx() -> str | None:
     return shutil.which("npx")
 
 
-def find_skill_path() -> str | None:
-    """Find the local path of the minitest-cli skill via ``npx skills ls``.
-
-    Checks both project and global scope.
-    """
+def _skills_ls_paths() -> list[str]:
+    """Paths of the skill reported by ``npx skills ls`` in project and global scope."""
     npx = _find_npx()
     if npx is None:
-        return None
-
+        return []
+    paths: list[str] = []
     for flags in (["--json"], ["--json", "-g"]):
         try:
             result = subprocess.run(
@@ -57,69 +49,68 @@ def find_skill_path() -> str | None:
                 timeout=30,
                 stdin=subprocess.DEVNULL,
             )
-            if result.returncode == 0:
-                skills = json.loads(result.stdout)
-                for s in skills:
-                    if s.get("name") == SKILL_NAME:
-                        return s.get("path")
+            if result.returncode != 0:
+                continue
+            paths += [s["path"] for s in json.loads(result.stdout) if s.get("name") == SKILL_NAME]
         except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError, OSError):
-            pass
-    return None
+            continue
+    return paths
 
 
-def _md5(content: str) -> str:
-    return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
+def _conventional_paths() -> list[str]:
+    """Where agent tools keep the skill, for installs ``skills ls`` cannot see (no npx)."""
+    roots = [Path.home(), Path.cwd()]
+    return [
+        str(root / tool / "skills" / SKILL_NAME)
+        for root in roots
+        for tool in (".agents", ".claude")
+    ]
 
 
-def reinstall_skill() -> bool:
-    """Run ``npx skills update`` to refresh the local skill in-place."""
-    npx = _find_npx()
-    if npx is None:
-        print_error("npx not found. Install Node.js to manage agent skills.")
-        return False
-    cmd = [npx, *SKILL_UPDATE_CMD[1:]]
-    err_console.print(f"[dim]Running: {' '.join(cmd)}[/dim]\n")
-    result = subprocess.run(cmd, check=False, stdin=subprocess.DEVNULL)
-    if result.returncode != 0:
-        print_error("Skill update failed. Try running the command manually.")
-        return False
-    print_success("Agent skill updated.")
-    return True
+def find_skill_paths() -> list[str]:
+    """Every installed copy of the skill, deduplicated by real path (symlinks collapse)."""
+    seen: dict[Path, str] = {}
+    for candidate in [*_skills_ls_paths(), *_conventional_paths()]:
+        path = Path(candidate)
+        if (path / "SKILL.md").is_file():
+            seen.setdefault(path.resolve(), candidate)
+    return list(seen.values())
+
+
+def find_skill_path() -> str | None:
+    """First installed copy of the skill, or None when it is not installed."""
+    paths = find_skill_paths()
+    return paths[0] if paths else None
 
 
 def check_and_refresh() -> UpgradeStatus:
-    """Check if the agent skill is outdated and refresh it."""
-    skill_path = find_skill_path()
-    if skill_path is None:
+    """Make every installed copy of the agent skill match this CLI version's skill."""
+    paths = find_skill_paths()
+    if not paths:
         print_info("Agent skill is not installed – nothing to refresh.")
-        print_info(f"Install it with: {' '.join(SKILL_INSTALL_CMD)}")
+        print_info(f"Install it with: {' '.join(skill_bundle.install_command())}")
         return UpgradeStatus.SKIPPED
 
-    local_skill = Path(skill_path) / "SKILL.md"
-    if not local_skill.exists():
-        print_info("Local SKILL.md not found – reinstalling skill.")
-        return UpgradeStatus.UPGRADED if reinstall_skill() else UpgradeStatus.FAILED
-
-    local_content = local_skill.read_text(encoding="utf-8")
-
-    # Fetch remote SKILL.md
-    err_console.print("[dim]Checking for skill updates…[/dim]")
+    refreshed = False
     try:
-        resp = httpx.get(SKILL_URL, timeout=15, follow_redirects=True)
-    except httpx.HTTPError as exc:
-        print_error(f"Could not fetch remote skill: {exc}")
+        for path in paths:
+            target = Path(path).resolve()
+            if skill_bundle.is_current(target):
+                continue
+            skill_bundle.install_into(target)
+            refreshed = True
+    except (OSError, ValueError) as exc:
+        print_error(f"Skill update failed: {exc}")
         return UpgradeStatus.FAILED
 
-    if resp.status_code != 200:
-        print_error(f"Could not fetch remote skill: HTTP {resp.status_code}")
-        return UpgradeStatus.FAILED
+    if refreshed:
+        print_success("Agent skill updated.")
+        return UpgradeStatus.UPGRADED
+    print_success("Agent skill is already up to date.")
+    return UpgradeStatus.UP_TO_DATE
 
-    remote_content = resp.text
 
-    if _md5(local_content) == _md5(remote_content):
-        print_success("Agent skill is already up to date.")
-        return UpgradeStatus.UP_TO_DATE
-
-    # Content differs – update
-    err_console.print("[bold]Agent skill has changed – updating…[/bold]")
-    return UpgradeStatus.UPGRADED if reinstall_skill() else UpgradeStatus.FAILED
+if __name__ == "__main__":
+    # Used by the auto-update worker, which starts a fresh interpreter after upgrading the
+    # CLI so the skill is read from (and stamped with) the version that was just installed.
+    sys.stdout.write(check_and_refresh().value)

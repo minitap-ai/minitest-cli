@@ -61,15 +61,15 @@ uv add <package>                                   # Add new dependency (always 
 - Name tests: `test_<action>_<scenario>`
 - Always check exit codes and output
 
-### Agent Skill Sync (CRITICAL)
-The public agent skill at `repos/agent-skills/skills/minitest-cli/SKILL.md` documents every CLI command for AI agents. Customers use the CLI with this skill simultaneously — they MUST stay in sync.
+### Agent Skill (CRITICAL)
+The agent skill lives in this repo at `skills/minitest-cli/` and ships **inside the wheel** (`minitest_cli/_skills/minitest-cli`), so the skill an agent reads is always the one of the CLI version installed. There is no paired PR: change the command and its documentation in the same PR.
 
-When you add, remove, or change a CLI command/flag:
-1. Update `repos/agent-skills/skills/minitest-cli/SKILL.md` in a paired PR
-2. Update the Quick Reference table and any relevant sections
+When you add, remove, or change a CLI command/flag, update `skills/minitest-cli/SKILL.md` (and the Quick Reference table) in that PR.
 
-The skill now has two writers — do not confuse them:
-- **Hand-maintained:** `SKILL.md` and its Quick Reference table. These are the CLI's responsibility; the paired PR above applies to them.
-- **CI-generated:** the `reference/*.md` files under `repos/agent-skills/skills/minitest-cli/reference/` are produced by testing-service CI — never hand-edit them. That CI also owns the machine-managed `<!-- skill-references-hash: <sha256> -->` line inside `SKILL.md`, which it bumps whenever the reference files change.
+- **Hand-maintained:** `SKILL.md`, `README.md`, `commands/`.
+- **CI-generated, never hand-edit:** `reference/*.md`. testing-service renders them from its knowledge fragments and publishes them to `minitap-ai/agent-skills`; `scripts/sync-skill-references.sh` copies the newest ones in, and the release workflow runs it before building so each release carries current references. Run it yourself to refresh the committed snapshot.
+- **Stamped at read time:** `metadata.cli-version` in the SKILL.md frontmatter is added by `utils/skill_bundle.py` from the running version. Do not write it in the file.
 
-Both file sets ship to users together via `npx skills add/update` (whole-skill sync). The CLI's refresh check (`utils/skill_refresh.py`) md5-compares `SKILL.md` only, so reference-file changes stay visible to `minitest upgrade` solely because the CI-managed hash line flips `SKILL.md`. Leave that hash line alone in hand-written edits.
+How it reaches users: `minitest skill` prints the bundled skill (offline). `minitest upgrade` and the background auto-update make every installed copy (found via `npx skills ls`, or `~/.agents|.claude/skills/minitest-cli` without npx) byte-identical to the bundled one, references included. First install: `npx skills add https://github.com/minitap-ai/minitest-cli/tree/v<version>/skills/minitest-cli --skill minitest-cli`. `ci.yml` and `release.yml` run `scripts/check-dist-skill.py` so a build that drops the skill fails.
+
+`minitap-ai/agent-skills` still holds a frozen copy for CLIs older than the release that introduced this; do not update it.

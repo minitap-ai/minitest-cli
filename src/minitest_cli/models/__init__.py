@@ -8,10 +8,13 @@ from minitest_cli.models.app import (
 )
 from minitest_cli.models.app_screen import (
     ScreenContext,
-    ScreenEdge,
-    ScreenMapResponse,
-    ScreenNode,
     ScreenPrecondition,
+    ScreenTransition,
+    ScreenTree,
+    ScreenTreeResponse,
+    TransitionCounts,
+    TreeCounts,
+    TreeScreen,
 )
 from minitest_cli.models.base import CamelModel
 from minitest_cli.models.batch import (
@@ -71,13 +74,16 @@ __all__ = [
     "GitHubContextResponse",
     "PlatformRun",
     "ScreenContext",
-    "ScreenEdge",
-    "ScreenMapResponse",
-    "ScreenNode",
     "ScreenPrecondition",
+    "ScreenTransition",
+    "ScreenTree",
+    "ScreenTreeResponse",
     "StoryRunListResponse",
     "StoryRunResponse",
     "TenantResponse",
+    "TransitionCounts",
+    "TreeCounts",
+    "TreeScreen",
     "target_label",
     "UpdateUserStoryRequest",
     "UserStoryDetailResponse",

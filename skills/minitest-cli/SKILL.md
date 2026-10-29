@@ -779,55 +779,96 @@ actionable guidance reaches you unchanged.
 
 ### 3b. See what exploration actually mapped (`minitest screens`)
 
-Before you invent scenarios for an app, read the screen map: it is the list of
-screens the exploration crawl genuinely stood on, so it tells you what the app
-really contains instead of what its name or tags imply.
+Before you invent scenarios for an app, read the screen tree: it is the list of
+screens the exploration crawl genuinely stood on, and every element it saw on
+them, so it tells you what the app really contains instead of what its name or
+tags imply.
 
 ```bash
-# Every mapped screen, shallowest first
+# Every mapped screen, shallowest first, with its transitions by status
 minitest --app <app_id> screens list
 
-# One platform only
+# One platform's tree only (android, ios or web)
 minitest --app <app_id> screens list --platform ios
 
-# The navigation shape — the fastest way to see where a crawl stopped
+# The tree from the root — the fastest way to see where a crawl stopped
 minitest --app <app_id> screens list --tree
 
-# Only the screens the crawl could not get past
+# Only the screens with at least one blocked transition
 minitest --app <app_id> screens list --blocked
 
-# One screen: how to reach it, and where it leads
+# One screen: how it is reached, its children, and every element on it
 minitest --app <app_id> screens get "Onboarding age"
 ```
 
-`screens list` wraps `GET /api/v1/apps/{app_id}/screens`, which returns the
-whole map in one call (screenshots are signed in a single batch). Filtering by
-`--platform` is server-side; `--area` and `--blocked` are applied client-side
-over that one response.
+**How the tree is built.** Each element the crawl sees on a screen is a
+*transition* `(from screen, element) → to screen`, tagged with the account
+(persona) that walked it — `signed out` when no persona was signed in. A
+transition has one status:
 
-With `--json` the command returns the map itself, and `screenCount` always
-matches the `screens` array beside it (so a filtered call reports the filtered
-count, not the server total). `--tree` is a human rendering only — under
-`--json` it is ignored and you get the same map object, whose `outgoing` edges
-carry the graph. Note the casing seam inherited from the API: the envelope is
-camelCase (`screenKey`, `displayName`) while `outgoing` and `context` are
-snake_case (`to_screen_key`, `parked_reason`, `requires_auth`).
-
-**Read the frontier line**, printed under the table. It reports three things
-that each mean something different:
-
-| Signal | Meaning |
+| Status | Meaning |
 | ------ | ------- |
-| *parked edge* | The crawl saw a way onward and deliberately did not follow it (a duplicate branch, a login wall, a non-navigating toggle). Parked edges are the unexplored frontier. |
-| *blocked screen* | The crawl reached the screen but could not get past it. `screens get` shows the reason, and the ask gating it. |
-| *edge leading to a screen with no row* | The crawl recorded a step to a destination that was never written as a screen — usually the destination was named slightly differently than the screen later called itself. The map understates what was reached. |
+| `explored` | The crawl tapped it and landed on the destination screen. |
+| `pending` | Seen on the screen, not tapped yet. Pending transitions are the unexplored frontier. |
+| `blocked` | The crawl could not get past it (an SMS code it cannot read, a device account picker). The reason is shown, with the ask gating it when there is one. |
+| `skipped` | Deliberately never tapped: `payment` and `delete_account`. |
+
+An automatic transition (the app moved on by itself, e.g. a splash screen) shows
+as the element `(auto)`. The server stores the app's first screen as the
+**root** and places every screen by walking explored transitions from it:
+**depth** is the number of steps from the root, and a screen's **parent** is the
+earliest explored transition into it from the level above. Every other explored
+transition into a screen is a **cross-link**. Screens no explored path from the
+root reaches are **detached** (usually left over from older crawls) and have no
+depth.
+
+`screens list` wraps `GET /api/v1/apps/{app_id}/screen-tree`, which returns one
+tree per platform in one call (screenshots are signed in a single batch).
+`--platform` is sent to the server; `--area` and `--blocked` are applied
+client-side over that one response. The table shows, per screen: `Depth` (`—`
+when detached), `Area`, `Reached via` (the element of the parent transition,
+`(auto)` for an automatic one, `—` for the root and detached screens), then its
+outgoing transitions by status (`Explored`, `Pending`, `Blocked`, `Skipped`). A
+totals line under each table sums those counts and the detached screens.
+
+`--tree` prints each tree from its root along parent transitions. Each child is
+labelled with the element tapped, plus `as <persona>` when the walk was signed
+in. Cross-links are printed once under the screen they leave, as
+`↪ <screen> (also via <element>)`, and not expanded again. Detached screens are
+listed at the end. With `--area` or `--blocked`, the tree keeps the matching
+screens and the path from the root to them.
+
+`screens get` shows the key, depth, area, notes, screenshot and what it takes
+to stand on the screen (auth, persona, deeplink, preconditions), then:
+
+- **Reached from** — every explored transition into it, with its account; the
+  parent is marked.
+- **Children** — the screens placed under it in the tree.
+- **Elements** — every transition leaving it, grouped pending, blocked (with the
+  reason), skipped (with the reason), then explored (with the destination), each
+  with the account that walked it.
+
+With `--json` both commands print the tree response itself:
+`{appId, trees: [{platform, rootScreenKey, counts, screens, transitions,
+detachedScreenKeys}]}`. Screens reference transitions by id
+(`parentTransitionId`, `childTransitionIds`, `outgoingTransitionIds`,
+`incomingTransitionIds`); a transition carries `fromScreenKey`, `elementLabel`,
+`elementKind`, `toScreenKey`, `status`, `reason`, `personaRef` (`""` for signed
+out) and `isTreeEdge`. When a filter applies (`--area`, `--blocked`, or the
+screen picked by `get`), each tree keeps only the matching screens and every
+transition leaving or entering them, `counts` is recomputed over the kept
+screens, and trees with no match are dropped. `--tree` is a human rendering
+only and does not change the JSON. Note the casing seam inherited from the API:
+the envelope is camelCase (`screenKey`, `displayName`) while each screen's
+`context` is snake_case (`requires_auth`, `reachable_via`).
 
 Two shapes worth recognising in `--tree` output:
 
 - **A long unbranching chain** — exploration never escaped a funnel (typically
   onboarding). Scenarios written from this map will all be onboarding scenarios.
-- **A wide, shallow tree** — exploration never got past the lobby, usually
-  because of auth. Check `screens get` for `Requires auth`.
+- **A wide, shallow tree with many pending or blocked elements** — exploration
+  never got past the lobby, usually because of auth. Check `screens get` on the
+  sign-in screen for its blocked transitions and their reasons.
 
 An empty result is not an error. It means no crawl has run against a build for
 this app yet — the map is written by exploration as it walks, so it stays empty
@@ -1450,10 +1491,10 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Delete tag          | `minitest --json --app ID tags delete "payments" --yes` (removed from every scenario)   |
 | Tag a story         | `minitest --json --app ID scenario update <id> --tag auth [--tag smoke]` (replaces the set) |
 | Filter stories by tag | `minitest --json --app ID scenario list --tag auth`                                  |
-| List mapped screens | `minitest --json --app ID screens list [--platform ios]`                                 |
-| See the crawl's shape | `minitest --app ID screens list --tree`                                                |
-| Screens the crawl was blocked on | `minitest --json --app ID screens list --blocked`                           |
-| Inspect one screen  | `minitest --json --app ID screens get "Onboarding age"`                                  |
+| List mapped screens | `minitest --json --app ID screens list [--platform ios]` (screen tree: screens + transitions) |
+| See the crawl's shape | `minitest --app ID screens list --tree` (root down, cross-links marked `↪`)           |
+| Screens with a blocked transition | `minitest --json --app ID screens list --blocked`                          |
+| Inspect one screen  | `minitest --json --app ID screens get "Onboarding age"` (reached from, children, elements by status) |
 | Read app knowledge  | `minitest --json app-knowledge get --app ID`                                             |
 | Update app knowledge (without Knowledge v2) | `minitest --json app-knowledge update --app ID --content-file ./knowledge.md`  |
 | Read / write the Product brief (Knowledge v2) | `minitest --json --app ID brief get` / `brief update --content-file ./brief.md` — see [`commands/knowledge.md`](commands/knowledge.md) |

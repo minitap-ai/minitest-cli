@@ -22,6 +22,7 @@ from minitest_cli.commands import (
     issues,
     knowledge,
     knowledge_documents,
+    reference,
     run,
     schedules,
     screens,
@@ -73,6 +74,7 @@ app.add_typer(schedules.app)
 app.add_typer(issues.app)
 app.add_typer(batch.app)
 app.add_typer(skill.app)
+app.command(name="reference", help=reference.HELP)(reference.reference)
 app.add_typer(upgrade.app)
 
 

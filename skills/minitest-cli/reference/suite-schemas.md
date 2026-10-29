@@ -154,4 +154,5 @@ Steps must be executable as-is by someone who has never seen the app:
 - Every capability-matrix row is covered by ≥ 1 scenario.
 - Every step is atomic and human-reproducible per the rules above.
 - No acceptance criterion mentions backend, database, network, or any non-visible
-  effect.
+  effect, except a backend state the app knowledge documents a read call for,
+  asserted next to a criterion for what the user sees.

@@ -10,6 +10,7 @@ from tests.triage_backend import APP_PATH, ASK_ID, BATCH_ID, Backend, invoke
 LIST = "/api/v1/escalations"
 ONE = f"{LIST}/{ASK_ID}"
 OTHER_ID = "eeeeeeee-0000-0000-0000-000000000002"
+SRP_ID = "99999999-0000-0000-0000-000000000001"
 
 
 def escalation(**overrides) -> dict:
@@ -134,7 +135,7 @@ class TestEscalatedRun:
             "userStoryId": "dddddddd-0000-0000-0000-000000000001",
             "batchId": BATCH_ID,
             "createdAt": "2026-10-29T10:00:00Z",
-            "platforms": [{"platform": "android", "executionState": "escalated"}],
+            "platforms": [{"platform": "android", "srpId": SRP_ID, "executionState": "escalated"}],
         }
 
     def test_status_reports_escalated_and_points_at_the_question(self):
@@ -147,6 +148,28 @@ class TestEscalatedRun:
         assert result.exit_code == 0, result.output
         assert "escalated" in result.output
         assert f"run ask list {BATCH_ID}" in " ".join(result.output.split())
+
+    def test_status_names_the_question_blocking_this_run(self):
+        backend = _backend(escalation(srpIds=[SRP_ID]), escalation(id=OTHER_ID)).on(
+            "GET", f"{APP_PATH}/story-runs/{self.RUN_ID}", httpx.Response(200, json=self._run())
+        )
+
+        result = invoke(backend, ["--json", "run", "status", self.RUN_ID])
+
+        assert result.exit_code == 0, result.output
+        output = " ".join(result.output.split())
+        assert f"run ask get {ASK_ID}" in output
+        assert OTHER_ID not in output
+
+    def test_status_says_when_the_question_is_already_answered(self):
+        backend = _backend(escalation(srpIds=[SRP_ID], state="healing")).on(
+            "GET", f"{APP_PATH}/story-runs/{self.RUN_ID}", httpx.Response(200, json=self._run())
+        )
+
+        result = invoke(backend, ["run", "status", self.RUN_ID])
+
+        assert result.exit_code == 0, result.output
+        assert "no longer waiting on you (healing)" in " ".join(result.output.split())
 
     @pytest.mark.real_question_count
     def test_batch_get_counts_waiting_questions(self):

@@ -1085,9 +1085,10 @@ minitest --json --app <app_id> run list "User Login" --all
 ```
 
 **Run statuses:** `pending` → `running` → `completed` | `failed` | `cancelled`,
-plus `escalated`: the run is parked on a question Mini asked (see 6b). `run status
---watch` stops on it rather than waiting forever, and prints the command to read
-the question.
+plus `escalated`: the run is parked on a question Mini asked (see 6b). `run status`
+names the question blocking the run on stderr (with its `run ask get <ask_id>`),
+or says it was already answered; `--watch` stops on `escalated` rather than
+waiting forever.
 
 A completed run includes per-target results: pass/fail for each acceptance
 criterion, fail reasons, recording URLs, and stable `resultId`, `criterionId`,
@@ -1177,7 +1178,7 @@ minitest --json --app <app_id> run feedback <result_id> "..." --scope tag:Checko
 
 `--scope` sets where the judgement rule Mini learns from the feedback applies:
 `scenario` (the default: the result's scenario), `tag:<name-or-id>` (every
-scenario carrying the tag, see `minitest tags`), or `app` (the whole app).
+scenario carrying the tag, see `minitest tags list`), or `app` (the whole app).
 
 ### 8b. Watch what the run actually did (recording + frames)
 
@@ -1393,7 +1394,8 @@ minitest --app <app_id> issues ticket unlink <failure_id>   # the ticket stays i
 
 `issues not-a-bug` picks the route itself: an issue with a `resultId` takes the
 feedback on its result, waits for Mini to process it, then resolves the issue; an
-issue without one takes it on the issue, which the server resolves at once. It
+issue without one takes it on the issue, which the server resolves at once (no
+rule is learned there, so `--scope` is ignored and reported as `null`). It
 prints `{"issueId", "resultId", "scope", "issueStatus", "closed"}`. When Mini is
 still processing after `--timeout` seconds it adds `"timedOut": true` and exits 1;
 the feedback is kept, so resolve later with `issues fix`. `--scope` is the same as

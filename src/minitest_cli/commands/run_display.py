@@ -70,10 +70,12 @@ def _platform_label(p: PlatformRun) -> str:
 def _platform_status_line(p: PlatformRun) -> tuple[str, str | None]:
     """Build a status line for a per-platform child."""
     parts: list[str] = [f"  {_platform_label(p)}:"]
-    if p.error_message:
-        parts.append(f" [bold red]error — {p.error_message}[/bold red]")
-    elif p.execution_state == "escalated":
+    if p.execution_state == "escalated":
         parts.append(" [bold yellow]waiting for an answer to Mini's question[/bold yellow]")
+        if p.error_message:
+            parts.append(f" [dim]({p.error_message})[/dim]")
+    elif p.error_message:
+        parts.append(f" [bold red]error — {p.error_message}[/bold red]")
     elif p.recording_url:
         parts.append(" [bold green]done[/bold green]")
     else:
@@ -97,8 +99,6 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
         "escalated": "?",
     }.get(status, "?")
     print_info(f"Run {run.id} — {status_icon} {status}")
-    if status == "escalated":
-        print_info(f"Mini has a question: `minitest run ask list {run.batch_id or '<batch-id>'}`.")
 
     for p in run.platforms:
         line, recording = _platform_status_line(p)

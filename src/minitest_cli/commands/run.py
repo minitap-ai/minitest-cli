@@ -9,7 +9,6 @@ from minitest_cli.commands.batch_helpers import post_batch
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
     base_path,
-    display_run_result,
     ensure_uuid,
     handle_response_error,
     poll_run_status,
@@ -24,6 +23,7 @@ from minitest_cli.commands.run_backend_override import (
     backend_api_override,
 )
 from minitest_cli.commands.run_asks import app as ask_app
+from minitest_cli.commands.run_asks_helpers import show_run
 from minitest_cli.commands.run_cancel import cancel
 from minitest_cli.commands.run_commit import from_commit
 from minitest_cli.commands.run_targets import (
@@ -129,7 +129,7 @@ def start(
             print_success(f"Run started: {run.id}")
             print_info(f"Use `minitest run status {run.id}` to check progress.")
         return
-    display_run_result(run, json_mode)
+    show_run(settings, run, json_mode)
 
 
 @app.command()
@@ -152,7 +152,7 @@ def status(
                 return await poll_run_status(client, app_id, run.id, json_mode)
             return run
 
-    display_run_result(run_api_call(_status()), json_mode)
+    show_run(settings, run_api_call(_status()), json_mode)
 
 
 @app.command(name="all")

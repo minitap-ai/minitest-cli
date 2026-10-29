@@ -5,10 +5,12 @@ account to use, an expected behavior, a dependency to provide). It asks, the blo
 scenario runs show ``escalated``, and they resume once the question is answered.
 """
 
+import textwrap
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from rich.console import Console
 
 from minitest_cli.commands.draft_render import read_text
 from minitest_cli.commands.run_asks_helpers import (
@@ -27,7 +29,6 @@ from minitest_cli.utils.output import (
     print_info,
     print_json,
     print_success,
-    print_table,
 )
 
 app = typer.Typer(
@@ -35,7 +36,6 @@ app = typer.Typer(
 )
 AskIdArg = Annotated[str, typer.Argument(help="Question ID (from `minitest run ask list`).")]
 ReasonOpt = Annotated[str | None, typer.Option("--reason", help="Why, so Mini can adapt.")]
-HEADERS = ["Ask ID", "State", "Platforms", "Question"]
 
 
 def _settings() -> Settings:
@@ -59,11 +59,13 @@ def _show(escalation: dict[str, Any]) -> None:
     if is_json_mode():
         print_json(escalation)
         return
-    print_info(f"Question {escalation['id']} — {_state(escalation)}")
-    print_info(f"  {_question(escalation)}")
+    console = Console()
+    console.print(f"[bold]Question {escalation['id']}[/bold] — {_state(escalation)}")
+    width = max(console.width - 2, 40)
     proposed_fix = (escalation.get("diagnosis") or {}).get("proposedFix")
-    if proposed_fix:
-        print_info(f"  Mini proposes: {proposed_fix}")
+    lines = [_question(escalation)] + ([f"Mini proposes: {proposed_fix}"] if proposed_fix else [])
+    for line in lines:
+        console.print(textwrap.indent(textwrap.fill(line, width), "  "), markup=False)
     if has_pending_proposal(escalation):
         print_info("  Approve or reject it: `minitest run ask approve|reject <ask-id>`.")
 
@@ -85,11 +87,15 @@ def list_asks(
     if not escalations:
         print_info("Mini is not waiting on any answer for this run.")
         return
-    rows = [
-        [e["id"], _state(e), ", ".join(e.get("affectedPlatforms") or []) or "-", _question(e)]
-        for e in escalations
-    ]
-    print_table(HEADERS, rows)
+    console = Console(soft_wrap=False)
+    for e in escalations:
+        platforms = ", ".join(e.get("affectedPlatforms") or []) or "-"
+        console.print(f"[bold]{e['id']}[/bold]  {_state(e)} · {platforms}", soft_wrap=True)
+        wrapped = textwrap.fill(_question(e), width=max(console.width - 2, 40))
+        console.print(textwrap.indent(wrapped, "  ") + "\n", markup=False, highlight=False)
+    print_info(
+        f"{len(escalations)} question(s). Answer: `minitest run ask answer <ask-id> --answer ...`."
+    )
 
 
 @app.command(name="get")

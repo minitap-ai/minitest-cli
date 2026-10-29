@@ -11,9 +11,11 @@ import httpx
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.draft_helpers import raise_for_status, run_conductor
+from minitest_cli.commands.run_display import display_run_result
 from minitest_cli.commands.run_helpers import ensure_uuid
 from minitest_cli.core.config import Settings
-from minitest_cli.utils.output import print_warning
+from minitest_cli.models.story_run import StoryRunResponse
+from minitest_cli.utils.output import print_info, print_warning
 
 ESCALATIONS_PATH = "/api/v1/escalations"
 WAITING_STATE = "awaiting_answer"
@@ -84,3 +86,38 @@ def ask_path(ask_id: str, suffix: str = "") -> str:
 
 def get_escalation(settings: Settings, ask_id: str) -> dict[str, Any]:
     return call(settings, "GET", ask_path(ask_id))
+
+
+async def run_questions(settings: Settings, run: StoryRunResponse) -> list[dict[str, Any]] | None:
+    """The questions on this scenario run's platforms, or None when Conductor cannot say."""
+    if run.batch_id is None or not any(p.execution_state == "escalated" for p in run.platforms):
+        return []
+    try:
+        escalations = await fetch_batch_escalations(settings, run.batch_id)
+    except (httpx.HTTPError, ValueError):
+        return None
+    srp_ids = {p.srp_id for p in run.platforms if p.srp_id}
+    return [e for e in escalations if srp_ids & set(e.get("srpIds") or [])]
+
+
+def point_at_questions(run: StoryRunResponse, questions: list[dict[str, Any]] | None) -> None:
+    """On stderr, say what an escalated run waits on and what to do about it."""
+    if not any(p.execution_state == "escalated" for p in run.platforms):
+        return
+    waiting = [q for q in questions or [] if is_waiting(q)]
+    for question in waiting:
+        print_warning(f"Mini asks: {question.get('question') or '(no question text)'}")
+    if waiting:
+        ids = " ".join(q["id"] for q in waiting)
+        print_warning(f"Read it with `minitest run ask get {ids}`, answer with `run ask answer`.")
+    elif questions:
+        states = ", ".join(sorted({str(q.get("state")) for q in questions}))
+        print_info(f"Mini's question on this run is no longer waiting on you ({states}).")
+    else:
+        print_warning(f"Mini has a question on this run: `minitest run ask list {run.batch_id}`.")
+
+
+def show_run(settings: Settings, run: StoryRunResponse, json_mode: bool) -> None:
+    """`display_run_result`, plus the questions an escalated run waits on."""
+    display_run_result(run, json_mode)
+    point_at_questions(run, run_conductor(run_questions(settings, run)))

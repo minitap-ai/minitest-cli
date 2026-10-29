@@ -4,7 +4,10 @@
 
 Releases are automated via GitHub Actions. Pushing a version tag triggers the
 full pipeline: refresh the bundled agent skill's references, build, publish to PyPI,
-and create a GitHub Release. The agent skill lives in this repo and ships inside the
+and create a GitHub Release. The references are fetched from production
+testing-service (`scripts/sync-skill-references.py`, public routes, no secret), so
+release testing-service **before** tagging a CLI release that relies on a reference
+change; the step fails if production does not serve `/api/skills/reference`. The agent skill lives in this repo and ships inside the
 wheel, so there is nothing to merge in `agent-skills` before releasing. uv is the
 only distribution channel (the Homebrew formula is retired); users
 on a `uv tool install` pick the release up automatically through auto-update

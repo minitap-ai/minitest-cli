@@ -146,6 +146,7 @@ class TestFallbackPlaybookContent:
 
     def test_delegates_to_the_suite_design_workflow(self):
         assert "minitest-cli` skill" in FALLBACK_PLAYBOOK
+        assert "minitest reference test-suite-design" in FALLBACK_PLAYBOOK
         assert "reference/test-suite-design.md" in FALLBACK_PLAYBOOK
         assert "before reading any application code" in FALLBACK_PLAYBOOK
         assert "hard stops" in FALLBACK_PLAYBOOK

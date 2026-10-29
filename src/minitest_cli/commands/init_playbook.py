@@ -30,9 +30,10 @@ they have the Minitest onboarding screen open in their browser.
 ## Then follow the suite-design methodology — do not improvise one
 
 Load the `minitest-cli` skill and follow its full test-suite design workflow
-(`reference/test-suite-design.md`) from start to finish. That document is the
-single source of truth for *how* to build the suite; this playbook only tells
-you *where you are*. In particular, do not skip:
+(`minitest reference test-suite-design`, or the skill's bundled
+`reference/test-suite-design.md` when that command is unavailable) from start to
+finish. That document is the single source of truth for *how* to build the suite;
+this playbook only tells you *where you are*. In particular, do not skip:
 
 - The questions you must ask the human **before reading any application code** —
   sources of truth first, then context, then scope.

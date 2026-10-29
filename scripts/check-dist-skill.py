@@ -1,4 +1,4 @@
-"""Fail unless the built wheel and sdist both carry the agent skill and its references.
+"""Fail unless the built wheel and sdist both carry the agent skill and its reference index.
 
 Run after `uv build`. The skill ships inside the wheel so it always matches the CLI;
 a build that silently drops it would leave `minitest skill` and `minitest upgrade`
@@ -16,9 +16,12 @@ sdist = tarfile.open(glob.glob("dist/*.tar.gz")[0]).getnames()
 checks = {
     "wheel": (
         wheel,
-        ("minitest_cli/_skills/minitest-cli/SKILL.md", "_skills/minitest-cli/reference/"),
+        (
+            "minitest_cli/_skills/minitest-cli/SKILL.md",
+            "_skills/minitest-cli/reference/index.json",
+        ),
     ),
-    "sdist": (sdist, ("skills/minitest-cli/SKILL.md", "skills/minitest-cli/reference/")),
+    "sdist": (sdist, ("skills/minitest-cli/SKILL.md", "skills/minitest-cli/reference/index.json")),
 }
 failed = False
 for label, (names, fragments) in checks.items():

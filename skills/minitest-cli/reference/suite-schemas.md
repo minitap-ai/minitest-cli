@@ -24,7 +24,7 @@ scenarios:
   - id: gate-signin-premium-seeded
     kind: gate                          # gate | feature
     name: "Sign in as the premium seeded account"
-    tags: [Auth]                        # 1–3 generic feature-area tags (see minitest-target.md)
+    tags: [Auth]                        # 1–3 generic feature-area tags (tag rules: test-suite-design)
     personas: [premium-seeded]          # the persona(s) this scenario binds — a
                                         # gate ESTABLISHES exactly one, so a 1-element list
     depends_on: []

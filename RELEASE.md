@@ -3,7 +3,9 @@
 ## Overview
 
 Releases are automated via GitHub Actions. Pushing a version tag triggers the
-full pipeline: build, publish to PyPI, and create a GitHub Release. uv is the
+full pipeline: refresh the bundled agent skill's references, build, publish to PyPI,
+and create a GitHub Release. The agent skill lives in this repo and ships inside the
+wheel, so there is nothing to merge in `agent-skills` before releasing. uv is the
 only distribution channel (the Homebrew formula is retired); users
 on a `uv tool install` pick the release up automatically through auto-update
 once it has been on PyPI for an hour.

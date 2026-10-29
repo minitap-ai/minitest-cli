@@ -49,4 +49,4 @@ git push origin HEAD
 git push origin v<VERSION>
 ```
 
-The tag push triggers the release workflow (PyPI publish, GitHub Release, Homebrew tap update).
+The tag push triggers the release workflow (refresh the bundled skill's references, PyPI publish, GitHub Release). The agent skill ships inside the wheel, so there is no paired agent-skills PR to merge.

@@ -377,6 +377,37 @@ CLI:** if `connectors` lists none (or none online), ask a workspace owner or
 admin to create one in the web app under **Workspace settings → Private
 network** and start it inside their network.
 
+#### Backend API
+
+When the app has a backend you own with an OpenAPI document, Mini can search
+that document and call the backend during runs (for example to arrange the state
+a scenario needs), authenticated with app vault secrets. Off by default.
+
+```bash
+minitest --json --app <app_id> apps backend-api show
+minitest --json --app <app_id> apps backend-api set --enable \
+  --base-url https://api.staging.example.com \
+  --openapi-url https://api.staging.example.com/openapi.json \
+  --secret API_TOKEN [--remove-secret <name>] [--clear-secrets] \
+  [--skill <name-or-id> | --clear-skill]
+minitest --json --app <app_id> apps backend-api set --disable
+```
+
+`set` changes only what you pass. `--secret` names an existing app vault secret
+(`minitest secret set`); `show` lists `missingSecretNames` that are no longer in
+the vault. Private, loopback and cloud-metadata URLs are refused (exit 1 with the
+server's reason). To point one run at another backend, add
+`--backend-base-url <url>` and/or `--backend-openapi-url <url>` to `run start`,
+`run all` or `run from-commit`: only that run uses them, the saved settings stay,
+and the backend API must already be on.
+
+If the OpenAPI document itself needs authentication, set how it is downloaded:
+`--openapi-auth none|bearer|header|basic|query` with `--openapi-auth-secret NAME`
+plus `--openapi-auth-header H` (header), `--openapi-auth-username U` (basic) or
+`--openapi-auth-param P` (query). The secret is used for that download only and is
+sent only to the saved OpenAPI URL's origin; `show` reports `openapiAuth` and
+`openapiAuthSecretMissing`.
+
 ### 2. Create scenarios
 
 A **scenario** describes a user journey to test. It has a name, a few tags, an
@@ -469,6 +500,8 @@ printf "%s" "$PASSWORD" | `minitest --json --app $APP test-profile create \
 ```
 
 **Specific account state (e.g. premium).** To exercise a flow that needs a particular state, proactively create a `<something>@qa.minitap.ai` persona WITH an explicit password, then ask the user to link that exact email+password combo to a pro/specific-state account in their backend. The `@qa.minitap.ai` address keeps the inbox readable for any OTP while the password lets them pre-provision the account state.
+
+**Credentials as secrets.** Instead of a literal password, OTP seed or card, a persona can point at an app secret: `--password-secret`, `--otp-secret`, `--card-secret` (generated, or still waiting for the user's value). See [Secrets](#secrets-minitest-secret).
 
 **No persona bound.** If a story has no profile, the agent defaults to anonymous (skip login). If a flow forces authentication, it self-generates a `<random>@qa.minitap.ai` with a runtime password, signs up, and reads the inbox for the confirmation/OTP code — so unbound scenarios still work without you provisioning anything.
 
@@ -911,6 +944,19 @@ remediation, or summary exists. When `source` is `withheld` the CLI also blanks
 that item, so there is nothing to dig into. Otherwise the envelope fields are
 left untouched alongside `guidance`.
 
+Read one build by its id, for example a build the user names or one a run was
+started on:
+
+```bash
+minitest --json --app <app_id> build get <build_id>
+```
+
+It returns a single object shaped like one `build list` item, including
+`appVersion`, `buildNumber`, `commitSha`, `commitTitle`, `status`,
+`verificationStatus`, and the same `guidance` and withheld-envelope rules. It
+reads the build whatever its status. A build of another app, or an unknown id,
+exits 4.
+
 ### 5. Run tests
 
 Execute a scenario on native cloud phone/tablet lanes or the web lane. For native runs,
@@ -1234,6 +1280,18 @@ and build number, then `no build info attached`. It does not inspect repository
 history or compute commits ahead. Failed code builds may carry a build-level fix
 prompt. Fix prompts from infrastructure failures are withheld.
 
+Read one issue by its failure ID, whatever its status:
+
+```bash
+minitest --app <app_id> issues get <failure_id>
+```
+
+It always emits JSON `{"issue": {...}, "build": {...}}`: the same issue item and
+`build` provenance block as `issues list`, without a `scope` block. Use it when
+the user names a specific issue. `issues list --issue` drops a resolved issue
+unless you pass `--include-resolved`; `issues get` returns it with its `status`
+and `issueStatus`. An issue of another app, or an unknown ID, exits 4.
+
 Mark one or more app findings as fixed with their failure IDs:
 
 ```bash
@@ -1281,8 +1339,8 @@ fails with a plain "StoryRun not found" that gives no hint of the mistake.
 
 From a run URL, use `batch_id` with `run verdicts` or `issues list --batch`, and
 use the optional `flow` value as the scenario ID when needed. From an issue
-URL, use `issueId` with `issues list --issue` or `issues fix`. The CLI itself
-never parses webapp URLs.
+URL, use `issueId` with `issues get`, `issues list --issue`, or `issues fix`.
+The CLI itself never parses webapp URLs.
 
 ### 10. Scheduled runs (`minitest schedules`)
 
@@ -1370,6 +1428,8 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Create web app      | `minitest --json apps create --name "My Web App" --platform web --web-url https://example.com [--tenant ID]` |
 | Residential proxy (owner/admin to change) | `minitest --json --app ID apps residential-proxy show` / `set [--enable\|--disable] [--country tr] [--domain D ...]` |
 | Private network (owner/admin to change) | `minitest --json --app ID apps private-network show` / `connectors` / `set [--enable\|--disable] [--connector NAME] [--domain D ...] [--port 443 ...]` |
+| Backend API (OpenAPI) | `minitest --json --app ID apps backend-api show` / `set [--enable\|--disable] [--base-url U] [--openapi-url U] [--secret NAME ...] [--remove-secret NAME] [--clear-secrets] [--skill NAME\|--clear-skill] [--openapi-auth TYPE --openapi-auth-secret NAME [--openapi-auth-header H\|--openapi-auth-username U\|--openapi-auth-param P]]` |
+| Point one run at another backend | `run start\|all\|from-commit ... --backend-base-url U --backend-openapi-url U` |
 | Create scenario   | `minitest --json --app ID scenario create --name "..." --tag auth --criteria "..."` |
 | Create scenario with profile | `minitest --json --app ID scenario create --name "..." --tag auth --profile <profile_id> --criteria "..."` |
 | List scenarios   | `minitest --json --app ID scenario list`                                               |
@@ -1405,6 +1465,12 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Propose a skill fix | `minitest --json --app ID app-skill propose <name> --reason "…" --instructions-file ./skill.md` |
 | Set a skill secret  | `printf '%s' "$V" \| minitest --app ID app-skill secret set <name> <SECRET_NAME>` (value from stdin, never shown again) |
 | Link skills to story | `minitest --json --app ID scenario-binding set-app-skills <story_id> --skill <name>`  |
+| List / inspect secrets | `minitest --json --app ID secret list [--missing]` / `secret describe <NAME>` — see [Secrets](#secrets-minitest-secret) |
+| Generate a secret   | `minitest --json --app ID secret create <NAME> --kind password --generate [--length N] [--charset alnum]` |
+| Ask a human for a secret | `minitest --json --app ID secret create <NAME> --kind K --empty --reason "..." [--scenario ID]` |
+| Link a secret to a persona | `minitest --json --app ID test-profile update <id> --password-secret <NAME> \| --otp-secret <NAME> \| --card-secret <NAME>` |
+| Lint secret references | `minitest --app ID secret lint --scenario ID \| --file PATH \| --text "..."` (exit 1 on leak or missing) |
+| Set / remove / rename a secret (humans only) | `secret set <NAME> --kind K` (stdin), `secret unset <NAME>`, `secret rename <OLD> <NEW>`, `secret extract <scenario_id> --as <NAME> --kind K` |
 | List env vars       | `minitest --json --app ID env list` (values masked; `--show` reveals)                    |
 | Reveal one env var  | `minitest --app ID env get <KEY>` (prints the value verbatim to stdout)           |
 | Set an env var      | `minitest --json --app ID env set <KEY> <VALUE> --yes [--dry-run]`                       |
@@ -1415,6 +1481,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Upload device build (physical) | `minitest --json --app ID build upload ./app.ipa --physical`                  |
 | Run on physical devices | `minitest --json --app ID run all --ios-build BID --ios-physical` / `--android-build BID --android-physical` |
 | List builds         | `minitest --json --app ID build list [--platform P] [--status S] [--kind K]`            |
+| Get one build       | `minitest --json --app ID build get <build_id>`                                          |
 | Build from GitHub commit | `minitest --json --app ID build from-commit [SHA] [--platform P] [--force-full]`   |
 | Run one native story| `minitest --json --app ID run start "Story Name" --ios-build X --android-build Y [--ios-device-type phone\|tablet] [--android-device-type phone\|tablet]` |
 | Run several native stories | `minitest --json --app ID run start "Story A" "Story B" --ios-build X --android-build Y` (one batch) |
@@ -1431,6 +1498,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Get batch + runs    | `minitest --json --app ID batch get <batch_id>`                                          |
 | Batch verdicts (one call) | `minitest --json --app ID run verdicts <batch_id> [--platform P] [--only-failed] [--actionable] [--verbose]` |
 | List issues and fix prompts | `minitest --app ID issues list [--issue ID \| --run ID \| --batch ID \| --all-runs] [--platform P] [--criticality C] [--include-resolved]` |
+| Get one issue       | `minitest --app ID issues get <failure_id>` (any status)                                 |
 | Mark app issues fixed | `minitest --app ID issues fix <failure_id> [<failure_id> ...]`                          |
 | Submit result feedback | `minitest --json --app ID run feedback <result_id> "text"`                         |
 | Recording + timed verdicts/actions | `minitest --json --app ID run recording <run_id> [--platform P] [--srp ID] [--device N] [--out DIR] [--criterion-frames N]` |
@@ -1497,6 +1565,84 @@ Bindings link profiles or files to a specific scenario:
   every file id you want bound; omitted ids are unbound. `--clear` unbinds all.
 - Skill binding: `set-app-skills` is atomic replace by skill name; Mini loads the
   linked skills before it starts. See [`commands/app-skills.md`](commands/app-skills.md).
+
+## Secrets (`minitest secret`)
+
+A secret is an app-scoped **name** (`UPPER_SNAKE`) and a **kind** (`password`,
+`totp` OTP seed, `card`, `token` API token, `text`). Its value is either
+**present** (typed by a human, or generated) or **missing** (waiting for a
+human, with a reason). Values are write-only: the CLI never prints one, and
+Mini and agents never see one; they handle names and references only.
+
+**Always `secret list` first** and reuse an existing secret before creating one:
+
+```bash
+minitest --json --app $APP secret list             # missing ones first, with their reason
+minitest --json --app $APP secret list --missing   # only those waiting for a value
+minitest --json --app $APP secret describe QA_PASSWORD   # kind, note, usages, reference to copy
+```
+
+Then create it without ever holding the value (both allowed inside a test run):
+
+- **You create the account yourself** (a `<prefix>@qa.minitap.ai` inbox
+  sign-up, an app with self sign-up): `--generate` a value for `password`,
+  `token` or `text` (not `card`, not `totp`). Default 24 characters
+  (`--length` 12-64) of letters, digits and `!-`; use `--charset alnum` if the
+  app refuses symbols. Link it, then sign up with the reference.
+- **Only the user has the value** (their real account, a card, an OTP seed, a
+  backend token): `--empty --reason "…"` (`--scenario ID` for the scenario that
+  needs it). Link or reference it right away and tell the user its name: runs
+  that need it are **skipped** (`secret_value_missing: NAME`) until a human
+  sets the value in the webapp (*Set value*) or with `secret set`.
+
+```bash
+minitest --json --app $APP secret create SIGNUP_PASSWORD --kind password --generate \
+  --note "Password of signup@qa.minitap.ai"
+minitest --json --app $APP secret create STAGING_CARD --kind card --empty \
+  --reason "Checkout needs the sandbox card the staging payment provider accepts" \
+  --scenario <scenario_id>
+```
+
+**Link it to a persona** by name (it may still be waiting for a value); pass an
+empty string on `update` to unlink:
+
+```bash
+minitest --json --app $APP test-profile create --name "New User" \
+  --username "signup@qa.minitap.ai" --password-secret SIGNUP_PASSWORD
+minitest --json --app $APP test-profile update <id> \
+  --otp-secret ADMIN_TOTP --card-secret STAGING_CARD
+```
+
+`--password-secret` takes a `password`, `--otp-secret` a `totp` (seed) or
+`text` (fixed code), `--card-secret` a `card`.
+
+**Reference it** in scenario descriptions, acceptance criteria and app-skill
+instructions as `{{secret:NAME}}`; a card field as `{{secret:NAME.number}}`,
+`.expiry`, `.cvc`, `.holder_name` or `.postal_code`. Mini receives the value at
+run time; it is never stored in the text. The legacy `$NAME` still works, but
+lint warns.
+
+**Lint before you save** (`--scenario ID`, `--file PATH` or `--text TEXT`):
+
+```bash
+minitest --app $APP secret lint --scenario <scenario_id>
+```
+
+- *pending*: referenced, exists, no value yet. A warning: runs wait for a human.
+- *missing*: referenced but no such secret. Exit 1: create it.
+- *leak*: a literal that is a secret's value or looks like one, reported by
+  position only. Exit 1: replace it by its reference.
+
+**Humans only** (never run these yourself; tell the user the command):
+`secret set NAME --kind K` (creates, replaces, or fills a missing value; value on
+stdin only), `secret unset NAME` (refused, exit 6, while still referenced),
+`secret rename OLD NEW` (rewrites every reference), and
+`secret extract <scenario_id> --as NAME --kind K` (turns a leaked literal into a
+secret). `set` and `extract` refuse to run inside a test run.
+
+Never put a value in a command argument, a scenario, a criterion, a skill, a
+note or a reason: arguments land in shell history and logs.
+`secret request` is a deprecated alias of `create --empty`.
 
 ## Drafts with Mini (`minitest draft`)
 

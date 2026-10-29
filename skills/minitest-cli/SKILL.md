@@ -913,6 +913,39 @@ SHA. `--force-full` bypasses incremental build caches. Inspect failures with
 `build list --status failed`; use `--kind web` for web builds because web rows
 may have no `platform`, and therefore are not selected by `--platform web`.
 
+> [!WARNING]
+> **`build from-commit` returns two different build ids. Only one of them works
+> with `run start`.**
+>
+> A commit build is queued through the build service, which has its own id
+> space, while `build list` and `run start --ios-build/--android-build` speak
+> the test-platform id space. The same physical build therefore has two ids.
+> Each entry of `builds[]` spells both out:
+>
+> | Field | Meaning |
+> |---|---|
+> | `buildId` | Build-service id. **Historical field, kept for backwards compatibility. `run start` rejects it.** |
+> | `appsManagerBuildId` | Same value as `buildId`, named unambiguously. |
+> | `testingServiceBuildId` | **The id to pass to `run start --ios-build/--android-build`.** This is the id `build list` shows. `null` when it could not be resolved. |
+>
+> Always read `testingServiceBuildId`:
+>
+> ```bash
+> minitest --json --app <app_id> build from-commit <full_sha> \
+>   | jq -r '.builds[] | select(.platform == "ios") | .testingServiceBuildId'
+> ```
+>
+> The CLI resolves it by matching the triggered `(commitSha, platform)` pair
+> against `build list`, which needs no waiting — a row exists as soon as the
+> build is queued. If that lookup fails or matches nothing, the command still
+> succeeds and still reports the queued build, but emits
+> `"testingServiceBuildId": null` (and, without `--json`, warns on stderr).
+>
+> On `null`, fall back to `build list` for that platform with
+> `--status pending --status completed`, and pick the row whose `commitSha` is
+> the commit you just built — **not** blindly `.items[0].id`, which may well
+> belong to a different commit.
+
 `build list` returns completed builds only unless you pass `--status`, so always
 use `--status failed` to see failures at all. `--status` is repeatable. Valid
 values: `pending` | `completed` | `failed` | `cancelled` — there is no
@@ -961,7 +994,10 @@ exits 4.
 
 Execute a scenario on native cloud phone/tablet lanes or the web lane. For native runs,
 provide at least one of `--ios-build` or `--android-build`; single-platform apps
-may omit the other. For web-only runs, pass `--web` by itself; native and web
+may omit the other. These flags take a **test-platform** build id: the `id` from
+`build list`, or `testingServiceBuildId` from `build from-commit`. Passing the
+`buildId` that `build from-commit` prints will not be recognised; see the warning
+in [§4](#4-upload-native-builds). For web-only runs, pass `--web` by itself; native and web
 lanes can also be combined. Web runs use the app's configured web URL and default web
 targets; there are no per-run `--web-url`, `--browser`, or `--viewport` overrides
 in the CLI.
@@ -1388,6 +1424,29 @@ minitest --json run all \
 minitest --json run all --web
 ```
 
+Commit-driven CI builds from a SHA instead of uploading artefacts. Take the
+build ids from `testingServiceBuildId` — **not** from `buildId`, which belongs
+to the build service's id space and is rejected by `run start`:
+
+```bash
+export MINITEST_APP_ID="<app_id>"
+
+TRIGGERED=$(minitest --json build from-commit "$GITHUB_SHA")
+IOS_BUILD=$(jq -r '.builds[] | select(.platform == "ios") | .testingServiceBuildId' <<<"$TRIGGERED")
+ANDROID_BUILD=$(jq -r '.builds[] | select(.platform == "android") | .testingServiceBuildId' <<<"$TRIGGERED")
+
+# Resolution is best effort — guard against null before running.
+if [ "$IOS_BUILD" = "null" ] || [ "$ANDROID_BUILD" = "null" ]; then
+  echo "Could not resolve a test-platform build id; look it up in 'build list'." >&2
+  exit 1
+fi
+
+minitest --json run all --ios-build "$IOS_BUILD" --android-build "$ANDROID_BUILD"
+```
+
+Or skip the two-step entirely: `run from-commit` builds the SHA and runs the
+suite in one call, and never exposes the build-service id at all.
+
 ## JSON Output
 
 JSON goes to stdout (camelCase keys, matching the backend API), diagnostics go
@@ -1482,7 +1541,8 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Run on physical devices | `minitest --json --app ID run all --ios-build BID --ios-physical` / `--android-build BID --android-physical` |
 | List builds         | `minitest --json --app ID build list [--platform P] [--status S] [--kind K]`            |
 | Get one build       | `minitest --json --app ID build get <build_id>`                                          |
-| Build from GitHub commit | `minitest --json --app ID build from-commit [SHA] [--platform P] [--force-full]`   |
+| Build from GitHub commit | `minitest --json --app ID build from-commit [SHA] [--platform P] [--force-full]` — read `testingServiceBuildId`, **not** `buildId`, for `run start` |
+| Build id to pass to `run start` | `... build from-commit SHA \| jq -r '.builds[] \| select(.platform=="ios") \| .testingServiceBuildId'` (`null` ⇒ fall back to `build list`) |
 | Run one native story| `minitest --json --app ID run start "Story Name" --ios-build X --android-build Y [--ios-device-type phone\|tablet] [--android-device-type phone\|tablet]` |
 | Run several native stories | `minitest --json --app ID run start "Story A" "Story B" --ios-build X --android-build Y` (one batch) |
 | Run tagged native stories | `minitest --json --app ID run start --tag smoke --ios-build X [--ios-device-type phone\|tablet]` |

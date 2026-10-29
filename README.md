@@ -217,6 +217,7 @@ app defaults.
 | `minitest schedules` | Scheduled runs: run scenarios at a set time and post a Slack summary |
 | `minitest issues` | Read app issues and their fix prompts, mark them fixed |
 | `minitest skill` | Print the CLI skill for your AI coding agent (not app skills) |
+| `minitest reference` | List or print the reference documents behind the skill (test-suite design method, suite schema), from Minitest or the bundled copy offline |
 
 ### Deprecated names
 

@@ -18,9 +18,14 @@ scenario start), and **dependency edges**. You reach a reviewed `suite.yaml` in 
 temp working dir through a disciplined multi-wave analysis, then apply it with the
 existing `minitest` CLI.
 
-Read [suite-schemas.md](suite-schemas.md) for the local `suite.yaml` schema and
-step-writing rules, and [minitest-target.md](minitest-target.md) for what the
-Minitest executor (Mini) can and cannot run. Read both now.
+Read both of these now:
+
+- The local `suite.yaml` schema and step-writing rules:
+  `minitest reference suite-schemas` (or `suite-schemas.md` next to this file when
+  the CLI cannot reach Minitest).
+- What the Minitest executor (Mini) can and cannot run, once per platform the app
+  targets: `minitest capabilities --platform <ios|android|web>` (or
+  `minitest-target.md` next to this file when the CLI cannot reach Minitest).
 
 ## Iron rules (read first)
 
@@ -247,7 +252,7 @@ wiring are now **derived facts**, not guesses.
 
 ## Wave 4 — Suite design (you alone, zero delegation)
 
-Compose `suite.yaml` in `$WORK` (schema + step-writing rules in suite-schemas.md),
+Compose `suite.yaml` in `$WORK` (schema + step-writing rules in `minitest reference suite-schemas`),
 governed by the doctrine below.
 
 **A user story = a full session, and it is self-contained.** Each story runs as a fresh tester session and owns its own path to the exact state it tests — signing in, onboarding, navigating, and setting up whatever cheap in-app state it needs. It never assumes a previous story left the device in a particular state — in a chain the device and app are shared, so it may start wherever the previous story stopped, and it checks where it is before taking its path. Even a story with dependencies must be runnable on its own. Put that setup path in the **description** (as straightforwardly as possible, so the agent reaches the testable state fast); the acceptance criteria stay focused on WHAT to verify once there. Getting a device, loading the app, signing in, and reaching the feature is the bulk of the cost — once the agent is there, it should exercise the feature exhaustively before the session is torn down.
@@ -418,6 +423,37 @@ Good (goal-oriented):
 2. Confirm both items appear in the list with their default details
 
 
+**Tags** are labels on scenarios, shared by every app of the tenant. The UI groups and filters scenarios by tag, and a tag's description is shown to the tester on every scenario carrying it — so tags affect runs, not just grouping.
+
+1. **List the existing tags first** (`minitest tags list`) and reuse them. Match case-insensitively: never create `checkout` next to an existing `Checkout`.
+2. **Give each scenario 1–3 generic tags** naming its feature area or team (`Checkout`, `Auth`, `Search`, `Onboarding`, `Payments`). A tag is meant to group many scenarios, so **never use the scenario's title as a tag**.
+3. **Create a tag only when nothing existing fits**: `minitest tags create --name <name> [--color <color>] [--description "<what the tester should know>"]`, or pass `--tag <name>` (repeatable) to `minitest scenario create` / `update` — unknown names are created. On `update`, any `--tag` replaces the scenario's whole tag set.
+4. Tag names are at most 40 characters and contain no comma.
+5. There are **no flow types, story types or categories** anymore: never pass `--type`, never use `minitest flow-types`.
+
+
+A scenario's **device count** decides how many devices one run drives at once (Android and iOS only — web runs use one browser). A scenario stored without an explicit count uses **auto**: one device per bound persona, minimum one — a story binding zero or one persona runs on a single device, a story binding several personas gets one device per persona at run time. An explicit integer overrides auto in either direction. Both are capped at `min(3, the tenant's device quota, the app's device-concurrency limit)` — a story binding more personas than that cap runs on the cap. Omitting the field when *creating* a story leaves it on auto; on *updates*, omission leaves the current value unchanged — how to set or reset it is documented on each create/update call. The count is decoupled from the personas the story binds — see "Personas vs. devices" in the personas guidance.
+
+**Extra devices are only for simultaneity.** Go above one device **only** for flows that verify **real-time cross-account or cross-device behavior**: live chat or a call between two users, a push or notification one account triggers for another, presence/typing indicators, or cross-account visibility (A blocks B, and B can no longer see A). A journey where one identity acts and another checks the result **sequentially** does not need extra devices — the tester signs in and out on one. Because auto gives a multi-persona story one device per persona, **explicitly set the device count to 1 on every sequential multi-persona story**; never rely on auto to "cover more personas". Most multi-persona suites still run one device per story.
+
+Multi-device is the deliberate exception, not a default to reach for. For an ordinary app with no simultaneous-identity flow the correct counts are: **unset on single-persona stories** (auto already means one device) and **an explicit 1 on multi-persona ones** — anything higher changes cost and behavior for nothing.
+
+
+**Cover offline and connectivity scenarios when the app warrants it.** If the app shows offline support, cached content, or sync mechanisms, create dedicated stories to test those flows. Example criterion: "Go offline (airplane mode), confirm the app shows cached content, then go back online and verify data syncs."
+
+- On Android, name the transition the criterion needs: **"Offline (airplane mode)"** for a fully offline device, **"Wi-Fi off"** only when the app must react to losing Wi-Fi specifically. The tester restores connectivity before it reports.
+- On web, the tester takes the page offline and back online, so word it as **"Offline"** rather than "Wi-Fi off" or "airplane mode".
+- **iOS** runs cannot change connectivity — do not write network-toggle criteria for iOS; such a scenario is screened as a capability gap there.
+
+
+**Bind a test file to every story that picks one.** Test devices start with empty storage: an Android device has no photos, videos, documents or audio at all, and an iOS simulator has only a few stock photos, never the file the story needs. So whenever a story picks something from the device — a photo or video from the gallery, a document from the file picker, an audio clip, anything it attaches, uploads or imports — bind a test file of that kind when you create the story. Do not open the picker first to check: it is always empty until a file is bound.
+
+- **Generic file** (any photo, a sample PDF, a short audio clip): bind one yourself. Reuse a test file the app already has when it fits; otherwise upload a stock one, then bind it. Never ask the customer for a generic file.
+- **Specific real-world file** (an ID document, a real invoice, a printed QR code the app must recognise): only the customer has it. Ask them for it, and bind it once they upload it.
+- Binding replaces the story's whole file set: pass every file the story should keep, not only the new one.
+- Bound files are pushed to the device before each run, so the story can simply say "Choose the test photo from the library" — never describe how the file gets onto the device.
+
+
 Design rules on top of that doctrine:
 
 - **Gates first.** For every persona that must be established (onboarding for
@@ -439,7 +475,7 @@ your design rationale, asking only: *"Given the code, can persona P actually
 execute these steps and observe these criteria?"* It checks reachability for that
 tier/flag set, criteria observability, and gating mismatches. In parallel, run
 your own mechanical invariant pass over `suite.yaml` (full list in
-suite-schemas.md), then the suite self-check below. Skipping the fresh-subagent
+`minitest reference suite-schemas`), then the suite self-check below. Skipping the fresh-subagent
 verification or the mechanical pass is a defect.
 
 **Before the suite is final, audit it as if someone else built it.** You wrote these stories knowing what you intended, which is exactly why you'll miss where they don't hold up. Take one cold pass over the finished set and fix what it surfaces — a few quiet corrections here save the user from a suite that looks complete but doesn't run.
@@ -475,15 +511,15 @@ unsure of a flag.
    App-level assumptions live here; scenario-local assumptions go in that
    story's description.
 2. **Create personas.** One `minitest test-profile create` per persona in
-   `suite.yaml` (see minitest-target.md for the `@qa.minitap.ai` mechanics).
+   `suite.yaml` (see the persona doctrine in Wave 2 for the `@qa.minitap.ai` mechanics).
    Record each returned id.
 3. **Create scenarios in dependency order** — parents before children. For each,
    fold its `steps` into the story **description** as the big UX path plus the
    feature/product-area anchor (minitest scenarios persist no steps field), pass
-   the acceptance criteria, pass its tags (minitest-target.md's tag rules), bind
+   the acceptance criteria, pass its tags (the tag rules in Wave 4), bind
    the persona, and wire prerequisites:
    `minitest scenario create --name "<name>" --tag "<tag>" [--tag ...] --description "<UX path + anchor>" --criteria "<criterion>" [--criteria ...] --profile "<persona id>" [--depends-on "<parent story id>" ...]`
-   Set `--device-count` only when minitest-target.md's device rules call for it.
+   Set `--device-count` only when the device-count rules in Wave 4 call for it.
 4. **Verify the wiring.** `minitest apps dependencies` to review the graph; fix
    with `minitest scenario update` / `minitest scenario-binding set-profile`.
 

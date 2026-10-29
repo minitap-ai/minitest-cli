@@ -18,6 +18,9 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Check the bundled references match their index
+        run: python3 scripts/sync-skill-references.py --check
+
       - name: Build package
         run: uv build
 

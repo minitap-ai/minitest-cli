@@ -1,0 +1,12 @@
+[
+  {
+    "topic": "test-suite-design",
+    "title": "Test Suite Design",
+    "summary": "The multi-wave method that turns an app codebase into a reviewed, dependency-aware Minitest suite."
+  },
+  {
+    "topic": "suite-schemas",
+    "title": "Suite Schema & Step-Writing Rules",
+    "summary": "The local suite.yaml schema and the rules for writing steps and criteria."
+  }
+]

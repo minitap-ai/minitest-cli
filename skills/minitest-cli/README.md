@@ -33,7 +33,7 @@ This skill teaches AI agents how to use the `minitest` command-line tool. Where 
 ## Installation
 
 ```
-npx skills add minitap-ai/agent-skills --skill minitest-cli
+npx skills add https://github.com/minitap-ai/minitest-cli/tree/v<version>/skills/minitest-cli --skill minitest-cli
 ```
 
 ## Maintenance — two writers
@@ -43,11 +43,9 @@ This skill has two distinct writers; keep them separate:
 - **Hand-maintained:** `SKILL.md`, `README.md`, `metadata.json`, and everything
   under `commands/` — the deep-dive guides for command groups whose contract is
   too long to keep in the prompt. Edit these by hand.
-- **Machine-generated:** everything under `reference/`. Those files are rendered
-  by the testing-service CI (each begins with
-  `<!-- rendered by Minitap — do not edit -->`) and must not be
-  hand-edited — changes belong in testing-service and are re-rendered from there.
-  The `<!-- skill-references-hash: … -->` line near the top of `SKILL.md` is
-  likewise machine-managed: CI rewrites it whenever the reference files change so
-  that `minitest upgrade` (which hashes `SKILL.md` only) detects the update. Do
-  not hand-edit that line.
+- **Machine-generated:** everything under `reference/`. testing-service renders
+  those documents from its knowledge fragments and serves them on its public
+  `/api/skills/reference` routes, which is what `minitest reference <topic>` prints.
+  The files here, with their `index.json`, are the copy the CLI falls back to
+  offline; `scripts/sync-skill-references.py` refreshes them from the server. Do
+  not hand-edit them: changes belong in testing-service.

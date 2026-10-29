@@ -31,10 +31,11 @@ jobs:
           print(f"Version {version} matches tag")
           PY
 
-      # The reference files are rendered by testing-service and published to
-      # agent-skills; take the newest so the wheel's skill is current at release.
+      # The reference files are rendered by testing-service and served by its public
+      # /api/skills/reference routes; take the production ones so the wheel's
+      # offline copy is current at release. Release testing-service first.
       - name: Refresh skill references
-        run: scripts/sync-skill-references.sh
+        run: python3 scripts/sync-skill-references.py && python3 scripts/sync-skill-references.py --check
 
       - name: Build package
         run: uv build

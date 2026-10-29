@@ -66,9 +66,9 @@ minitest upgrade             # update by hand at any time
 
 `MINITEST_NO_AUTO_UPDATE=1` also turns it off, and wins over the saved setting.
 
-> **Installed with Homebrew?** The `minitap-ai/tap/minitest-cli` formula is
-> retired: it stopped at 0.24.0 and is now disabled. Switch to uv with
-> `brew uninstall minitest-cli && uv tool install minitest-cli`.
+> **Installed with Homebrew?** minitest-cli is no longer published on Homebrew:
+> a copy installed from the old tap stopped at 0.24.0 and never updates itself.
+> Switch to uv with `brew uninstall minitest-cli && uv tool install minitest-cli`.
 
 ## Quick Start
 

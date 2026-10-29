@@ -1169,9 +1169,22 @@ It writes to `--out` (default `./minitest-recordings/<run_id>-<platform>/`):
   - `criteria[]` lists each result with `status`, `criticality`, `failReason`,
     `resultSummary`, and `observedFromSec`/`observedUntilSec`, the window in
     which the tester judged it.
-  - `actions[]` lists every gesture/click/nav with `atSec`, `endSec`, `type`,
-    `target` (the element label), and `intent` (what the tester said it was
-    trying to do).
+  - `actions[]` lists every agent action with `atSec`, `endSec`, `type`,
+    `label` (the same one-line wording the webapp shows, e.g. `Tap on “Sign in”`,
+    `Tap at (360, 516)`, `Type into “Email”: “…”`, `Wi-Fi off`,
+    `Rotate to landscape`, `Setting location to 48.8584, 2.2945`,
+    `POST /users/register · 201`), `target` (the element label), and `intent`
+    (what the tester said it was trying to do). Each type keeps its detail:
+    - taps, long presses and clicks: `x`, `y` (device pixels) and `identifier`;
+    - `text`: the full typed `text` (the label may shorten it);
+    - `network`: `networkChange` (`airplane_mode_on`, `airplane_mode_off`,
+      `wifi_off`, `wifi_on`, `offline`, `online`) and `networkCondition`;
+    - `orientation`: `orientation` (`landscape` or `portrait`);
+    - `location`: `locationMode` (`set`, `route`, `clear`), `latitude`,
+      `longitude`, and for routes `route` and `speedMps`;
+    - `backend`: `method`, `url`, `statusCode`, `error` and `durationMs`
+      (request and response bodies are not included);
+    - `nav`: `url`; web `key`: `key` (e.g. `Enter`).
   - `timeBase` is `compressed`, or `raw` when the file was never sped up.
 - `criteria/NN-<status>.png`: one strip per criterion, with `--criterion-frames`
   frames spread across its observation window (±1s), left to right. Needs

@@ -77,7 +77,11 @@ async def _not_a_bug(
         if result_id is None:
             path = f"{failures_base_path(app_id)}/{issue_id}/feedback"
             updated = AppFailure.model_validate(await _post_feedback(client, path, text, scope))
-            return report | {"issueStatus": updated.issue_status, "closed": True}
+            if scope is not None:
+                print_warning(
+                    "This issue has no criterion result, so Mini learns no rule: --scope ignored."
+                )
+            return report | {"scope": None, "issueStatus": updated.issue_status, "closed": True}
         await _post_feedback(
             client, f"/api/v1/apps/{app_id}/issues/{result_id}/feedback", text, scope
         )

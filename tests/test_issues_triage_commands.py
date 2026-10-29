@@ -68,7 +68,9 @@ class TestNotABug:
         result = invoke(backend, ["issues", "not-a-bug", ISSUE_ID, TEXT, "--scope", "app"])
 
         assert result.exit_code == 0, result.output
-        assert json.loads(result.stdout)["closed"] is True
+        report = json.loads(result.stdout)
+        assert report["closed"] is True and report["scope"] is None
+        assert "--scope ignored" in " ".join(result.output.split())
         assert backend.sent("POST", FINDING_FEEDBACK) == [
             {"feedbackText": TEXT, "scope": {"kind": "app"}}
         ]

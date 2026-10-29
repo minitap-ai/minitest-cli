@@ -109,7 +109,12 @@ def call(
     return resp.json()
 
 
-def raise_for_status(resp: httpx.Response, *, resource: str) -> None:
+DRAFT_CONFLICT_HINT = "Re-read it with `minitest draft get <id>` before deciding what to do next."
+
+
+def raise_for_status(
+    resp: httpx.Response, *, resource: str, conflict_hint: str = DRAFT_CONFLICT_HINT
+) -> None:
     """Map a Conductor error to the exit code that says what the caller should do next."""
     if resp.status_code < 400:
         return
@@ -122,7 +127,7 @@ def raise_for_status(resp: httpx.Response, *, resource: str) -> None:
         raise typer.Exit(code=EXIT_NOT_FOUND)
     if resp.status_code == 409:
         print_error(detail or f"{resource} cannot do that in its current state.")
-        print_info("Re-read it with `minitest draft get <id>` before deciding what to do next.")
+        print_info(conflict_hint)
         raise typer.Exit(code=EXIT_CONFLICT)
     if resp.status_code in (400, 422):
         print_error(detail or f"Invalid request ({resp.status_code}).")

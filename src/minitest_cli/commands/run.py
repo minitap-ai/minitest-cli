@@ -16,13 +16,14 @@ from minitest_cli.commands.run_helpers import (
     resolve_app,
     resolve_user_story_id,
     run_api_call,
-    TERMINAL_STATUSES,
+    WAIT_STOP_STATUSES,
 )
 from minitest_cli.commands.run_backend_override import (
     BackendBaseUrlOpt,
     BackendOpenapiUrlOpt,
     backend_api_override,
 )
+from minitest_cli.commands.run_asks import app as ask_app
 from minitest_cli.commands.run_cancel import cancel
 from minitest_cli.commands.run_commit import from_commit
 from minitest_cli.commands.run_targets import (
@@ -42,9 +43,7 @@ from minitest_cli.commands.run_recording import register_recording_commands
 from minitest_cli.commands.run_tagged import print_batch_started, start_selected, start_tagged
 from minitest_cli.commands.verdicts import verdicts
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
-from minitest_cli.models.story_run import (
-    StoryRunResponse,
-)
+from minitest_cli.models.story_run import StoryRunResponse
 from minitest_cli.utils.output import (
     print_error,
     print_info,
@@ -149,7 +148,7 @@ def status(
             resp = await client.get(f"{base_path(app_id)}/{run_id}")
             handle_response_error(resp, resource="Run")
             run = StoryRunResponse.model_validate(resp.json())
-            if watch and _derive_run_status(run) not in TERMINAL_STATUSES:
+            if watch and _derive_run_status(run) not in WAIT_STOP_STATUSES:
                 return await poll_run_status(client, app_id, run.id, json_mode)
             return run
 
@@ -196,5 +195,6 @@ app.command(name="cancel")(cancel)
 app.command(name="from-commit")(from_commit)
 app.command(name="verdicts")(verdicts)
 app.command(name="feedback")(feedback)
+app.add_typer(ask_app)
 register_recording_commands(app)
 register_logs_command(app)

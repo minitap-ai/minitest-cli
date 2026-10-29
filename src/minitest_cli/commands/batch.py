@@ -7,6 +7,7 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.batch_helpers import batches_base_path
+from minitest_cli.commands.run_asks_helpers import count_waiting, warn_waiting
 from minitest_cli.commands.deprecated_alias import deprecated_option, merge_deprecated_option
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_helpers import (
@@ -15,17 +16,8 @@ from minitest_cli.commands.run_helpers import (
     resolve_app,
     run_api_call,
 )
-from minitest_cli.models.batch import (
-    BatchListItem,
-    BatchListResponse,
-    BatchResponse,
-)
-from minitest_cli.utils.output import (
-    output,
-    print_info,
-    print_success,
-    print_table,
-)
+from minitest_cli.models.batch import BatchListItem, BatchListResponse, BatchResponse
+from minitest_cli.utils.output import output, print_info, print_success, print_table
 
 app = typer.Typer(name="batch", help="List, inspect and cancel runs (Runs in the webapp).")
 
@@ -121,16 +113,19 @@ def get_batch(
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(batch_id, kind="batch id")
 
-    async def _get() -> BatchResponse:
+    async def _get() -> tuple[BatchResponse, int | None]:
         async with ApiClient(settings) as client:
             resp = await client.get(f"{batches_base_path(app_id)}/{batch_id}")
-            handle_response_error(resp, resource="Batch")
-            return BatchResponse.model_validate(resp.json())
+        handle_response_error(resp, resource="Batch")
+        return BatchResponse.model_validate(resp.json()), await count_waiting(settings, batch_id)
 
-    batch = run_api_call(_get())
+    batch, waiting = run_api_call(_get())
 
     if json_mode:
-        output(batch.model_dump(mode="json", by_alias=True), json_mode=True)
+        payload = batch.model_dump(mode="json", by_alias=True)
+        if waiting is not None:
+            payload["waitingQuestions"] = waiting
+        output(payload, json_mode=True)
         return
 
     headline = batch.headline_status or batch.status.value
@@ -139,6 +134,7 @@ def get_batch(
         print_info(f"  commit: {batch.commit_sha}")
     if batch.tag_name:
         print_info(f"  tag: {batch.tag_name}")
+    warn_waiting(batch.id, waiting)
 
     target_rows: list[list[str]] = []
     for t in batch.targets:

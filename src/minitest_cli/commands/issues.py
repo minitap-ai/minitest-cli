@@ -1,12 +1,15 @@
-"""Commands for reading app issues, their fix prompts, and closing them."""
+"""Commands for reading app issues, their fix prompts, and triaging them."""
 
 from enum import StrEnum
 from typing import Annotated
 
 import typer
 
-from minitest_cli.commands.issues_fix import fix
+from minitest_cli.commands.issues_fix import archive, fix, reopen
 from minitest_cli.commands.issues_get import get
+from minitest_cli.commands.issues_not_a_bug import not_a_bug
+from minitest_cli.commands.issues_severity import severity
+from minitest_cli.commands.issues_ticket import app as ticket_app
 from minitest_cli.commands.issues_service import collect_issues
 from minitest_cli.commands.run_helpers import ensure_uuid, resolve_app, run_api_call
 from minitest_cli.utils.output import print_error, print_json
@@ -24,10 +27,17 @@ class IssueCriticality(StrEnum):
 
 
 app = typer.Typer(
-    name="issues", help="Read app issues, fix prompts, and mark them fixed.", no_args_is_help=True
+    name="issues",
+    help="Read app issues and their fix prompts, and triage them as in the webapp.",
+    no_args_is_help=True,
 )
 app.command()(get)
 app.command()(fix)
+app.command(name="not-a-bug")(not_a_bug)
+app.command()(archive)
+app.command()(reopen)
+app.command()(severity)
+app.add_typer(ticket_app)
 
 
 @app.command("list")

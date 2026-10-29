@@ -42,6 +42,8 @@ POLL_INTERVAL_SECONDS = 2
 # platform's ``cancellation_requested_at`` stamp; the others come from
 # collapsing per-platform ``execution_state`` values.
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+# Polling stops here too: an escalated run waits on a person, not on time.
+WAIT_STOP_STATUSES = TERMINAL_STATUSES | {"escalated"}
 
 
 def get_settings() -> Settings:
@@ -192,7 +194,7 @@ async def poll_run_status(
 
             spinner.update(f"[bold blue]Running… status: {status}")
 
-            if status in TERMINAL_STATUSES:
+            if status in WAIT_STOP_STATUSES:
                 return run
 
             await asyncio.sleep(POLL_INTERVAL_SECONDS)

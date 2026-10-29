@@ -36,3 +36,19 @@ def _isolate_skill_installs(monkeypatch: pytest.MonkeyPatch, tmp_path_factory) -
     monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.chdir(home)
     monkeypatch.setattr("minitest_cli.utils.skill_refresh._skills_ls_paths", lambda: [])
+
+
+@pytest.fixture(autouse=True)
+def _no_question_lookup(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`batch get` and run polling ask Conductor how many questions wait; keep tests offline.
+
+    Tests of that count opt back in with ``@pytest.mark.real_question_count``.
+    """
+    if request.node.get_closest_marker("real_question_count"):
+        return
+
+    async def _unknown(_settings, _batch_id):
+        return None
+
+    for module in ("batch", "run_commit_helpers"):
+        monkeypatch.setattr(f"minitest_cli.commands.{module}.count_waiting", _unknown)

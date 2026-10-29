@@ -136,6 +136,7 @@ python_classes = [
 ]
 markers = [
     "real_app_lookup: resolve --app names through the API instead of the test shortcut",
+    "real_question_count: ask Conductor for waiting questions instead of the test shortcut",
 ]
 addopts = [
     "-v",

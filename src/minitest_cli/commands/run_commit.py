@@ -101,7 +101,9 @@ def from_commit(
             seen_warnings = {
                 warning for target in batch.targets for warning in target.compatibility_warnings
             }
-            return await poll_batch(client, app_id, batch.id, timeout, seen_warnings)
+            return await poll_batch(
+                client, app_id, batch.id, timeout, seen_warnings, settings=settings
+            )
 
     batch = run_api_call(_run())
     payload = batch_commit_payload(batch)

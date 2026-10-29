@@ -17,6 +17,12 @@ class AppFailure(CamelModel):
     story_run_id: str | None = None
     batch_id: str | None = None
     criterion_id: str | None = None
+    acceptance_criteria_result_id: str | None = None
+    feedback_pending: bool = False
+    severity_override: str | None = None
+    external_ticket_provider: str | None = None
+    external_ticket_id: str | None = None
+    external_ticket_url: str | None = None
     version_label: str | None = None
     is_new_regression: bool = False
     consecutive_failures: int | None = None

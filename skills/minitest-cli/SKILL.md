@@ -8,7 +8,7 @@ description: >
   affects UI, navigation, or user journeys to check if existing tests need
   to be updated.
 metadata:
-  cli-version: "0.45.0"
+  cli-version: "0.46.0"
 ---
 
 # Minitest CLI
@@ -265,8 +265,9 @@ commands themselves use 2.
 Only 3 is worth a blind retry. 6 comes from `df` (explained in
 [`commands/draft-features.md`](commands/draft-features.md)), from `draft`
 (the draft's state does not allow it: `draft get` it, see
-[`commands/drafts.md`](commands/drafts.md)) and from
-`app-skill delete` on a skill still linked to scenarios.
+[`commands/drafts.md`](commands/drafts.md)), from `run ask` (the question is
+no longer waiting: `run ask get` it) and from `app-skill delete` on a skill still
+linked to scenarios.
 
 ## Core Workflow
 
@@ -1083,11 +1084,39 @@ minitest --json --app <app_id> run list "User Login" --status failed
 minitest --json --app <app_id> run list "User Login" --all
 ```
 
-**Run statuses:** `pending` → `running` → `completed` | `failed` | `cancelled`
+**Run statuses:** `pending` → `running` → `completed` | `failed` | `cancelled`,
+plus `escalated`: the run is parked on a question Mini asked (see 6b). `run status
+--watch` stops on it rather than waiting forever, and prints the command to read
+the question.
 
 A completed run includes per-target results: pass/fail for each acceptance
 criterion, fail reasons, recording URLs, and stable `resultId`, `criterionId`,
 and `criterionVersionId` identifiers for each criterion result.
+
+### 6b. Answer Mini's questions on a run (`minitest run ask`)
+
+When Mini gets stuck on something only a person can settle (which account to use,
+whether a behavior is expected, how to provide a dependency), it asks a question
+and the scenario runs it blocks show `escalated`. They resume once it is answered.
+The webapp shows these on the run page; from the CLI:
+
+```bash
+minitest --json --app <app_id> run ask list <batch_id>          # questions waiting for you
+minitest --json --app <app_id> run ask list <batch_id> --all    # also answered / closed / Minitap-side
+minitest --json run ask get <ask_id>                            # question, Mini's diagnosis, proposed fix
+minitest --json run ask answer <ask_id> --answer "Use the test ad unit id ca-app-pub-3940…"
+minitest --json run ask answer <ask_id> --answer-file answer.md # or - for stdin
+minitest --json run ask decline <ask_id> --reason "Not testable on our side"
+minitest --json run ask approve <ask_id>                        # accept the fix Mini proposed
+minitest --json run ask reject <ask_id> --reason "Wrong account"
+```
+
+`<batch_id>` is the id in the webapp's `/test/runs/<id>`. `batch get` adds
+`waitingQuestions` to its JSON (omitted when Conductor cannot be reached) and
+warns on stderr when one is waiting; `run from-commit` warns while it polls. A
+question asking for a file (`answerType: file`) is answered from the webapp. An
+answer to a question that is no longer waiting exits 6: re-read it with `run ask
+get`.
 
 ### 7. Work with batches
 
@@ -1139,11 +1168,16 @@ picked a specific failure to investigate.
 
 Submit feedback on a criterion result by its `resultId`. This records a verdict
 judgment such as "not a bug" or expected behavior. It does not mark an app issue
-as fixed:
+as fixed (for the webapp's full "Not a bug", use `issues not-a-bug`, section 9):
 
 ```bash
 minitest --json --app <app_id> run feedback <result_id> "Not a bug: expected behavior for this account"
+minitest --json --app <app_id> run feedback <result_id> "..." --scope tag:Checkout
 ```
+
+`--scope` sets where the judgement rule Mini learns from the feedback applies:
+`scenario` (the default: the result's scenario), `tag:<name-or-id>` (every
+scenario carrying the tag, see `minitest tags`), or `app` (the whole app).
 
 ### 8b. Watch what the run actually did (recording + frames)
 
@@ -1299,9 +1333,8 @@ minitest --app <app_id> issues fix <failure_id> [<failure_id> ...]
 ```
 
 `issues fix` always returns JSON with one result per ID and continues after an
-individual failure. Use it only after the app defect has been fixed. This is
-different from `run feedback <result_id> "Not a bug: ..."`, which records that a
-criterion result was expected behavior and does not close a fixed app defect.
+individual failure. Use it only after the app defect has been fixed. When the
+issue is not a defect at all, use `issues not-a-bug` (below) instead.
 
 The payload is `{"results": [...], "fixed": N, "failed": N}`. `results` carries
 one entry per ID in the order given: `{"issueId": "...", "status": "fixed"}` when
@@ -1324,6 +1357,48 @@ A partial failure always exits 1, even when every failed ID was a 404, so a
 stale ID mixed into a batch of good ones turns the whole call non-zero. Check
 `failed` and the per-ID `error` strings to tell a stale ID apart from a real
 problem, and retry only the IDs whose `status` is `failed`.
+
+`issues archive` and `issues reopen` take the same IDs and return the same shape,
+with the count under `archived` / `open` instead of `fixed`. Archive hides an
+issue from the open list without calling it fixed; reopen moves a resolved or
+archived issue back to open.
+
+#### Triage like the webapp
+
+Each issue in `issues list` / `issues get` carries `resultId` (the criterion
+result behind it; null for an issue Mini found on its own), `feedbackPending`,
+`severityOverride` and `ticketUrl`.
+
+```bash
+# "Not a bug": feedback, then resolve once Mini processed it (waits, like the webapp)
+minitest --app <app_id> issues not-a-bug <failure_id> "The promo banner is expected here."
+minitest --app <app_id> issues not-a-bug <failure_id> "..." --scope app        # rule for the whole app
+minitest --app <app_id> issues not-a-bug <failure_id> "..." --scope tag:Checkout
+minitest --app <app_id> issues not-a-bug <failure_id> "..." --keep-open        # criterion is wrong, re-judge it
+minitest --app <app_id> issues not-a-bug <failure_id> "..." --timeout 600
+
+# Criticality, sticky for later runs (reset = back to Mini's own judgement)
+minitest --app <app_id> issues severity <failure_id> critical|warning|reset
+
+# Tracker tickets (Linear, Jira, Notion, GitHub connected in the workspace)
+minitest --app <app_id> issues ticket targets linear
+minitest --app <app_id> issues ticket fields linear --target <target_id> [--issue-type <id>]
+minitest --app <app_id> issues ticket create <failure_id> --provider linear --target <target_id> \
+  [--field KEY=VALUE ...]                                  # repeat a key for multi-select
+minitest --app <app_id> issues ticket search jira "login crash" [--target <target_id>]
+minitest --app <app_id> issues ticket link <failure_id> --provider jira --ticket QA-123
+minitest --app <app_id> issues ticket get <failure_id>
+minitest --app <app_id> issues ticket unlink <failure_id>   # the ticket stays in the tracker
+```
+
+`issues not-a-bug` picks the route itself: an issue with a `resultId` takes the
+feedback on its result, waits for Mini to process it, then resolves the issue; an
+issue without one takes it on the issue, which the server resolves at once. It
+prints `{"issueId", "resultId", "scope", "issueStatus", "closed"}`. When Mini is
+still processing after `--timeout` seconds it adds `"timedOut": true` and exits 1;
+the feedback is kept, so resolve later with `issues fix`. `--scope` is the same as
+on `run feedback`. `issues severity` only applies to an issue on an acceptance
+criterion (exit 1 otherwise). The `issues ticket` commands print the server's JSON.
 
 Webapp links are input hints for the agent, not CLI arguments. Extract IDs from
 the known routes, set `--app` from `app_id`, and pass only IDs to the CLI:
@@ -1500,7 +1575,12 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | List issues and fix prompts | `minitest --app ID issues list [--issue ID \| --run ID \| --batch ID \| --all-runs] [--platform P] [--criticality C] [--include-resolved]` |
 | Get one issue       | `minitest --app ID issues get <failure_id>` (any status)                                 |
 | Mark app issues fixed | `minitest --app ID issues fix <failure_id> [<failure_id> ...]`                          |
-| Submit result feedback | `minitest --json --app ID run feedback <result_id> "text"`                         |
+| Archive / reopen issues | `minitest --app ID issues archive\|reopen <failure_id> [<failure_id> ...]`          |
+| Not a bug (feedback + resolve) | `minitest --app ID issues not-a-bug <failure_id> "text" [--scope scenario\|tag:T\|app] [--keep-open] [--timeout N]` |
+| Change issue criticality | `minitest --app ID issues severity <failure_id> critical\|warning\|reset`        |
+| Tracker ticket for an issue | `minitest --app ID issues ticket targets\|fields\|create\|search\|link\|get\|unlink ...` |
+| Submit result feedback | `minitest --json --app ID run feedback <result_id> "text" [--scope scenario\|tag:T\|app]` |
+| Mini's questions on a run | `minitest --json --app ID run ask list <batch_id> [--all]`, `run ask get\|answer\|decline\|approve\|reject <ask_id>` |
 | Recording + timed verdicts/actions | `minitest --json --app ID run recording <run_id> [--platform P] [--srp ID] [--device N] [--out DIR] [--criterion-frames N]` |
 | Frame strips from a video | `minitest run frames <video> [--start S] [--end E] [--every SEC] [--at T ...] [--columns N] [--width PX]` |
 | Target logs (device log, crash report, console, HAR) | `minitest --json --app ID run logs <run_id> [--platform P] [--target-id ID] [--out DIR]` |

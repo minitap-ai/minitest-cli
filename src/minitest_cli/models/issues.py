@@ -65,6 +65,12 @@ class IssueItem(CamelModel):
     user_story_id: str | None = None
     user_story_name: str | None = None
     criterion_id: str | None = None
+    # The criterion result behind the issue; None for an issue Mini found on its
+    # own (a finding). `issues not-a-bug` routes on it, `run feedback` takes it.
+    result_id: str | None = None
+    feedback_pending: bool = False
+    severity_override: str | None = None
+    ticket_url: str | None = None
     story_run_id: str | None = None
     last_seen_batch_id: str | None = None
     last_seen_version: str | None = None

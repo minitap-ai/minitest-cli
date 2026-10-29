@@ -39,7 +39,7 @@ class PlatformRun(CamelModel):
     Every previously-flat ``ios_*`` / ``android_*`` field on
     :class:`StoryRunResponse` now lives here, one row per platform that
     was in scope for the run. ``execution_state`` is the lifecycle axis
-    (pending/running/evaluating/completed/failed/blocked/skipped);
+    (pending/running/evaluating/escalated/completed/failed/blocked/skipped);
     ``evaluating`` is a platform that finished executing and is waiting
     for its verdict. ``verdict`` is
     the criticality-aware outcome populated once the platform reaches a
@@ -89,6 +89,7 @@ class StoryRunResponse(CamelModel):
     user_story_id: str
     user_story_name: str | None = None
     tenant_id: str | None = None
+    batch_id: str | None = None
     platforms: list[PlatformRun] = []
     created_at: datetime
     results: list[CriterionResult] = []

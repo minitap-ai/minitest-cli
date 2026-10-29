@@ -11,6 +11,7 @@ from typing import Annotated
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.feedback_scope import ScopeOpt, check_scope, scope_body, with_scope
 from minitest_cli.commands.run_helpers import (
     ensure_uuid,
     handle_response_error,
@@ -26,16 +27,21 @@ def feedback(
         str,
         typer.Argument(help="Feedback text, e.g. 'This is expected behavior, not a bug.'"),
     ],
+    scope: ScopeOpt = None,
 ) -> None:
-    """Submit feedback on an acceptance-criterion result."""
+    """Submit feedback on an acceptance-criterion result.
+
+    It does not close the issue; `minitest issues not-a-bug` does both.
+    """
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(result_id, kind="result")
+    check_scope(scope)
 
     async def _submit() -> dict:
         async with ApiClient(settings) as client:
+            body = with_scope({"feedbackText": text}, await scope_body(client, app_id, scope))
             resp = await client.post(
-                f"/api/v1/apps/{app_id}/issues/{result_id}/feedback",
-                json={"feedbackText": text},
+                f"/api/v1/apps/{app_id}/issues/{result_id}/feedback", json=body
             )
             handle_response_error(resp, resource="Criterion result")
             return resp.json()

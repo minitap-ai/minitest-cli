@@ -27,9 +27,11 @@ def _derive_run_status(run: StoryRunResponse) -> str:
     Mirrors the heuristic used by the cockpit / webapp: any platform
     with a stamped ``cancellation_requested_at`` short-circuits to
     ``cancelled``; otherwise we pick the worst platform state in
-    lifecycle order (running > pending/blocked > evaluating > failed >
-    completed). ``evaluating`` is a platform that finished executing and
-    is waiting for its verdict, so it outranks every terminal state.
+    lifecycle order (running > escalated > pending/blocked > evaluating >
+    failed > completed). ``escalated`` is a platform parked on a question
+    Mini asked (``minitest run ask list``); it resumes once answered.
+    ``evaluating`` is a platform that finished executing and is waiting
+    for its verdict, so it outranks every terminal state.
     """
     if any(p.cancellation_requested_at is not None for p in run.platforms):
         return "cancelled"
@@ -38,6 +40,8 @@ def _derive_run_status(run: StoryRunResponse) -> str:
         return "pending"
     if "running" in states:
         return "running"
+    if "escalated" in states:
+        return "escalated"
     if "pending" in states or "blocked" in states:
         return "pending"
     if "evaluating" in states:
@@ -68,6 +72,8 @@ def _platform_status_line(p: PlatformRun) -> tuple[str, str | None]:
     parts: list[str] = [f"  {_platform_label(p)}:"]
     if p.error_message:
         parts.append(f" [bold red]error — {p.error_message}[/bold red]")
+    elif p.execution_state == "escalated":
+        parts.append(" [bold yellow]waiting for an answer to Mini's question[/bold yellow]")
     elif p.recording_url:
         parts.append(" [bold green]done[/bold green]")
     else:
@@ -88,8 +94,11 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
         "pending": "…",
         "running": "…",
         "cancelled": "⊘",
+        "escalated": "?",
     }.get(status, "?")
     print_info(f"Run {run.id} — {status_icon} {status}")
+    if status == "escalated":
+        print_info(f"Mini has a question: `minitest run ask list {run.batch_id or '<batch-id>'}`.")
 
     for p in run.platforms:
         line, recording = _platform_status_line(p)

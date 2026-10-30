@@ -1,0 +1,23 @@
+name: QA stamp
+
+# Report-only trial (max two weeks) of the release process QA stamp: shows the verdict of
+# the stamp in the PR body in the job summary and never fails the pull request.
+# See minitap-ai/Umbrella#331 (stamp format) and minitap-ai/devops-common#42 (this check).
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: qa-stamp-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qa-stamp:
+    permissions:
+      contents: read
+      pull-requests: read
+    # TRIAL PIN: head of devops-common branch feat/qa-stamp-check (PR #42).
+    # Must be bumped to the v8.6.0 tag before this PR is merged.
+    uses: minitap-ai/devops-common/.github/workflows/qa-stamp.yml@a2763b6c81bd0ffebcc1d027d1152fa19e003f06
+    with:
+      mode: report

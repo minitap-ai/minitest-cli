@@ -7,10 +7,6 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
-concurrency:
-  group: qa-stamp-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   qa-stamp:
     permissions:

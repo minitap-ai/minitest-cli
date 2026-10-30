@@ -18,6 +18,6 @@ jobs:
       pull-requests: read
     # TRIAL PIN: head of devops-common branch feat/qa-stamp-check (PR #42).
     # Must be bumped to the v8.6.0 tag before this PR is merged.
-    uses: minitap-ai/devops-common/.github/workflows/qa-stamp.yml@a2763b6c81bd0ffebcc1d027d1152fa19e003f06
+    uses: minitap-ai/devops-common/.github/workflows/qa-stamp.yml@b2d20e8ba209275bbfc6ebd41ee352bae0b228a5
     with:
       mode: report

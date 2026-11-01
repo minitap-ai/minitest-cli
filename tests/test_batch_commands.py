@@ -1,4 +1,4 @@
-"""Tests for batch commands (list, get, cancel)."""
+"""Tests for batch commands (list, get, cancel, delete)."""
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -424,3 +424,81 @@ class TestCancelBatchCommand:
             result = _run_with_context(["cancel", _BATCH_UUID], settings)
 
         assert result.exit_code == 2
+
+
+_OTHER_BATCH_UUID = "99999999-8888-7777-6666-444444444444"
+_THIRD_BATCH_UUID = "99999999-8888-7777-6666-333333333333"
+
+
+class TestDeleteBatchCommand:
+    def _delete(self, tmp_path, responses, args, *, json_mode=False):
+        client = _mock_client()
+        client.delete = AsyncMock(side_effect=responses)
+        with patch("minitest_cli.commands.batch_delete.ApiClient", return_value=client):
+            result = _run_with_context(
+                ["delete", *args], _make_settings(tmp_path), json_mode=json_mode
+            )
+        return result, client
+
+    def test_delete_refuses_without_yes(self, tmp_path) -> None:
+        result, client = self._delete(tmp_path, [], [_BATCH_UUID])
+
+        assert result.exit_code == 1
+        assert "--yes" in result.output
+        client.delete.assert_not_called()
+
+    def test_delete_targets_each_run_once(self, tmp_path) -> None:
+        result, client = self._delete(
+            tmp_path,
+            [_mock_response(204), _mock_response(204)],
+            [_BATCH_UUID, _OTHER_BATCH_UUID, _BATCH_UUID, "--yes"],
+        )
+
+        assert result.exit_code == 0
+        assert [call.args[0] for call in client.delete.call_args_list] == [
+            f"/api/v1/apps/app-123/batches/{_BATCH_UUID}",
+            f"/api/v1/apps/app-123/batches/{_OTHER_BATCH_UUID}",
+        ]
+        assert _OTHER_BATCH_UUID in result.output
+
+    def test_delete_keeps_going_past_a_refused_run_and_exits_non_zero(self, tmp_path) -> None:
+        result, client = self._delete(
+            tmp_path,
+            [
+                _mock_response(409, {"detail": "Run has not finished."}),
+                httpx.ConnectError("offline"),
+                _mock_response(204),
+            ],
+            [_BATCH_UUID, _OTHER_BATCH_UUID, _THIRD_BATCH_UUID, "--yes"],
+            json_mode=True,
+        )
+
+        assert result.exit_code == 3
+        assert client.delete.await_count == 3
+        results = json.loads(result.stdout)["results"]
+        assert [(r["id"], r["deleted"]) for r in results] == [
+            (_BATCH_UUID, False),
+            (_OTHER_BATCH_UUID, False),
+            (_THIRD_BATCH_UUID, True),
+        ]
+        assert results[0]["error"] == "Run has not finished."
+        assert results[0]["status"] == 409
+
+    def test_delete_of_only_unknown_runs_exits_4(self, tmp_path) -> None:
+        result, _ = self._delete(
+            tmp_path, [_mock_response(404, {"detail": "Batch not found"})], [_BATCH_UUID, "--yes"]
+        )
+
+        assert result.exit_code == 4
+        assert "Batch not found" in result.output
+
+    def test_delete_rejects_an_invalid_id_before_deleting_anything(self, tmp_path) -> None:
+        result, client = self._delete(tmp_path, [], [_BATCH_UUID, "not-a-uuid", "--yes"])
+
+        assert result.exit_code == 1
+        client.delete.assert_not_called()
+
+    def test_delete_never_promises_an_undo(self, tmp_path) -> None:
+        result, _ = self._delete(tmp_path, [_mock_response(204)], [_BATCH_UUID, "--yes"])
+
+        assert not any(word in result.output.lower() for word in ("undo", "restore"))

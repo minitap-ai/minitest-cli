@@ -1,4 +1,4 @@
-"""Batch commands: list, get, cancel."""
+"""Batch commands: list, get, cancel, delete."""
 
 import math
 from typing import Annotated
@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.batch_delete import delete
 from minitest_cli.commands.batch_helpers import batches_base_path
 from minitest_cli.commands.run_asks_helpers import count_waiting, warn_waiting
 from minitest_cli.commands.deprecated_alias import deprecated_option, merge_deprecated_option
@@ -19,7 +20,8 @@ from minitest_cli.commands.run_helpers import (
 from minitest_cli.models.batch import BatchListItem, BatchListResponse, BatchResponse
 from minitest_cli.utils.output import output, print_info, print_success, print_table
 
-app = typer.Typer(name="batch", help="List, inspect and cancel runs (Runs in the webapp).")
+app = typer.Typer(name="batch", help="List, inspect, cancel and delete runs (Runs in the webapp).")
+app.command(name="delete")(delete)
 
 BATCH_TABLE_HEADERS = ["ID", "Status", "Source", "Commit", "Tag", "Targets", "Created"]
 

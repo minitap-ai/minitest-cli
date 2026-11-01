@@ -8,7 +8,7 @@ description: >
   affects UI, navigation, or user journeys to check if existing tests need
   to be updated.
 metadata:
-  cli-version: "0.46.0"
+  cli-version: "0.47.0"
 ---
 
 # Minitest CLI
@@ -1136,7 +1136,7 @@ get`.
 ### 7. Work with batches
 
 A batch groups runs triggered together (by `run all`, CI, or a single
-`run start`). Use the `batch` group to inspect or cancel them.
+`run start`). Use the `batch` group to inspect, cancel or delete them.
 
 ```bash
 minitest --json --app <app_id> batch list                      # recent batches
@@ -1145,7 +1145,14 @@ minitest --json --app <app_id> batch list --commit-sha abc1234
 minitest --json --app <app_id> batch list --user-story <id>
 minitest --json --app <app_id> batch get <batch_id>            # batch + its runs
 minitest --json --app <app_id> batch cancel <batch_id>         # cancels all pending/running runs
+minitest --json --app <app_id> batch delete <batch_id>... --yes  # deletes finished runs
 ```
+
+`batch delete` takes several ids and answers `{"results": [{"id", "deleted", "status", "error"}]}`,
+one entry per id; it exits non-zero if any id failed. A deleted run leaves the runs list, scenario
+history and health for everyone in the workspace, and its share links stop working. There is no
+undo from the CLI, so only delete a run the user asked you to delete. A run that has not finished
+is refused (409): cancel it or wait for it first. It needs an owner, admin or API key.
 
 **Batch statuses:** `pending` | `awaiting_build` | `running` | `completed` | `failed` | `cancelled`
 
@@ -1601,6 +1608,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Frame strips from a video | `minitest run frames <video> [--start S] [--end E] [--every SEC] [--at T ...] [--columns N] [--width PX]` |
 | Target logs (device log, crash report, console, HAR) | `minitest --json --app ID run logs <run_id> [--platform P] [--target-id ID] [--out DIR]` |
 | Cancel batch        | `minitest --json --app ID batch cancel <batch_id>`                                       |
+| Delete finished runs | `minitest --json --app ID batch delete <batch_id>... --yes`                             |
 | Create a schedule   | `minitest --json --app ID schedules create --name N --at 03:00 [--days weekdays] [--timezone Europe/Oslo] [--tag T \| --scenario S] (--url U --browser chrome \| --android [--android-build ID]) --slack-channel C…` — see [`commands/schedules.md`](commands/schedules.md) |
 | Preview a schedule  | `minitest --json --app ID schedules preview <schedule>` (or the `create` flags): duration, builds tonight would pick |
 | List / show schedules | `minitest --json --app ID schedules list` / `schedules get <schedule>`                  |

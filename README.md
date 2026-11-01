@@ -213,7 +213,7 @@ app defaults.
 | `minitest screens` | Inspect the screens exploration mapped for an app |
 | `minitest build` | Native iOS/Android build management |
 | `minitest run`   | Start runs and inspect their scenario runs |
-| `minitest batch` | List, inspect and cancel runs (a batch is a Run in the webapp) |
+| `minitest batch` | List, inspect, cancel and delete runs (a batch is a Run in the webapp) |
 | `minitest schedules` | Scheduled runs: run scenarios at a set time and post a Slack summary |
 | `minitest issues` | Read app issues and their fix prompts, mark them fixed |
 | `minitest skill` | Print the CLI skill for your AI coding agent (not app skills) |

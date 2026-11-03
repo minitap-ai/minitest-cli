@@ -1,6 +1,7 @@
 """Async HTTP client with automatic auth and channel headers."""
 
 from collections.abc import Generator
+from http.cookiejar import Cookie, CookieJar
 from typing import Any
 
 import httpx
@@ -32,6 +33,20 @@ class _BearerAuth(httpx.Auth):
         token = self._token_override or load_token(self._settings)
         request.headers["Authorization"] = f"Bearer {token}"
         yield request
+
+
+class _DiscardingCookieJar(CookieJar):
+    """A cookie jar that never stores anything, so no request carries a Cookie header.
+
+    The CLI authenticates with a Bearer header only. The API's load balancer
+    sets a session-affinity cookie; replaying it pins every later request of
+    a client (e.g. the `run verdicts` fan-out) to one pod, where they queue.
+    Every store path (Set-Cookie on responses and redirect hops, ``set``)
+    goes through ``set_cookie``, so dropping it here keeps the jar empty.
+    """
+
+    def set_cookie(self, cookie: Cookie) -> None:
+        return
 
 
 class ApiClient:
@@ -68,6 +83,7 @@ class ApiClient:
             base_url=self._base_url,
             headers=headers,
             auth=_BearerAuth(self._settings, self._token_override),
+            cookies=_DiscardingCookieJar(),
             timeout=DEFAULT_TIMEOUT,
         )
         return self

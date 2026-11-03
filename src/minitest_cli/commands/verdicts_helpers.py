@@ -1,11 +1,10 @@
 """Fetching for the `run verdicts` command.
 
 Criterion leaves live only on the story-run detail endpoint, so we fan out
-one detail request per story run and stitch the results onto the batch.
+one detail request per story run (a few at a time) and stitch the results
+onto the batch.
 The shaping rules themselves live in `verdicts_projection`.
 """
-
-import asyncio
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.batch_helpers import batches_base_path
@@ -18,6 +17,7 @@ from minitest_cli.commands.verdicts_projection import (
 from minitest_cli.core.config import Settings
 from minitest_cli.models.batch import BatchResponse
 from minitest_cli.models.story_run import BatchVerdictsResponse, StoryRunResponse
+from minitest_cli.utils.concurrency import gather_bounded
 
 __all__ = ["VALID_PLATFORMS", "fetch_verdicts"]
 
@@ -42,9 +42,7 @@ async def fetch_verdicts(
         resp = await client.get(f"{batches_base_path(app_id)}/{batch_id}")
         handle_response_error(resp, resource="Batch")
         batch = BatchResponse.model_validate(resp.json())
-        runs = await asyncio.gather(
-            *(_fetch_story(client, app_id, sr.id) for sr in batch.story_runs)
-        )
+        runs = await gather_bounded(_fetch_story(client, app_id, sr.id) for sr in batch.story_runs)
 
     # The batch payload already carries every story's name; the per-run
     # detail responses never do. Carry it across instead of making callers

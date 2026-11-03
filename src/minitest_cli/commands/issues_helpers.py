@@ -1,6 +1,5 @@
 """HTTP access for the ``issues`` command group."""
 
-import asyncio
 import httpx
 import typer
 
@@ -13,6 +12,7 @@ from minitest_cli.models.app_failure import (
     AppFailureListResponse,
 )
 from minitest_cli.models.batch import BatchListResponse, BatchResponse
+from minitest_cli.utils.concurrency import gather_bounded
 from minitest_cli.utils.output import err_console, print_error
 
 PAGE_SIZE = 100
@@ -160,7 +160,7 @@ async def fetch_other_batch_hint(
         for batch_id in await fetch_batch_ids(client, app_id)
         if batch_id != current_batch_id
     ]
-    counts = await asyncio.gather(
-        *(fetch_open_count(client, app_id, batch_id) for batch_id in batch_ids)
+    counts = await gather_bounded(
+        fetch_open_count(client, app_id, batch_id) for batch_id in batch_ids
     )
     return sum(count > 0 for count in counts), sum(counts)

@@ -29,6 +29,7 @@ from minitest_cli.commands import (
     secret,
     skill,
     tags,
+    targets_catalog,
     test_file,
     test_profile,
     upgrade,
@@ -71,6 +72,7 @@ app.add_typer(build.app)
 app.add_typer(env.app)
 app.add_typer(run.app)
 app.add_typer(schedules.app)
+app.add_typer(targets_catalog.app)
 app.add_typer(issues.app)
 app.add_typer(batch.app)
 app.add_typer(skill.app)

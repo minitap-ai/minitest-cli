@@ -44,12 +44,12 @@ def set_profile(
         typer.Option(
             "--profile",
             help="Test profile ID to bind (repeatable). Replaces the full set. "
-            "Omit with --clear to remove all.",
+            "Use --clear instead to remove them all.",
         ),
     ] = None,
     clear: Annotated[
         bool,
-        typer.Option("--clear", help="Remove all profile bindings."),
+        typer.Option("--clear", help="Remove all bindings; the scenario then runs as New user."),
     ] = False,
 ) -> None:
     settings = get_settings()
@@ -75,7 +75,9 @@ def set_profile(
     data = run_api_call(_run())
     if not json_mode:
         if clear:
-            print_success(f"Test profiles cleared on scenario {user_story_id}.")
+            print_success(
+                f"Test profiles cleared on scenario {user_story_id}; it now runs as New user."
+            )
         else:
             bound = ", ".join(profile_ids or [])
             print_success(f"Test profiles [{bound}] bound to scenario {user_story_id}.")

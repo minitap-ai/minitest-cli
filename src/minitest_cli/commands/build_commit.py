@@ -1,4 +1,4 @@
-"""``minitest build from-commit``: queue a build from a GitHub commit."""
+"""``minitest build from-commit``: queue a build from a repository commit."""
 
 from typing import Annotated, Any
 
@@ -51,7 +51,7 @@ def from_commit(
     platform: PlatformOpt = None,
     force_full: ForceFullOpt = False,
 ) -> None:
-    """Queue a build from a GitHub commit, without running any test."""
+    """Queue a build from a commit of the linked GitHub, GitLab or Bitbucket repo, no tests."""
     settings, app_id, json_mode = resolve_app()
     sha = validate_commit_sha(commit_sha)
     platforms = validate_platforms(platform)

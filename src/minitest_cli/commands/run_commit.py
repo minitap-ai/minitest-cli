@@ -1,4 +1,4 @@
-"""``minitest run from-commit``: build a GitHub commit and test it."""
+"""``minitest run from-commit``: build a repository commit and test it."""
 
 from typing import Annotated
 
@@ -72,7 +72,7 @@ def from_commit(
     backend_base_url: BackendBaseUrlOpt = None,
     backend_openapi_url: BackendOpenapiUrlOpt = None,
 ) -> None:
-    """Build a GitHub commit and run the test suite against it."""
+    """Build a commit of the linked GitHub, GitLab or Bitbucket repo and run the suite on it."""
     settings, app_id, json_mode = resolve_app()
     sha = validate_commit_sha(commit_sha)
     platforms = validate_platforms(platform)

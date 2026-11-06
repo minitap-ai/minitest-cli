@@ -21,7 +21,10 @@ VALID_PLATFORMS = ("ios", "android", "web")
 
 NO_REPO_MARKER = "no source repository"
 PLATFORM_MISMATCH_MARKER = "are not enabled for this app"
-CONNECT_REPO_HINT = "Connect a GitHub repository to this app in the Minitest web app, then retry."
+CONNECT_REPO_HINT = (
+    "Connect a GitHub, GitLab or Bitbucket repository to this app in the Minitest web app, "
+    "then retry."
+)
 PLATFORM_HINT = "Pass --platform explicitly, for example --platform web on a web app."
 
 CommitShaArg = Annotated[

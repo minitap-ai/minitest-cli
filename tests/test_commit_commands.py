@@ -110,7 +110,7 @@ class TestBuildFromCommit:
         assert result.exit_code == 1
         assert seen  # the request was attempted
         assert "No GitHub repository is connected" in result.output
-        assert "Connect a GitHub repository" in result.output
+        assert "Connect a GitHub, GitLab or Bitbucket repository" in result.output
 
     @pytest.mark.parametrize(
         ("args", "expected"),

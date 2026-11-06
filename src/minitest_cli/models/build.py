@@ -1,4 +1,4 @@
-"""Build models: uploaded artifacts and builds produced from a GitHub commit."""
+"""Build models: uploaded artifacts and builds produced from a repository commit."""
 
 from datetime import datetime
 from typing import Literal

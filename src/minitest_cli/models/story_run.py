@@ -5,7 +5,6 @@ from uuid import UUID
 
 from minitest_cli.models.base import CamelModel
 from minitest_cli.models.recording import DeviceRecording, SegmentMap
-from minitest_cli.models.targets import DeviceType
 
 
 class CriterionResult(CamelModel):
@@ -53,7 +52,7 @@ class PlatformRun(CamelModel):
     batch_target_id: str | None = None
     browser: str | None = None
     viewport: str | None = None
-    device_type: DeviceType | None = None
+    device_type: str | None = None
     label: str | None = None
     build_id: UUID | None = None
     recording_path: str | None = None
@@ -108,7 +107,7 @@ class VerdictTarget(CamelModel):
     """Per-platform aggregate roll-up for a batch target."""
 
     platform: str
-    device_type: DeviceType | None = None
+    device_type: str | None = None
     label: str | None = None
     build_id: str | None = None
     verdict: str | None = None
@@ -130,7 +129,7 @@ class VerdictStoryPlatform(CamelModel):
     """
 
     platform: str
-    device_type: DeviceType | None = None
+    device_type: str | None = None
     label: str | None = None
     verdict: str | None = None
     execution_state: str | None = None

@@ -15,6 +15,8 @@ from minitest_cli.commands._response_errors import (
 )
 from minitest_cli.commands.run_helpers import handle_response_error
 from minitest_cli.commands.batch_warnings import print_compatibility_warnings
+from minitest_cli.commands.target_errors import explain_target_refusal
+from minitest_cli.commands.target_summary import target_payload
 from minitest_cli.models.batch import BatchResponse, CreateBatchRequest
 from minitest_cli.utils.output import err_console, print_error
 
@@ -31,6 +33,7 @@ async def post_batch(client: ApiClient, app_id: str, body: CreateBatchRequest) -
         json=body.model_dump(by_alias=True, exclude_none=True),
         timeout=BATCH_CREATE_TIMEOUT,
     )
+    explain_target_refusal(resp)
     if resp.status_code == 403 and _requests_physical(body):
         _exit_physical_forbidden(resp)
     if resp.status_code == 422 and try_handle_android_abi_mismatch(resp):
@@ -50,7 +53,8 @@ def _exit_physical_forbidden(resp: httpx.Response) -> None:
     print_error(extract_detail(resp))
     err_console.print(
         "  [yellow]Fix:[/yellow] ask Minitap to enable physical devices for this workspace,"
-        " or drop [bold]--ios-physical[/bold] / [bold]--android-physical[/bold]"
+        " or drop [bold]--ios-physical[/bold] / [bold]--android-physical[/bold] /"
+        " [bold]backend=physical[/bold]"
         " to run on virtual devices."
     )
     raise typer.Exit(code=EXIT_NETWORK_ERROR)
@@ -61,6 +65,7 @@ def batch_summary_payload(batch: BatchResponse) -> dict[str, Any]:
     return {
         "batchId": batch.id,
         "status": batch.status.value,
+        "targets": [target_payload(target) for target in batch.targets],
         "storyRuns": [
             {
                 "runId": r.id,

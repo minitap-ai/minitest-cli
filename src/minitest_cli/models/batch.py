@@ -6,7 +6,7 @@ from enum import StrEnum
 from minitest_cli.models.base import CamelModel
 from minitest_cli.models.build import BuildContext
 from minitest_cli.models.story_run import StoryRunResponse
-from minitest_cli.models.targets import BatchTarget, DeviceType
+from minitest_cli.models.targets import BatchTarget
 
 
 class BatchStatus(StrEnum):
@@ -57,7 +57,14 @@ class BatchTargetView(CamelModel):
     url: str | None = None
     browser: str | None = None
     viewport: str | None = None
-    device_type: DeviceType | None = None
+    device_type: str | None = None
+    backend: str | None = None
+    device_models: list[str] | None = None
+    os_version: str | None = None
+    ran_device_model: str | None = None
+    ran_os_version: str | None = None
+    browser_version_requested: str | None = None
+    browser_version: str | None = None
     label: str
     compatibility_warnings: list[str] = []
     counters: BatchCounters = BatchCounters()

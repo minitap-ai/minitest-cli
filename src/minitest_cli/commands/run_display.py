@@ -63,13 +63,16 @@ def format_run_row(run: StoryRunResponse) -> list[str]:
     ]
 
 
-def _platform_label(p: PlatformRun) -> str:
-    return p.label or target_label(p.platform, p.browser, p.viewport, p.device_type)
+def _platform_label(p: PlatformRun, labels: dict[str, str] | None = None) -> str:
+    named = (labels or {}).get(p.batch_target_id or "")
+    return named or p.label or target_label(p.platform, p.browser, p.viewport, p.device_type)
 
 
-def _platform_status_line(p: PlatformRun) -> tuple[str, str | None]:
+def _platform_status_line(
+    p: PlatformRun, labels: dict[str, str] | None = None
+) -> tuple[str, str | None]:
     """Build a status line for a per-platform child."""
-    parts: list[str] = [f"  {_platform_label(p)}:"]
+    parts: list[str] = [f"  {_platform_label(p, labels)}:"]
     if p.execution_state == "escalated":
         parts.append(" [bold yellow]waiting for an answer to Mini's question[/bold yellow]")
         if p.error_message:
@@ -83,7 +86,9 @@ def _platform_status_line(p: PlatformRun) -> tuple[str, str | None]:
     return "".join(parts), p.recording_url
 
 
-def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
+def display_run_result(
+    run: StoryRunResponse, json_mode: bool, labels: dict[str, str] | None = None
+) -> None:
     """Display the full results of a completed run."""
     if json_mode:
         print_json(run.model_dump(mode="json", by_alias=True))
@@ -101,7 +106,7 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
     print_info(f"Run {run.id} — {status_icon} {status}")
 
     for p in run.platforms:
-        line, recording = _platform_status_line(p)
+        line, recording = _platform_status_line(p, labels)
         err_console.print(line)
         if recording:
             err_console.print(f"    Recording: {recording}")
@@ -115,7 +120,7 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
             if (p.srp_id == cr.srp_id if cr.srp_id else p.platform == cr.platform)
         ]
         platform_label = (
-            _platform_label(matching_platforms[0])
+            _platform_label(matching_platforms[0], labels)
             if len(matching_platforms) == 1
             else target_label(cr.platform, None, None)
         )
@@ -134,7 +139,9 @@ def display_run_result(run: StoryRunResponse, json_mode: bool) -> None:
             print_error("Some acceptance criteria failed.")
     elif status == "failed":
         errors = [
-            f"{_platform_label(p)}: {p.error_message}" for p in run.platforms if p.error_message
+            f"{_platform_label(p, labels)}: {p.error_message}"
+            for p in run.platforms
+            if p.error_message
         ]
         if errors:
             print_error(f"Run failed — {'; '.join(errors)}")

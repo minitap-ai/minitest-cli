@@ -117,7 +117,12 @@ def point_at_questions(run: StoryRunResponse, questions: list[dict[str, Any]] | 
         print_warning(f"Mini has a question on this run: `minitest run ask list {run.batch_id}`.")
 
 
-def show_run(settings: Settings, run: StoryRunResponse, json_mode: bool) -> None:
+def show_run(
+    settings: Settings,
+    run: StoryRunResponse,
+    json_mode: bool,
+    labels: dict[str, str] | None = None,
+) -> None:
     """`display_run_result`, plus the questions an escalated run waits on."""
-    display_run_result(run, json_mode)
+    display_run_result(run, json_mode, labels)
     point_at_questions(run, run_conductor(run_questions(settings, run)))

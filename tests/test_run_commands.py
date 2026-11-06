@@ -1010,7 +1010,7 @@ class TestRunAllCommand:
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_all.ApiClient", return_value=client):
             result = _run_with_context(
                 ["all", *_BUILD_FLAGS],
                 settings,
@@ -1032,7 +1032,7 @@ class TestRunAllCommand:
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_all.ApiClient", return_value=client):
             result = _run_with_context(
                 ["all", *_BUILD_FLAGS],
                 settings,
@@ -1049,7 +1049,7 @@ class TestRunAllCommand:
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_all.ApiClient", return_value=client):
             result = _run_with_context(
                 ["all", *_BUILD_FLAGS],
                 settings,
@@ -1071,7 +1071,7 @@ class TestRunAllCommand:
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(200, _BATCH_RESPONSE))
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_all.ApiClient", return_value=client):
             result = _run_with_context(["all", "--web"], settings, json_mode=True)
 
         assert result.exit_code == 0
@@ -1082,7 +1082,7 @@ class TestRunAllCommand:
         client = _mock_client()
         client.post = AsyncMock(return_value=_mock_response(500, {"detail": "error"}))
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_all.ApiClient", return_value=client):
             result = _run_with_context(["all", *_BUILD_FLAGS], settings)
 
         assert result.exit_code == 3
@@ -1092,7 +1092,7 @@ class TestRunAllCommand:
         client = _mock_client()
         client.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=client):
+        with patch("minitest_cli.commands.run_all.ApiClient", return_value=client):
             result = _run_with_context(["all", *_BUILD_FLAGS], settings)
 
         assert result.exit_code == 3
@@ -1112,7 +1112,7 @@ class TestRunAllCommand:
         """run all with no lane flag exits with code 1, naming all three lanes."""
         settings = _make_settings(tmp_path)
 
-        with patch("minitest_cli.commands.run.ApiClient", return_value=_mock_client()):
+        with patch("minitest_cli.commands.run_all.ApiClient", return_value=_mock_client()):
             result = _run_with_context(["all"], settings)
 
         assert result.exit_code == 1
@@ -1246,7 +1246,7 @@ class TestRunLaneFlagSurface:
         assert "--web" in output
         assert "--ios-build" in output
         assert "--android-build" in output
-        for forbidden in ("--target", "--web-url", "--browser", "--viewport"):
+        for forbidden in ("--web-url", "--browser", "--viewport"):
             assert forbidden not in output
 
 

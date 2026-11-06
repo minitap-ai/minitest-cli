@@ -38,6 +38,11 @@ minitest --json --app $APP schedules create --name "Monitoring" --at 05:00 \
   --days every-day --timezone Europe/Oslo \
   --android --ios-build <build-id> --slack-channel C0123ABCD
 
+# Several devices: the same --target spec as `run` (no build= or version= on schedules)
+minitest --json --app $APP schedules create --name "iOS matrix" --at 03:00 \
+  --target platform=ios,os=26 --target platform=ios,device=tablet,os=27 \
+  --ios-build <build-id> --slack-channel C0123ABCD
+
 # What tonight would run: scenario count, duration per target, builds it would pick
 minitest --json --app $APP schedules preview "Nightly sanity check"
 
@@ -79,6 +84,7 @@ reason; never read a missing run as all clear.
 | What runs | `--suite` (default), `--tag T` (repeatable) with `--exclude <scenario>` (repeatable), or `--scenario <name-or-id>` (repeatable) |
 | Web | `--browser BROWSER[:SURFACE]` (`chrome`, `chrome:mobile`, `chrome:tablet`, `chrome:android`, `safari:ios`; default `chrome`), plus `--url URL` or `--web-branch BRANCH` |
 | Native | `--ios` / `--android` (latest build that installs), `--ios-build ID` / `--android-build ID` (fixed), `--ios-branch B` / `--android-branch B` (build the branch first), `--<platform>-physical`, `--<platform>-device-type phone\|tablet` |
+| Targets | `--target key=value,...` (repeatable) or `--targets-file F`, the `run` spec without `build=` and `version=`: builds come from the Native flags (default: latest). A platform a `--target` names gets exactly its targets; do not combine it with that platform's `--*-physical` / `--*-device-type` |
 | Summary | `--slack-channel ID`, `--slack-channel-name NAME`, `--post-all-clear/--no-post-all-clear` (default on) |
 | Agents | `--from-file schedule.json\|yaml`: the shape `schedules get --json` prints (read-only fields are ignored); flags override its fields |
 

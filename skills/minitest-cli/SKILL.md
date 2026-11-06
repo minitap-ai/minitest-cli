@@ -7,15 +7,15 @@ description: >
   manage native builds via the command line. Also use after any code change that
   affects UI, navigation, or user journeys to check if existing tests need
   to be updated.
-metadata:
-  cli-version: "0.47.0"
 ---
 
 # Minitest CLI
 
 `minitest` is a command-line tool for automated mobile and web app testing. For
-native apps it runs on virtual devices (simulators & emulators); for web apps it
-runs browser-based targets configured on the app. An AI agent analyses the app
+native apps it runs on cloud simulators and emulators, or on physical phones
+when the workspace has them (`build upload --physical`, then `run start
+--ios-physical` / `--android-physical`); for web apps it runs browser-based
+targets configured on the app. An AI agent analyses the app
 screen and verifies acceptance criteria you define. You manage everything through
 the CLI: scenarios, native builds, web lanes, runs, batches, and results.
 
@@ -54,7 +54,7 @@ both are set. Commands that are tenant-scoped rather than app-scoped (`apps`,
 `--json` is still harmless on these, but their payload is markdown or a raw
 value by design:
 
-- `minitest init --agent`, `minitest maintenance --agent`, `minitest skill` —
+- `minitest init --agent`, `minitest skill` —
   print playbook markdown for the agent to read.
 - `minitest --app $APP env get <KEY>` — prints the raw value verbatim **only
   without** `--json`; with `--json` it returns `{"KEY": "value"}`. Use the
@@ -149,72 +149,14 @@ the file that matches with `minitest scenario-binding set-files`, and only
 `minitest test-file upload` a file nobody has provided yet. Bound files are
 the only ones the run places on the device; an unbound test file is never used.
 
-## Maintaining existing tests (`minitest maintenance`)
+## Keeping tests current after a code change
 
-Use `minitest maintenance` when the app UI/code changed and the customer wants
-their Minitest scenarios updated without sharing GitHub/code with Minitap.
-Run it from the app repository. The customer's own coding agent reads local code;
-the CLI sends only proposed test-flow edits and an opaque local HEAD SHA.
-
-```bash
-# Fetch the server-composed maintenance brain (same rules as cloud maintenance)
-minitest maintenance --agent
-
-# First agent step: opens a maintenance run and returns context as JSON
-minitest --json maintenance context
-```
-
-The `context` output includes:
-
-- `mode`: `audit` on the first run, `incremental` after a watermark exists
-- `fromSha`: null in audit mode; diff baseline in incremental mode
-- `headSha`: local HEAD SHA reported by the CLI
-- `context`: current stories, stable criterion ids, dependencies, app memory
-- `guardrail`: pending Release Queue count; warn the user before continuing when non-zero
-
-In incremental mode, inspect changes with `git diff <fromSha>..HEAD` locally.
-In audit mode, inspect the full current codebase against every active story.
-
-Post findings back through these mechanics-only commands:
-
-```bash
-minitest --json maintenance affected --file affected.json
-minitest --json maintenance change --file change.json
-minitest --json maintenance divergence --file divergence.json
-minitest --json maintenance status --phase triage --message "Mapped affected stories" --progress 40
-minitest --json maintenance complete --changed   # or --no-changed when nothing changed
-```
-
-> `maintenance status`, `complete`, and `apply` print nothing on stdout under
-> `--json` — judge them by their exit code (0 = accepted), or drop `--json` to
-> read the human confirmation.
-
-The exact JSON fields for `affected.json`, `change.json`, and `divergence.json`
-are specified by the maintenance brain fetched via `minitest maintenance --agent`;
-follow that contract rather than inventing field names — the endpoint currently
-returns a 500 for some tenants, and without it the payload shapes cannot be guessed
-(the API rejects invented fields). `complete --changed` is
-what advances the watermark to the current HEAD, so the next run resolves to
-`incremental` mode; use `--no-changed` when nothing was edited.
-
-At the end, always show the user the Release Queue review link so they can inspect
-the proposed edits in the webapp, and offer to apply them right away — it is one
-flow, not two modes:
-
-```bash
-minitest maintenance apply --review # prints the Release Queue link (no changes made)
-minitest maintenance apply          # applies all pending edits now
-```
-
-Leave `--json` off these two: they only ever print human text, and the review
-link is the whole point of `--review`.
-
-Present it as a single choice: surface the review link, then ask whether the user
-wants you to apply the edits now or review them manually through the link first.
-Auto-applying is simply the option they can pick, not a separate mode.
-
-Never ask the user to paste code or diffs into Minitap. The privacy contract is:
-local code stays local; proposed criteria/dependency edits are the only payload.
+When the app's code changed and scenarios may be out of date, ask Mini for the
+update: `minitest draft create --message "<what changed and where>"`. On an open
+PR, `draft link-pr <id> <pr_number>` then `draft check <id>` proves the change on
+the PR's head; merge it once checked. If you write the scenario changes
+yourself, use a draft feature (`minitest df`) instead. See
+[Drafts with Mini](#drafts-with-mini-minitest-draft).
 
 ## Authentication
 
@@ -434,11 +376,11 @@ or browser).
 > `user-story` and `user-story-binding`. The old names still work as hidden,
 > deprecated aliases (they print a warning on stderr; `--json` stdout is
 > unchanged), but always use `scenario`. If the CLI answers `No such command
-> 'scenario'`, it predates the rename: run `minitest upgrade`. Flags, JSON keys
-> and API fields keep their `story` names (`--user-story`, `userStoryId`,
-> `storyRuns`).
+> 'scenario'`, it predates the rename: run `minitest upgrade`. JSON keys and API
+> fields keep their `story` names (`userStoryId`, `storyRuns`); flags say
+> `--scenario`.
 
-`--profile <profile_id>` is optional. If omitted, Minitest auto-assigns the app's default profile when one is configured.
+`--profile <profile_id>` is optional and repeatable: a scenario can bind several test accounts (one per role it needs, e.g. a buyer and a seller on two devices). If omitted, Minitest binds the app's default test account, or "New user" when there is no default.
 
 ```bash
 minitest --json --app <app_id> scenario create \
@@ -510,7 +452,7 @@ A non-`@qa.minitap.ai` username with no password is rejected *unless* the profil
 **Bring-your-own account.** Only when the user supplies a real account they own (and the app needs a password) pass both, via stdin:
 
 ```bash
-printf "%s" "$PASSWORD" | `minitest --json --app $APP test-profile create \
+printf "%s" "$PASSWORD" | minitest --json --app $APP test-profile create \
   --name "Pro User" --username "real-user@example.com" --password-stdin --about "..."
 ```
 
@@ -518,7 +460,7 @@ printf "%s" "$PASSWORD" | `minitest --json --app $APP test-profile create \
 
 **Credentials as secrets.** Instead of a literal password, OTP seed or card, a persona can point at an app secret: `--password-secret`, `--otp-secret`, `--card-secret` (generated, or still waiting for the user's value). See [Secrets](#secrets-minitest-secret).
 
-**No persona bound.** If a story has no profile, the agent defaults to anonymous (skip login). If a flow forces authentication, it self-generates a `<random>@qa.minitap.ai` with a runtime password, signs up, and reads the inbox for the confirmation/OTP code — so unbound scenarios still work without you provisioning anything.
+**No persona bound.** A scenario created without a profile gets the app's default test account, or the system **"New user"** account when there is none (clearing the bindings also binds "New user"). As "New user" the agent proceeds anonymously where the app allows it. If a flow forces authentication, it self-generates a `<random>@qa.minitap.ai` with a runtime password, signs up, and reads the inbox for the confirmation/OTP code — so unbound scenarios still work without you provisioning anything.
 
 **Phone-OTP personas.** If the app authenticates via SMS one-time codes instead of email, set `--phone-number` (E.164, e.g. `+14155551234`) and `--static-otp-code` (the fixed code the customer's backend accepts for that number) instead of `--username`/`--password`:
 
@@ -631,7 +573,7 @@ produced. `scenario get` shows the recorded permission as
 
 #### Device count
 
-A story's **device count** is how many virtual devices a single run provisions.
+A story's **device count** is how many devices a single run provisions.
 By default it is **auto**: one device per bound persona (minimum 1). Set an
 explicit override with `--device-count` on `scenario create` / `update`. The
 value is capped server-side at `min(3, tenant device quota)`.
@@ -914,8 +856,8 @@ and cannot be combined with `--*-device-type`. A workspace without physical
 devices gets exit 3 and a message saying so: tell the user to ask Minitap to
 enable them, don't retry.
 
-For a repo-connected app, queue a build directly from GitHub without starting
-tests:
+For a repo-connected app (GitHub, GitLab or Bitbucket), queue a build directly
+from the repository without starting tests:
 
 ```bash
 minitest --json --app <app_id> build from-commit [<full_sha>] \
@@ -1053,7 +995,7 @@ minitest --json --app <app_id> run all --web
 minitest --json --app <app_id> run from-commit <full_sha> \
   [--platform ios|android|web] [--platform ...] \
   [--ios-device-type phone|tablet] [--android-device-type phone|tablet] \
-  [--user-story <id-or-name>] [--no-watch] [--timeout <seconds>]
+  [--scenario <id-or-name>] [--no-watch] [--timeout <seconds>]
 
 # Cancel every pending or running platform of a run (optionally just one)
 minitest --json --app <app_id> run cancel <run_id> [--platform ios|android|web] [--srp <srp_id>]
@@ -1142,7 +1084,7 @@ A batch groups runs triggered together (by `run all`, CI, or a single
 minitest --json --app <app_id> batch list                      # recent batches
 minitest --json --app <app_id> batch list --status running
 minitest --json --app <app_id> batch list --commit-sha abc1234
-minitest --json --app <app_id> batch list --user-story <id>
+minitest --json --app <app_id> batch list --scenario <id>
 minitest --json --app <app_id> batch get <batch_id>            # batch + its runs
 minitest --json --app <app_id> batch cancel <batch_id>         # cancels all pending/running runs
 minitest --json --app <app_id> batch delete <batch_id>... --yes  # deletes finished runs
@@ -1513,11 +1455,6 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Task                | Command                                                                           |
 | ------------------- | --------------------------------------------------------------------------------- |
 | Onboard a new app   | `minitest init` (prints the end-to-end onboarding playbook)                       |
-| Maintain tests locally | `minitest maintenance --agent` (prints the CLI maintenance playbook)           |
-| Open maintenance run | `minitest --json maintenance context`                                            |
-| Post maintenance change | `minitest maintenance change --file change.json`                              |
-| Complete maintenance run | `minitest maintenance complete --changed`                                    |
-| Apply maintenance edits | `minitest maintenance apply` or `minitest maintenance apply --review`          |
 | List apps           | `minitest --json apps list`                                                              |
 | Get app details     | `minitest --json apps get <app_id>`                                                      |
 | App dependency graph| `minitest apps dependencies <app_id>` (Mermaid flowchart to stdout)               |
@@ -1580,7 +1517,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Run on physical devices | `minitest --json --app ID run all --ios-build BID --ios-physical` / `--android-build BID --android-physical` |
 | List builds         | `minitest --json --app ID build list [--platform P] [--status S] [--kind K]`            |
 | Get one build       | `minitest --json --app ID build get <build_id>`                                          |
-| Build from GitHub commit | `minitest --json --app ID build from-commit [SHA] [--platform P] [--force-full]`   |
+| Build from a commit      | `minitest --json --app ID build from-commit [SHA] [--platform P] [--force-full]`   |
 | Run one native story| `minitest --json --app ID run start "Story Name" --ios-build X --android-build Y [--ios-device-type phone\|tablet] [--android-device-type phone\|tablet]` |
 | Run several native stories | `minitest --json --app ID run start "Story A" "Story B" --ios-build X --android-build Y` (one batch) |
 | Run tagged native stories | `minitest --json --app ID run start --tag smoke --ios-build X [--ios-device-type phone\|tablet]` |
@@ -1588,7 +1525,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Run a tag           | `minitest --json --app ID run start --tag checkout --web` (not combinable with story names) |
 | Run all native stories | `minitest --json --app ID run all --ios-build X --android-build Y [--ios-device-type phone\|tablet] [--android-device-type phone\|tablet]` |
 | Run all web stories | `minitest --json --app ID run all --web`                                                 |
-| Build and run commit | `minitest --json --app ID run from-commit SHA [--platform P] [--ios-device-type phone\|tablet] [--android-device-type phone\|tablet] [--user-story ID] [--no-watch] [--timeout N]` |
+| Build and run commit | `minitest --json --app ID run from-commit SHA [--platform P] [--ios-device-type phone\|tablet] [--android-device-type phone\|tablet] [--scenario ID] [--no-watch] [--timeout N]` |
 | Cancel a run        | `minitest --json --app ID run cancel <run_id> [--platform P] [--srp ID]`                |
 | Check run           | `minitest --json --app ID run status <run_id>`                                           |
 | List runs for story | `minitest --json --app ID run list "Story Name"`                                         |
@@ -1665,7 +1602,8 @@ depends on.
 
 Bindings link profiles or files to a specific scenario:
 
-- Profile binding: at most one profile per story. `set-profile --clear` unbinds.
+- Profile binding: several profiles per story. `set-profile` is **atomic
+  replace** (repeat `--profile`); `--clear` leaves the story on "New user".
 - File binding: many files per story. `set-files` is **atomic replace** — pass
   every file id you want bound; omitted ids are unbound. `--clear` unbinds all.
 - Skill binding: `set-app-skills` is atomic replace by skill name; Mini loads the

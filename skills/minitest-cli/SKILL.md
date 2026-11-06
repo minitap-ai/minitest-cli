@@ -920,8 +920,8 @@ Execute a scenario on native cloud phone/tablet lanes or the web lane. For nativ
 provide at least one of `--ios-build` or `--android-build`; single-platform apps
 may omit the other. For web-only runs, pass `--web` by itself; native and web
 lanes can also be combined. Web runs use the app's configured web URL and default web
-targets; there are no per-run `--web-url`, `--browser`, or `--viewport` overrides
-in the CLI.
+targets; pick browsers, versions and viewports per run with `--target`
+(below). There is no per-run `--web-url`.
 
 Native cloud lanes default to `phone`. On `run start` (including `--tag`),
 `run all`, and `run from-commit`, `--ios-device-type phone|tablet` and
@@ -932,8 +932,9 @@ existing iOS + Android default. An explicit device type (even `phone`) for a
 nonselected OS is an error. These options are native-cloud only, not for
 physical devices, web/mobile-web targets, or Edge.
 
-V1 supports **one form factor per OS per run**; run phones and tablets in separate
-batches rather than treating the option as a matrix. Tablet labels are
+With the legacy flags a run has **one device per OS**. To pick the device, its OS
+version, a farm model, a browser version, Android TV, or **several devices per
+platform**, use `--target` (see "Run targets" below). Tablet labels are
 `iOS · Tablet` / `Android · Tablet`; phone labels remain `iOS` / `Android`.
 Per-run choices do not change app defaults. An iPhone-only build may run on iPad
 in compatibility mode (`tablet_iphone_compatibility_mode` warning); unknown
@@ -941,6 +942,81 @@ device-family metadata produces `tablet_compatibility_unknown`. Neither warning
 blocks launch, and neither run establishes native tablet-layout coverage.
 Surface the distinction and never claim native iPad support from a passing
 compatibility-mode or unknown-metadata run.
+
+#### Run targets (`--target`, `--targets-file`)
+
+`run start` (with scenarios or `--tag`), `run all` and `run from-commit` take a
+repeatable `--target` whose value is comma-separated `key=value` pairs. The
+same spec is read by the minitest-trigger GitHub Action's `targets:` input.
+
+| Key | Values | Notes |
+| --- | --- | --- |
+| `platform` | `ios`, `android`, `web` | required |
+| `backend` | `cloud` (default), `physical` | `physical` is native only |
+| `device` | `phone` (default), `tablet`, `tv` | cloud only; `tv` is Android only |
+| `model` | e.g. `iPhone 13` | needs `backend=physical`: one exact farm model |
+| `os` | e.g. `27` (`27.0` is read as `27`) | cloud: a major from the catalog; physical: needs `model` |
+| `browser` | `chrome`, `edge`, `firefox` | web only |
+| `version` | browser major, e.g. `157` | web with `browser`, not on `viewport=mobile` |
+| `viewport` | `desktop`, `tablet`, `mobile` | web only |
+| `build` | a build id | overrides the lane's build |
+
+```bash
+# What the workspace can ask for: cloud devices x OS, farm models (free now), browser majors
+minitest --json --app <app_id> targets catalog
+
+# iOS 26 and iOS 27 simulators on one build, plus Android from its usual flag
+minitest --json --app <app_id> run all --ios-build <sim_build_id> --android-build <apk_id> \
+  --target platform=ios,os=26 --target platform=ios,os=27
+
+# One exact farm iPhone with its device build
+minitest --json --app <app_id> run start "User Login" --ios-build <device_build_id> \
+  --target "platform=ios,backend=physical,model=iPhone 13"
+
+# Chrome 157 and 156 on desktop
+minitest --json --app <app_id> run all \
+  --target platform=web,browser=chrome,version=157,viewport=desktop \
+  --target platform=web,browser=chrome,version=156,viewport=desktop
+
+# From a commit: unpinned targets are built from the commit
+minitest --json --app <app_id> run from-commit <full_sha> \
+  --target platform=ios,os=27 --target "platform=ios,backend=physical,model=iPhone 14"
+
+# The same targets from a file: a JSON list of objects with the same keys
+minitest --json --app <app_id> run all --ios-build <id> --targets-file targets.json
+```
+
+Rules (checked before anything is sent, then again by the server):
+
+- Native targets take their build from `--ios-build` / `--android-build` (or the
+  commit), unless they carry `build=`. Every cloud target of a platform installs
+  the same build, and so does every physical one.
+- `--target platform=ios` replaces the legacy iOS lane: do not combine it with
+  `--ios-device-type` / `--ios-physical` (same for Android), and do not combine a
+  web `--target` with `--web`. Platforms no `--target` names keep the legacy flags.
+- On `from-commit`, a target without `build=` is built from the commit; one with
+  `build=` must be on a platform the commit does not build. `--platform` defaults
+  to the platforms of the unpinned targets.
+- A TV app (`formFactor: tv`) runs every Android target on Android TV.
+- The same target listed twice is refused.
+
+The server refuses, and the CLI explains (exit 3, never a traceback):
+several devices on one platform, or several versions of one browser, when the
+workspace does not have it (`run-targets-multi-device`); a browser `version` when
+browser versions are off; Android TV or tablets when they are off; an OS or a
+browser version the catalog does not offer. Pick values from `targets catalog`.
+
+Results are per target: `batch get`, `run from-commit` and the batch summary of
+`run start --tag` / `run all` print one row per target, named as the webapp
+names it (`iPhone 17 · iOS 27`, `iPhone 13 · iOS 18.7`, `Chrome 157 · Desktop`,
+`Android TV`), plus one line per platform: `iOS: critical · 1 critical · 2 warnings
+(2 targets)`, the worst target winning (errored > critical > warning > passed >
+skipped). In `--json`, each entry of `targets` carries `targetId`, `label`,
+`platform`, `backend`, `deviceType`, `deviceModels`, `osVersion`,
+`ranDeviceModel`, `ranOsVersion`, `browser`, `viewport`,
+`browserVersionRequested`, `browserVersion`, `buildId`, `status` and the
+counters. `run start` / `run status` label each platform line of a run with its
+target.
 
 ```bash
 # Run a single scenario (by name or UUID) and wait for results
@@ -1465,6 +1541,8 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Private network (owner/admin to change) | `minitest --json --app ID apps private-network show` / `connectors` / `set [--enable\|--disable] [--connector NAME] [--domain D ...] [--port 443 ...]` |
 | Backend API (OpenAPI) | `minitest --json --app ID apps backend-api show` / `set [--enable\|--disable] [--base-url U] [--openapi-url U] [--secret NAME ...] [--remove-secret NAME] [--clear-secrets] [--skill NAME\|--clear-skill] [--openapi-auth TYPE --openapi-auth-secret NAME [--openapi-auth-header H\|--openapi-auth-username U\|--openapi-auth-param P]]` |
 | Point one run at another backend | `run start\|all\|from-commit ... --backend-base-url U --backend-openapi-url U` |
+| List run targets (devices, OS, browsers) | `minitest --json --app ID targets catalog [--tenant ID]` |
+| Several devices / versions in one run | `run start\|all\|from-commit ... --target platform=ios,os=26 --target platform=ios,os=27` (or `--targets-file F`) |
 | Create scenario   | `minitest --json --app ID scenario create --name "..." --tag auth --criteria "..."` |
 | Create scenario with profile | `minitest --json --app ID scenario create --name "..." --tag auth --profile <profile_id> --criteria "..."` |
 | List scenarios   | `minitest --json --app ID scenario list`                                               |

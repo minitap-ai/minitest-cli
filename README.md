@@ -117,9 +117,43 @@ The device-type options do not select an OS: `start`/`all` still need the
 corresponding build flag; `from-commit` uses `--platform` (or its existing iOS +
 Android default). An explicit device type, even `phone`, errors when that OS is
 not selected. These options do not apply to physical devices, web/mobile-web
-targets, or Edge. V1 supports one form factor per OS per run; run phone and
-tablet suites separately. Tablet results are labelled `iOS · Tablet` or
+targets, or Edge. For several form factors or OS versions in one run, use
+`--target` (below). Tablet results are labelled `iOS · Tablet` or
 `Android · Tablet`; phone labels stay unchanged.
+
+## Run targets: several devices, OS versions, browser versions
+
+`run start`, `run all`, `run from-commit` and `schedules create|update|preview`
+take a repeatable `--target` (or `--targets-file targets.json`, a JSON list of
+objects with the same keys). Its value is comma-separated `key=value` pairs:
+
+| Key | Values |
+| --- | --- |
+| `platform` | `ios`, `android`, `web` (required) |
+| `backend` | `cloud` (default), `physical` |
+| `device` | `phone` (default), `tablet`, `tv` (Android only) |
+| `model` | an exact farm model, e.g. `iPhone 13` (needs `backend=physical`) |
+| `os` | an OS version, e.g. `27` (`27.0` reads as `27`) |
+| `browser` | `chrome`, `edge`, `firefox` |
+| `version` | a browser major, e.g. `157` |
+| `viewport` | `desktop`, `tablet`, `mobile` |
+| `build` | a build id, overriding the lane's build (not on schedules) |
+
+```bash
+minitest --app <app-id> targets catalog          # what the workspace can ask for
+minitest --app <app-id> run all --ios-build <id> --target platform=ios,os=26 --target platform=ios,os=27
+minitest --app <app-id> run all --ios-build <device-build-id> --target "platform=ios,backend=physical,model=iPhone 13"
+minitest --app <app-id> run all --target platform=web,browser=chrome,version=157,viewport=desktop
+```
+
+Builds still come from `--ios-build` / `--android-build` or the commit. A
+platform named by a `--target` gets exactly those targets (don't add its
+`--*-device-type` / `--*-physical`); the other platforms keep the legacy flags.
+Several devices on one platform, browser versions and Android TV depend on
+your workspace: when one is off, the run is refused with a message that says
+which. Results show one row per target (`iPhone 17 · iOS 27`,
+`Chrome 157 · Desktop`) and one line per platform
+(`iOS: critical · 1 critical · 2 warnings (2 targets)`).
 
 ## Physical devices
 

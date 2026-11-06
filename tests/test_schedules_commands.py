@@ -327,3 +327,58 @@ class TestBackendErrors:
 
         assert result.exit_code == 4
         assert "Schedule not found" in result.stderr
+
+
+class TestTargets:
+    def test_two_ios_targets_are_stored_with_the_latest_build(self, tmp_path):
+        backend = FakeBackend()
+
+        result = _invoke(
+            tmp_path,
+            backend,
+            ["create", "--name", "ios matrix", "--at", "03:00", "--slack-channel", "C0MINITAP",
+             "--target", "platform=ios,os=26", "--target", "platform=ios,device=tablet,os=27"],
+        )  # fmt: skip
+
+        assert result.exit_code == 0, result.output
+        sent = backend.sent("POST", SCHEDULES)[0]
+        assert sent["targets"] == [
+            {"platform": "ios", "backend": "cloud", "osVersion": "26"},
+            {"platform": "ios", "backend": "cloud", "deviceType": "tablet", "osVersion": "27"},
+        ]
+        assert sent["buildSources"] == {"ios": {"mode": "latest"}}
+        assert "iPhone · iOS 26 (latest build), iPad · iOS 27 (latest build)" in result.output
+
+    def test_update_replaces_only_the_platform_the_target_names(self, tmp_path):
+        backend = FakeBackend()
+
+        result = _invoke(
+            tmp_path,
+            backend,
+            ["update", SAVED_ID, "--android-build", BUILD_ID,
+             "--target", "platform=android,backend=physical,model=Pixel 8,os=15"],
+        )  # fmt: skip
+
+        assert result.exit_code == 0, result.output
+        sent = backend.sent("PATCH", f"{SCHEDULES}/{SAVED_ID}")[0]
+        assert sent["targets"] == [
+            WEB_TARGET,
+            {
+                "platform": "android",
+                "backend": "physical",
+                "deviceModel": "Pixel 8",
+                "osVersion": "15",
+            },
+        ]
+        assert sent["buildSources"] == {"android": {"mode": "fixed", "buildId": BUILD_ID}}
+
+    def test_a_build_in_the_target_is_refused(self, tmp_path):
+        backend = FakeBackend()
+
+        result = _invoke(
+            tmp_path, backend, ["update", SAVED_ID, "--target", f"platform=ios,build={BUILD_ID}"]
+        )
+
+        assert result.exit_code == 1
+        assert "drop build=" in " ".join(result.output.split())
+        assert backend.sent("PATCH", f"{SCHEDULES}/{SAVED_ID}") == []

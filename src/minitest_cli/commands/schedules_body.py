@@ -1,6 +1,7 @@
 """Assemble the request body of `minitest schedules create|update|preview` from flags."""
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from minitest_cli.api.client import ApiClient
@@ -14,6 +15,7 @@ from minitest_cli.commands.schedules_spec import (
     parse_time,
 )
 from minitest_cli.commands.schedules_options import Family
+from minitest_cli.commands.target_spec import collect_specs
 from minitest_cli.commands.schedules_where import NativeLane, WhereFlags, resolve_where
 from minitest_cli.models.targets import DeviceType
 
@@ -116,6 +118,8 @@ def spec_flags(
     slack_channel_name: str | None,
     post_all_clear: bool | None,
     drop: list[Family] | None = None,
+    target: list[str] | None = None,
+    targets_file: Path | None = None,
 ) -> SpecFlags:
     return SpecFlags(
         name=name,
@@ -135,5 +139,6 @@ def spec_flags(
                 android, android_build, android_branch, android_physical, android_device_type
             ),
             drop=[family.value for family in drop or []],
+            specs=collect_specs(target, targets_file),
         ),
     )

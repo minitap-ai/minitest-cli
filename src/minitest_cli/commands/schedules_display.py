@@ -5,6 +5,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from minitest_cli.commands.schedules_spec import DAY_NAMES, DAY_PRESETS
+from minitest_cli.models.target_labels import CLOUD_DEVICES, OS_NAMES
 from minitest_cli.models.targets import target_label
 
 _DAY_PRESET_LABELS = {"weekdays": "Weekdays", "weekends": "Weekends", "every-day": "Every day"}
@@ -65,6 +66,19 @@ def _source_label(source: dict[str, Any] | None) -> str:
     return str(source.get("url"))
 
 
+def _native_label(target: dict[str, Any]) -> str:
+    platform, os = str(target.get("platform", "")), target.get("osVersion")
+    if target.get("backend") == "physical":
+        name = (
+            str(target.get("deviceModel") or "") or f"{OS_NAMES.get(platform, platform)} physical"
+        )
+    elif os:
+        name = CLOUD_DEVICES.get((platform, target.get("deviceType") or "phone"), platform)
+    else:
+        return target_label(platform, None, None, target.get("deviceType"))
+    return f"{name} · {OS_NAMES.get(platform, platform)} {os}" if os else name
+
+
 def where_label(schedule: dict[str, Any]) -> str:
     parts = []
     builds = schedule.get("buildSources") or {}
@@ -76,9 +90,7 @@ def where_label(schedule: dict[str, Any]) -> str:
                 label = target_label(platform, browser, target.get("viewport") or "pc")
             parts.append(label)
             continue
-        physical = " physical" if target.get("backend") == "physical" else ""
-        label = target_label(platform, None, None, target.get("deviceType"))
-        parts.append(f"{label}{physical} ({_source_label(builds.get(platform))})")
+        parts.append(f"{_native_label(target)} ({_source_label(builds.get(platform))})")
     web_source = schedule.get("webSource")
     where = ", ".join(parts)
     return f"{where} on {_source_label(web_source)}" if web_source else where

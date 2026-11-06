@@ -36,6 +36,7 @@ from minitest_cli.commands.schedules_options import (
     UrlOpt,
     WebBranchOpt,
 )
+from minitest_cli.commands.target_spec import TargetOpt, TargetsFileOpt
 from minitest_cli.commands.schedules_spec import load_file
 from minitest_cli.commands.user_story_helpers import is_json_mode
 from minitest_cli.utils.output import output, print_success
@@ -64,6 +65,8 @@ def update(
     android_branch: AndroidBranchOpt = None,
     android_physical: AndroidPhysicalOpt = False,
     android_device_type: AndroidDeviceTypeOpt = None,
+    target: TargetOpt = None,
+    targets_file: TargetsFileOpt = None,
     drop: DropOpt = None,
     slack_channel: SlackChannelOpt = None,
     slack_channel_name: SlackChannelNameOpt = None,

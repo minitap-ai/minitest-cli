@@ -1,9 +1,11 @@
 """Turn the platform and source flags of `minitest schedules` into targets and sources."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from minitest_cli.commands.schedules_spec import fail
+from minitest_cli.commands.schedules_targets import apply_specs
+from minitest_cli.models.target_spec import TargetSpec
 from minitest_cli.models.targets import DeviceType
 
 BROWSERS = ("chrome", "firefox", "safari", "edge")
@@ -32,10 +34,11 @@ class WhereFlags:
     ios: NativeLane
     android: NativeLane
     drop: list[str] | None = None
+    specs: list[TargetSpec] = field(default_factory=list)
 
     @property
     def given(self) -> bool:
-        return bool(self.browsers or self.url or self.web_branch or self.drop) or any(
+        return bool(self.browsers or self.url or self.web_branch or self.drop or self.specs) or any(
             lane.given for lane in (self.ios, self.android)
         )
 
@@ -97,13 +100,18 @@ def resolve_where(flags: WhereFlags, current: dict[str, Any] | None) -> dict[str
         web_targets = [parse_browser(b) for b in flags.browsers or ["chrome"]]
         targets = [t for t in targets if not _is_web(t)] + web_targets
 
+    named = {spec.platform for spec in flags.specs}
     for platform, lane in (("ios", flags.ios), ("android", flags.android)):
         if not lane.given:
             continue
         target, source = _native_lane(platform, lane)
-        targets = [t for t in targets if _is_web(t) or t.get("platform") != platform]
-        targets.append(target)
         build_sources[platform] = source
+        if platform not in named:
+            targets = [t for t in targets if _is_web(t) or t.get("platform") != platform]
+            targets.append(target)
+    lanes = {"ios": flags.ios, "android": flags.android}
+    conflicts = {p: bool(lane.physical or lane.device_type) for p, lane in lanes.items()}
+    targets = apply_specs(flags.specs, targets, build_sources, conflicts)
 
     for family in flags.drop or []:
         if family == "web":

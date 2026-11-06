@@ -17,6 +17,7 @@ from minitest_cli.commands.run_helpers import (
     resolve_app,
     run_api_call,
 )
+from minitest_cli.commands.target_summary import print_targets
 from minitest_cli.models.batch import BatchListItem, BatchListResponse, BatchResponse
 from minitest_cli.utils.output import output, print_info, print_success, print_table
 
@@ -138,25 +139,7 @@ def get_batch(
         print_info(f"  tag: {batch.tag_name}")
     warn_waiting(batch.id, waiting)
 
-    target_rows: list[list[str]] = []
-    for t in batch.targets:
-        c = t.counters
-        target_rows.append(
-            [
-                t.label,
-                c.headline_status or c.status or "",
-                str(c.passed),
-                str(c.warnings),
-                str(c.criticals),
-                str(c.skipped),
-            ]
-        )
-    if target_rows:
-        print_table(
-            ["Target", "Status", "Passed", "Warnings", "Criticals", "Skipped"],
-            target_rows,
-            title=f"Targets ({len(target_rows)})",
-        )
+    print_targets(batch.targets)
 
     rows: list[list[str]] = []
     for r in batch.story_runs:

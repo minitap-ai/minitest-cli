@@ -5,6 +5,8 @@ from typing import Annotated, Literal
 
 import typer
 
+from minitest_cli.commands.target_rules import check_lanes
+from minitest_cli.models.target_spec import TargetSpec
 from minitest_cli.models.targets import BatchTarget, DeviceType
 from minitest_cli.utils.output import print_error
 
@@ -90,6 +92,38 @@ def validate_device_types(
             raise typer.Exit(code=1)
 
 
+def reject_legacy_overlap(
+    specs: Sequence[TargetSpec],
+    device_types: dict[str, DeviceType | None],
+    physical: dict[str, bool] | None = None,
+) -> None:
+    for platform in sorted({spec.platform for spec in specs if spec.native}):
+        flags = [f"--{platform}-device-type"] if device_types.get(platform) else []
+        flags += [f"--{platform}-physical"] if (physical or {}).get(platform) else []
+        if flags:
+            print_error(
+                f"{' / '.join(flags)} cannot be combined with --target platform={platform}:"
+                " put device= or backend= in the target instead."
+            )
+            raise typer.Exit(code=1)
+
+
+def _spec_targets(
+    specs: Sequence[TargetSpec], builds: dict[NativePlatform, str | None]
+) -> list[BatchTarget]:
+    targets = []
+    for spec in specs:
+        build = spec.build or (builds.get(spec.platform) if spec.native else None)  # pyright: ignore[reportArgumentType]
+        if spec.native and build is None:
+            print_error(
+                f"--target {spec.describe()} needs a build: pass --{spec.platform}-build <id>"
+                " or add build=<id> to the target."
+            )
+            raise typer.Exit(code=1)
+        targets.append(spec.to_batch_target(build))
+    return targets
+
+
 def build_targets(
     ios_build: str | None,
     android_build: str | None,
@@ -98,11 +132,20 @@ def build_targets(
     android_device_type: DeviceType | None = None,
     ios_physical: bool = False,
     android_physical: bool = False,
+    specs: Sequence[TargetSpec] = (),
 ) -> list[BatchTarget]:
     builds: dict[NativePlatform, str | None] = {"ios": ios_build, "android": android_build}
-    device_types = {"ios": ios_device_type, "android": android_device_type}
+    device_types: dict[str, DeviceType | None] = {
+        "ios": ios_device_type,
+        "android": android_device_type,
+    }
     physical = {"ios": ios_physical, "android": android_physical}
-    native: list[NativePlatform] = [platform for platform, build in builds.items() if build]
+    reject_legacy_overlap(specs, device_types, physical)
+    if web and any(not spec.native for spec in specs):
+        print_error("--web cannot be combined with --target platform=web: drop --web.")
+        raise typer.Exit(code=1)
+    named = {spec.platform for spec in specs}
+    native: list[NativePlatform] = [p for p, build in builds.items() if build and p not in named]
     validate_physical(native, physical, device_types)
     validate_device_types(native, ios_device_type, android_device_type)
     targets = [
@@ -114,30 +157,14 @@ def build_targets(
         )
         for platform in native
     ]
+    targets += _spec_targets(specs, builds)
     if web:
         targets.append(BatchTarget(platform="web"))
     if not targets:
         print_error(
-            "Select at least one lane: --ios-build, --android-build, or --web. "
+            "Select at least one lane: --ios-build, --android-build, --web or --target. "
             "Configure web targets for the app with `minitest apps`."
         )
         raise typer.Exit(code=1)
+    check_lanes(targets)
     return targets
-
-
-def build_commit_targets(
-    platforms: list[str] | None,
-    ios_device_type: DeviceType | None,
-    android_device_type: DeviceType | None,
-) -> list[BatchTarget] | None:
-    selected = platforms if platforms is not None else ["ios", "android"]
-    validate_device_types(selected, ios_device_type, android_device_type)
-    if ios_device_type is None and android_device_type is None:
-        return None
-    device_types = {"ios": ios_device_type, "android": android_device_type}
-    return [
-        BatchTarget.model_validate(
-            {"platform": platform, "device_type": device_types.get(platform)}
-        )
-        for platform in selected
-    ]

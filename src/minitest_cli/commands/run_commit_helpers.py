@@ -10,6 +10,7 @@ from minitest_cli.commands.batch_warnings import print_compatibility_warnings
 from minitest_cli.commands.run_display import _derive_run_status
 from minitest_cli.commands.run_asks_helpers import count_waiting, warn_waiting
 from minitest_cli.commands.run_helpers import handle_response_error
+from minitest_cli.commands.target_summary import target_payload
 from minitest_cli.core.config import Settings
 from minitest_cli.models import BatchResponse, BatchStatus
 from minitest_cli.utils.output import err_console, print_warning
@@ -28,22 +29,7 @@ def batch_commit_payload(batch: BatchResponse) -> dict[str, Any]:
         "batchId": batch.id,
         "status": batch.status.value,
         "commitSha": batch.commit_sha,
-        "targets": [
-            {
-                "platform": target.platform,
-                **(
-                    {"deviceType": target.device_type, "label": target.label}
-                    if target.device_type is not None
-                    else {}
-                ),
-                "buildId": target.build_id,
-                "status": target.counters.status,
-                "passed": target.counters.passed,
-                "criticals": target.counters.criticals,
-                "warnings": target.counters.warnings,
-            }
-            for target in batch.targets
-        ],
+        "targets": [target_payload(target) for target in batch.targets],
         "storyRuns": [
             {
                 "runId": run.id,

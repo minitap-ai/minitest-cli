@@ -12,6 +12,7 @@ from minitest_cli.commands.run_helpers import (
     run_api_call,
 )
 from minitest_cli.commands.tags_helpers import resolve_tag_ids
+from minitest_cli.commands.target_summary import print_targets
 from minitest_cli.commands.user_story_helpers import EXIT_NOT_FOUND, fetch_all_user_stories
 from minitest_cli.core.config import Settings
 from minitest_cli.models.batch import BackendApiRunOverride, BatchResponse, CreateBatchRequest
@@ -25,6 +26,7 @@ def print_batch_started(batch: BatchResponse, json_mode: bool) -> None:
         return
     rows = [format_run_row(r) for r in batch.story_runs]
     print_table(RUN_TABLE_HEADERS, rows, title=f"Batch {batch.id} — {batch.status.value}")
+    print_targets(batch.targets)
     print_info(
         f"Started {len(batch.story_runs)} runs. "
         f"Use `minitest batch get {batch.id}` or `minitest run status <id>` to follow up."

@@ -150,12 +150,15 @@ class TestRunFromCommit:
             "commitSha": SHA,
             "targets": [
                 {
+                    "targetId": "t1",
                     "platform": "web",
+                    "label": "web",
                     "buildId": "01171854-02d8-4f63-ae04-c8c7400fdd64",
                     "status": "awaiting_build",
                     "passed": 0,
                     "criticals": 0,
                     "warnings": 0,
+                    "skipped": 0,
                 }
             ],
             "storyRuns": [],

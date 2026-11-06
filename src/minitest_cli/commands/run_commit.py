@@ -24,17 +24,24 @@ from minitest_cli.commands.run_backend_override import (
     backend_api_override,
 )
 from minitest_cli.commands.run_helpers import (
+    RUN_TABLE_HEADERS,
+    format_run_row,
     resolve_app,
     resolve_user_story_id,
     run_api_call,
 )
 from minitest_cli.models import BatchResponse, BatchStatus, CreateBatchRequest
-from minitest_cli.commands.run_targets import (
-    AndroidDeviceTypeOpt,
-    IosDeviceTypeOpt,
-    build_commit_targets,
+from minitest_cli.commands.run_commit_targets import build_commit_targets
+from minitest_cli.commands.run_targets import AndroidDeviceTypeOpt, IosDeviceTypeOpt
+from minitest_cli.commands.target_spec import TargetOpt, TargetsFileOpt, collect_specs
+from minitest_cli.commands.target_summary import print_targets
+from minitest_cli.utils.output import (
+    output,
+    print_info,
+    print_success,
+    print_table,
+    print_warning,
 )
-from minitest_cli.utils.output import output, print_info, print_success, print_warning
 
 CommitShaArg = Annotated[
     str, typer.Argument(help="Full 40-character commit SHA to build and test.")
@@ -65,6 +72,8 @@ def from_commit(
     platform: PlatformOpt = None,
     ios_device_type: IosDeviceTypeOpt = None,
     android_device_type: AndroidDeviceTypeOpt = None,
+    target: TargetOpt = None,
+    targets_file: TargetsFileOpt = None,
     scenario: ScenarioOpt = None,
     legacy_user_story: LegacyUserStoryOpt = None,
     watch: WatchOpt = True,
@@ -76,7 +85,9 @@ def from_commit(
     settings, app_id, json_mode = resolve_app()
     sha = validate_commit_sha(commit_sha)
     platforms = validate_platforms(platform)
-    targets = build_commit_targets(platforms, ios_device_type, android_device_type)
+    targets, scope = build_commit_targets(
+        platforms, ios_device_type, android_device_type, collect_specs(target, targets_file)
+    )
     scenarios = merge_deprecated_option(
         scenario, legacy_user_story, old_flag="--user-story", new_flag="--scenario"
     )
@@ -91,7 +102,7 @@ def from_commit(
             body = CreateBatchRequest(
                 user_story_ids=story_ids,
                 commit_sha=sha,
-                platforms=platforms if targets is None else None,
+                platforms=scope,
                 targets=targets,
                 backend_api_override=backend_api_override(backend_base_url, backend_openapi_url),
             )
@@ -120,4 +131,7 @@ def from_commit(
         )
     elif not watch:
         print_info(f"Follow up with `minitest batch get {batch.id}`.")
-    output(payload, json_mode=False)
+    output({k: v for k, v in payload.items() if k not in ("targets", "storyRuns")}, json_mode=False)
+    print_targets(batch.targets)
+    if batch.story_runs:
+        print_table(RUN_TABLE_HEADERS, [format_run_row(run) for run in batch.story_runs])

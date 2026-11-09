@@ -1,0 +1,17 @@
+name: QA stamp
+
+# Checks the QA stamp in the PR body (qa-stamp skill in the umbrella). `require` fails the
+# pull request only when the stamp is missing or invalid; `pending` and better pass here.
+# Full proof is checked at release time.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  qa-stamp:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: minitap-ai/devops-common/.github/workflows/qa-stamp.yml@v8.7.0
+    with:
+      mode: require

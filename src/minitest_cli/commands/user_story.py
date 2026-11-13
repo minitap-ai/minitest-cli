@@ -9,6 +9,7 @@ from minitest_cli.commands import (
     user_story_create,
     user_story_delete,
     user_story_modify,
+    user_story_network_control,
     user_story_setup_commit,
 )
 from minitest_cli.commands.deprecated_alias import deprecated_alias
@@ -42,6 +43,7 @@ app.command(name="create")(user_story_create.create_user_story)
 app.command(name="update")(user_story_modify.update_user_story)
 app.command(name="delete")(user_story_delete.delete_user_story)
 app.command(name="allow-setup-commit")(user_story_setup_commit.allow_setup_commit)
+app.command(name="network-control")(user_story_network_control.set_network_control)
 app.command(name="revoke-setup-commit")(user_story_setup_commit.revoke_setup_commit)
 
 

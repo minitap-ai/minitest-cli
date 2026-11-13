@@ -527,6 +527,23 @@ minitest --json --app <app_id> scenario delete <user_story_id> --force
 > index; passing `id` fails with "No criterion matches id".
 > `--revert-criterion <criterionId>=<id-of-the-target-version>` takes one of each.
 
+#### Criteria that need network control
+
+Mark every criterion that turns Wi-Fi or airplane mode off, or slows the network.
+Cloud iOS simulators cannot change the network: there a marked criterion is
+skipped instead of judged, and the scenario's other criteria still run (a
+scenario whose every criterion is marked is skipped on them). Android and
+physical iPhones check it as usual.
+
+```bash
+minitest --json --app <app_id> scenario network-control <story_id> 2 3
+minitest --json --app <app_id> scenario network-control <story_id> <criterionId> --off
+```
+
+> Takes 1-based indexes on a live scenario, or `criterionId`s — use the
+> `criterionId` for a criterion created in a draft. `scenario get --json` shows
+> `needsNetworkControl` on each criterion.
+
 #### Story dependencies
 
 Use `--depends-on` / `--remove-dependency` on `scenario update` to manage
@@ -1551,6 +1568,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Revert criterion to a version | `minitest --json --app ID scenario update <id> --revert-criterion <crit_id>=<version_id>` |
 | Set story dependencies | `minitest --json --app ID scenario update <id> --depends-on <parent_id> [--depends-on <parent_id2>]` |
 | Remove a dependency | `minitest --json --app ID scenario update <id> --remove-dependency <parent_id>`        |
+| Mark criteria needing network control | `minitest --json --app ID scenario network-control <id> <index-or-crit_id>...` |
 | Allow a setup commit | `minitest --json --app ID scenario allow-setup-commit <id> --customer-quote "..."` |
 | Revoke a setup commit | `minitest --json --app ID scenario revoke-setup-commit <id>`                        |
 | Set story device count | `minitest --json --app ID scenario update <id> --device-count 2` (or `auto` to reset) |

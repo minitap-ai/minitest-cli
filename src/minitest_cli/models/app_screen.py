@@ -1,24 +1,9 @@
-"""Pydantic models for the screen map (``GET /api/v1/apps/{app_id}/screens``).
+"""Pydantic models for the screen tree (``GET /api/v1/apps/{app_id}/screen-tree``).
 
-Casing seam — the one thing to get right here. testing-service serialises the
-*envelope* in camelCase (``ScreenMapResponse`` / ``ScreenNodeResponse`` extend
-``BaseApiModel``, which carries an alias generator), but it embeds ``outgoing``
-and ``context`` as the DB models verbatim, and those extend ``DbModelConfig``,
-which has **no** alias generator. So a node arrives as::
-
-    {"screenKey": "welcome", ..., "outgoing": [{"to_screen_key": ...}]}
-
-camelCase outside, snake_case inside. The models below mirror that exactly:
-``ScreenEdge`` / ``ScreenContext`` / ``ScreenPrecondition`` are plain
-``BaseModel``s, deliberately *not* ``CamelModel``.
-
-The failure mode is on the **write** side, not the read side. ``CamelModel``
-sets ``populate_by_name``, so it would still happily *parse* snake_case input —
-which is exactly what makes the mistake easy to ship. What breaks is
-``--json``: ``model_dump(by_alias=True)`` would emit ``toScreenKey`` where the
-API emits ``to_screen_key``, so anything piping the CLI's JSON would silently
-read a different shape than the same field served by the API.
-``TestWireShape`` in ``tests/test_screens_commands.py`` pins the emitted keys.
+Casing seam: the envelope is camelCase, but each screen's ``context`` is the
+testing-service DB model embedded verbatim, which is snake_case. ``ScreenContext``
+and ``ScreenPrecondition`` are therefore plain ``BaseModel``s, not ``CamelModel``:
+``--json`` must emit ``requires_auth`` exactly as the API serves it.
 """
 
 from datetime import datetime
@@ -27,34 +12,16 @@ from pydantic import BaseModel, Field
 
 from minitest_cli.models.base import CamelModel
 
+AUTO_ELEMENT_KEY = "(auto)"
+AUTO_ELEMENT_KIND = "auto"
+
 
 class ScreenPrecondition(BaseModel):
-    """One machine-testable precondition. Snake_case on the wire."""
-
     kind: str
     ref: str | None = None
 
 
-class ScreenEdge(BaseModel):
-    """An observed onward affordance from a screen. Snake_case on the wire.
-
-    A ``parked`` edge is the crawl saying "I saw the way on and chose not to
-    follow it" — collectively, the parked edges are the unexplored frontier.
-    """
-
-    action: str
-    to_screen_key: str | None = None
-    onward_observed: bool = False
-    parked: bool = False
-    parked_reason: str | None = None
-    parked_kind: str | None = None
-    last_verified_at: datetime | None = None
-    consecutive_failures: int = 0
-
-
 class ScreenContext(BaseModel):
-    """What it takes to stand on a screen. Snake_case on the wire."""
-
     requires_auth: bool = False
     persona_ref: str | None = None
     preconditions: list[ScreenPrecondition] = Field(default_factory=list)
@@ -64,29 +31,72 @@ class ScreenContext(BaseModel):
     cheaply_reachable_reason: str | None = None
 
 
-class ScreenNode(CamelModel):
-    """One node of the screen map. camelCase envelope."""
+class TransitionCounts(CamelModel):
+    explored: int = 0
+    pending: int = 0
+    blocked: int = 0
+    skipped: int = 0
+
+
+class TreeCounts(TransitionCounts):
+    screens: int = 0
+
+
+class ScreenTransition(CamelModel):
+    """``(from screen, element) → to screen``, tagged with the account that walked it.
+
+    ``persona_ref`` is ``""`` for signed-out, never null.
+    """
 
     id: str
-    platform: str
+    from_screen_key: str
+    element_key: str
+    element_label: str
+    element_kind: str
+    to_screen_key: str | None = None
+    status: str
+    reason: str | None = None
+    persona_ref: str = ""
+    gated_by: str | None = None
+    first_walked_at: datetime | None = None
+    last_walked_at: datetime | None = None
+    is_tree_edge: bool = False
+
+    @property
+    def is_auto(self) -> bool:
+        return self.element_kind == AUTO_ELEMENT_KIND or self.element_key == AUTO_ELEMENT_KEY
+
+
+class TreeScreen(CamelModel):
+    """A screen placed in the tree. ``depth`` is null for detached screens."""
+
     screen_key: str
     display_name: str
-    depth: int
     area: str | None = None
-    discovered_at: datetime
-    first_reached_at: datetime
-    blocked_reason: str | None = None
-    gated_by: str | None = None
+    notes: str | None = None
+    context: ScreenContext | None = None
     screenshot_path: str | None = None
     screenshot_url: str | None = None
-    outgoing: list[ScreenEdge] = Field(default_factory=list)
-    context: ScreenContext | None = None
+    first_reached_at: datetime | None = None
+    depth: int | None = None
+    parent_transition_id: str | None = None
+    child_transition_ids: list[str] = Field(default_factory=list)
+    outgoing_transition_ids: list[str] = Field(default_factory=list)
+    incoming_transition_ids: list[str] = Field(default_factory=list)
+    counts: TransitionCounts = Field(default_factory=TransitionCounts)
 
 
-class ScreenMapResponse(CamelModel):
-    """The whole map for an app, in one fetch. camelCase envelope."""
+class ScreenTree(CamelModel):
+    """One platform's tree: screens, every transition between them, and the detached rest."""
 
+    platform: str
+    root_screen_key: str | None = None
+    counts: TreeCounts = Field(default_factory=TreeCounts)
+    screens: list[TreeScreen] = Field(default_factory=list)
+    transitions: list[ScreenTransition] = Field(default_factory=list)
+    detached_screen_keys: list[str] = Field(default_factory=list)
+
+
+class ScreenTreeResponse(CamelModel):
     app_id: str
-    platform: str | None = None
-    screen_count: int
-    screens: list[ScreenNode] = Field(default_factory=list)
+    trees: list[ScreenTree] = Field(default_factory=list)

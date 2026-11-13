@@ -1,86 +1,154 @@
 """Data access and selection for ``minitest screens``.
 
-Presentation (table headers, rows, hint lines) lives in ``screens_format``.
+Presentation lives in ``screens_format`` (table), ``screens_tree`` (tree) and
+``screens_detail`` (one screen).
 """
+
+from dataclasses import dataclass
+from enum import StrEnum
+
+from rich.markup import escape
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands._response_errors import handle_response_error
 from minitest_cli.commands.build_helpers import run_api_call
 from minitest_cli.core.config import Settings
-from minitest_cli.models import ScreenEdge, ScreenMapResponse, ScreenNode
+from minitest_cli.models import (
+    ScreenTransition,
+    ScreenTree,
+    ScreenTreeResponse,
+    TreeCounts,
+    TreeScreen,
+)
+
+SIGNED_OUT = "signed out"
+_VIA_WIDTH = 46
 
 
-def screens_path(app_id: str) -> str:
-    """Return the screen-map API path for an app."""
-    return f"/api/v1/apps/{app_id}/screens"
+class ScreenPlatform(StrEnum):
+    android = "android"
+    ios = "ios"
+    web = "web"
 
 
-async def _get_screen_map(
+def screen_tree_path(app_id: str) -> str:
+    return f"/api/v1/apps/{app_id}/screen-tree"
+
+
+async def _get_screen_tree(
     settings: Settings, app_id: str, platform: str | None
-) -> ScreenMapResponse:
+) -> ScreenTreeResponse:
     params: dict[str, str] = {}
     if platform is not None:
         params["platform"] = platform
 
     async with ApiClient(settings) as client:
-        resp = await client.get(screens_path(app_id), params=params)
-    handle_response_error(resp, resource="Screen map")
-    return ScreenMapResponse.model_validate(resp.json())
+        resp = await client.get(screen_tree_path(app_id), params=params)
+    handle_response_error(resp, resource="Screen tree")
+    return ScreenTreeResponse.model_validate(resp.json())
 
 
-def fetch_screen_map(settings: Settings, app_id: str, platform: str | None) -> ScreenMapResponse:
-    """Fetch the whole screen map in one call."""
-    return run_api_call(_get_screen_map(settings, app_id, platform))
+def fetch_screen_tree(settings: Settings, app_id: str, platform: str | None) -> ScreenTreeResponse:
+    response = run_api_call(_get_screen_tree(settings, app_id, platform))
+    if platform is None:
+        return response
+    trees = [tree for tree in response.trees if tree.platform == platform]
+    return response.model_copy(update={"trees": trees})
 
 
 def truncate(text: str, limit: int) -> str:
-    """Shorten text for display, marking the cut."""
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def filter_nodes(
-    nodes: list[ScreenNode], *, area: str | None, blocked_only: bool
-) -> list[ScreenNode]:
-    """Apply the client-side filters. The API returns the whole map in one fetch."""
-    selected = nodes
+def account_label(transition: ScreenTransition) -> str:
+    return transition.persona_ref or SIGNED_OUT
+
+
+def element_label(transition: ScreenTransition) -> str:
+    return "(auto)" if transition.is_auto else transition.element_label
+
+
+def via_markup(transition: ScreenTransition) -> str:
+    """Element tapped, plus the account when the walk was not signed out."""
+    label = escape(truncate(element_label(transition), _VIA_WIDTH))
+    if transition.persona_ref:
+        label += f" [magenta]as {escape(transition.persona_ref)}[/magenta]"
+    return label
+
+
+@dataclass(frozen=True)
+class TreeIndex:
+    tree: ScreenTree
+    screens: dict[str, TreeScreen]
+    transitions: dict[str, ScreenTransition]
+
+    @classmethod
+    def of(cls, tree: ScreenTree) -> "TreeIndex":
+        return cls(
+            tree=tree,
+            screens={s.screen_key: s for s in tree.screens},
+            transitions={t.id: t for t in tree.transitions},
+        )
+
+    def name(self, screen_key: str | None) -> str:
+        if screen_key is None:
+            return "?"
+        screen = self.screens.get(screen_key)
+        return screen.display_name if screen else screen_key
+
+    def pick(self, ids: list[str]) -> list[ScreenTransition]:
+        return [self.transitions[i] for i in ids if i in self.transitions]
+
+    def parent(self, screen: TreeScreen) -> ScreenTransition | None:
+        if screen.parent_transition_id is None:
+            return None
+        return self.transitions.get(screen.parent_transition_id)
+
+
+def select_screens(tree: ScreenTree, *, area: str | None, blocked_only: bool) -> list[TreeScreen]:
+    selected = tree.screens
     if area is not None:
         wanted = area.strip().casefold()
-        selected = [n for n in selected if (n.area or "").casefold() == wanted]
+        selected = [s for s in selected if (s.area or "").casefold() == wanted]
     if blocked_only:
-        selected = [n for n in selected if n.blocked_reason]
+        selected = [s for s in selected if s.counts.blocked > 0]
     return selected
 
 
-def find_node(nodes: list[ScreenNode], needle: str) -> list[ScreenNode]:
-    """Match a screen by canonical key or display name, case-insensitively.
+def narrow_tree(tree: ScreenTree, keep: list[TreeScreen]) -> ScreenTree:
+    """Restrict a tree to ``keep`` and every transition touching it, counts recomputed.
 
-    Returns every match: one screen key can exist on both platforms, and the
-    caller needs to say so rather than silently picking one.
+    Tree counts stay the sum of the kept screens' outgoing counts, and every
+    transition id a kept screen references is still present.
     """
+    keys = {s.screen_key for s in keep}
+    counts = TreeCounts(
+        screens=len(keep),
+        explored=sum(s.counts.explored for s in keep),
+        pending=sum(s.counts.pending for s in keep),
+        blocked=sum(s.counts.blocked for s in keep),
+        skipped=sum(s.counts.skipped for s in keep),
+    )
+    transitions = [
+        t for t in tree.transitions if t.from_screen_key in keys or t.to_screen_key in keys
+    ]
+    detached = [k for k in tree.detached_screen_keys if k in keys]
+    return tree.model_copy(
+        update={
+            "screens": keep,
+            "transitions": transitions,
+            "counts": counts,
+            "detached_screen_keys": detached,
+        }
+    )
+
+
+def find_screens(response: ScreenTreeResponse, needle: str) -> list[tuple[ScreenTree, TreeScreen]]:
+    """Match by screen key or display name, case-insensitively, across every tree."""
     wanted = " ".join(needle.split()).casefold()
     return [
-        n for n in nodes if n.screen_key.casefold() == wanted or n.display_name.casefold() == wanted
-    ]
-
-
-def parked_count(node: ScreenNode) -> int:
-    """Edges the crawl saw but chose not to follow."""
-    return sum(1 for edge in node.outgoing if edge.parked)
-
-
-def dangling_edges(nodes: list[ScreenNode]) -> list[tuple[ScreenNode, ScreenEdge]]:
-    """Followed edges whose destination has no row in the map.
-
-    The crawl says it walked somewhere, but no screen was ever written under
-    that key — usually because the destination was named slightly differently
-    than the screen later called itself, so the two normalise apart. It means
-    the map understates what was actually reached, which is worth saying out
-    loud rather than rendering as a silently truncated tree.
-    """
-    keys = {n.screen_key for n in nodes}
-    return [
-        (node, edge)
-        for node in nodes
-        for edge in node.outgoing
-        if not edge.parked and (edge.to_screen_key or "") not in keys
+        (tree, screen)
+        for tree in response.trees
+        for screen in tree.screens
+        if wanted in (screen.screen_key.casefold(), screen.display_name.casefold())
     ]

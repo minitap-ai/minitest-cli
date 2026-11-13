@@ -1,97 +1,65 @@
-"""Table and hint rendering for ``minitest screens``."""
+"""Table, title and summary rendering for ``minitest screens list``."""
 
-from minitest_cli.commands.screens_helpers import dangling_edges, parked_count, truncate
-from minitest_cli.models import ScreenMapResponse, ScreenNode
+from rich.markup import escape
 
-BASE_HEADERS = ["Depth", "Screen", "Area", "Reach", "Out", "Parked", "Status"]
+from minitest_cli.commands.screens_helpers import TreeIndex, element_label, truncate
+from minitest_cli.models import ScreenTree, ScreenTreeResponse, TreeScreen
+
+HEADERS = ["Depth", "Screen", "Area", "Reached via", "Explored", "Pending", "Blocked", "Skipped"]
 
 _NAME_WIDTH = 44
-_REASON_WIDTH = 34
+_VIA_WIDTH = 30
 
 
-def reach_label(node: ScreenNode) -> str:
-    """Summarise what it takes to stand on this screen."""
-    ctx = node.context
-    if ctx is None:
+def reached_via(index: TreeIndex, screen: TreeScreen) -> str:
+    parent = index.parent(screen)
+    if parent is None:
         return "—"
-    parts: list[str] = []
-    if ctx.reachable_via:
-        parts.append(ctx.reachable_via)
-    if ctx.requires_auth:
-        parts.append(f"auth:{ctx.persona_ref or '?'}")
-    if not ctx.cheaply_reachable:
-        parts.append("costly")
-    return " ".join(parts) or "—"
+    return escape(truncate(element_label(parent), _VIA_WIDTH))
 
 
-def status_label(node: ScreenNode) -> str:
-    """Render the blocked reason, which is a reason rather than a boolean."""
-    if node.blocked_reason:
-        return truncate(node.blocked_reason, _REASON_WIDTH)
-    return "ok"
-
-
-def headers(*, show_platform: bool) -> list[str]:
-    if not show_platform:
-        return BASE_HEADERS
-    return [*BASE_HEADERS[:2], "Platform", *BASE_HEADERS[2:]]
-
-
-def format_screen_row(node: ScreenNode, *, show_platform: bool) -> list[str]:
-    """Format one screen as a table row."""
-    parked = parked_count(node)
-    row = [
-        str(node.depth),
-        truncate(node.display_name, _NAME_WIDTH),
-        node.area or "—",
-        reach_label(node),
-        str(len(node.outgoing) - parked),
-        str(parked) if parked else "—",
-        status_label(node),
+def format_screen_row(index: TreeIndex, screen: TreeScreen) -> list[str]:
+    counts = screen.counts
+    return [
+        "—" if screen.depth is None else str(screen.depth),
+        escape(truncate(screen.display_name, _NAME_WIDTH)),
+        escape(screen.area or "—"),
+        reached_via(index, screen),
+        str(counts.explored),
+        str(counts.pending),
+        str(counts.blocked),
+        str(counts.skipped),
     ]
-    if show_platform:
-        row.insert(2, node.platform)
-    return row
 
 
-def table_title(screen_map: ScreenMapResponse, shown: list[ScreenNode]) -> str:
-    """Title that distinguishes 'filtered down to' from 'this is all there is'."""
-    total = screen_map.screen_count
+def tree_title(index: TreeIndex, shown: list[TreeScreen]) -> str:
+    tree = index.tree
+    total = len(tree.screens)
     scope = f"{len(shown)} of {total}" if len(shown) != total else str(total)
-    suffix = f" ({screen_map.platform})" if screen_map.platform else ""
-    depths = [n.depth for n in shown]
-    span = f", depth {min(depths)}–{max(depths)}" if depths else ""
-    return f"Screens{suffix} — {scope} mapped{span}"
+    root = index.name(tree.root_screen_key) if tree.root_screen_key else "none recorded"
+    return f"Screens ({tree.platform}) — {scope} screen(s), root: {escape(root)}"
 
 
-def frontier_hint(shown: list[ScreenNode], all_nodes: list[ScreenNode]) -> str:
-    """Surface the frontier — the question a screen list is usually asked to answer.
-
-    ``shown`` drives the counts the user can see; ``all_nodes`` drives the
-    dangling check, so a filtered view never reports its own filtering as a
-    broken map.
-    """
-    parked = sum(parked_count(n) for n in shown)
-    blocked = sum(1 for n in shown if n.blocked_reason)
-    dangling = len(dangling_edges(all_nodes))
-
-    bits: list[str] = []
-    if parked:
-        bits.append(f"{parked} parked edge(s) — onward navigation seen but not followed")
-    if blocked:
-        bits.append(f"{blocked} blocked screen(s)")
-    if dangling:
-        bits.append(f"{dangling} edge(s) leading to a screen with no row in the map")
-    if not bits:
-        return ""
-    return f"Frontier: {'; '.join(bits)}. Use --tree to see where they sit."
+def summary_line(tree: ScreenTree, shown: list[TreeScreen]) -> str:
+    """Totals over the shown screens: their outgoing transitions by status, and detached."""
+    detached = set(tree.detached_screen_keys)
+    parts = [
+        f"{len(shown)} screen(s)",
+        f"{sum(s.counts.explored for s in shown)} explored",
+        f"{sum(s.counts.pending for s in shown)} pending",
+        f"{sum(s.counts.blocked for s in shown)} blocked",
+        f"{sum(s.counts.skipped for s in shown)} skipped",
+        f"{sum(1 for s in shown if s.screen_key in detached)} detached",
+    ]
+    return "Totals: " + " · ".join(parts)
 
 
-def empty_message(screen_map: ScreenMapResponse, *, area: str | None, blocked: bool) -> str:
+def empty_message(response: ScreenTreeResponse, *, area: str | None, blocked: bool) -> str:
     """Explain an empty result: nothing crawled yet, versus filtered to nothing."""
-    if screen_map.screen_count == 0:
+    total = sum(len(tree.screens) for tree in response.trees)
+    if total == 0:
         return (
-            "No screens mapped for this app yet. The map is written by the exploration "
+            "No screens mapped for this app yet. The tree is written by the exploration "
             "crawl as it walks a build, so it stays empty until a crawl has run."
         )
     filters: list[str] = []
@@ -99,5 +67,4 @@ def empty_message(screen_map: ScreenMapResponse, *, area: str | None, blocked: b
         filters.append(f"--area {area}")
     if blocked:
         filters.append("--blocked")
-    applied = " ".join(filters) or "the current filters"
-    return f"{screen_map.screen_count} screen(s) mapped, but none match {applied}."
+    return f"{total} screen(s) mapped, but none match {' '.join(filters)}."

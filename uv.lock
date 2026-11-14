@@ -141,7 +141,7 @@ wheels = [
 
 [[package]]
 name = "minitest-cli"
-version = "0.50.1"
+version = "0.51.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

@@ -225,7 +225,7 @@ Any email field an app asks for takes a `@qa.minitap.ai` address, and a contact 
 - **Names** are unique per app (case-insensitive), at most 255 characters. Username and password ≤255, `about` ≤2000, `static_otp_code` ≤32, `phone_number` is E.164.
 - **Deleting** a test account still bound to a scenario is refused (409) and lists those scenarios; rebind them first.
 - **Shared test accounts** can be bound but are read-only: they cannot be edited, deleted, or set as default.
-- **`exclusive_use`** keeps two concurrently running tests off the same account — matched by login (username, else phone number), so it also covers the same login bound in another app. Set it on every test account that signs into that account: a non-exclusive one on the same login is not held back. Set in the webapp ("One run at a time") or the API; minitest-cli has no flag.
+- **`exclusive_use`** keeps two concurrently running tests off the same account — matched by login (username, else phone number), so it also covers the same login bound in another app. Set it on every test account that signs into that account: a non-exclusive one on the same login is not held back. Set in the webapp ("One run at a time"), the API, or `minitest test-profile create|update --exclusive` (`--no-exclusive` to turn it off).
 - **Status:** each test account has a provisioning status (`untested`, `unverified`, `working`, `failed`). Changing the password resets it (to `unverified`, or `untested` when cleared); other edits don't. Only a real sign-in sets `working` or `failed`.
 
 **Coverage check:** before creating scenarios, verify you have a test account for every distinct role visible in the app. A missing account means missing entire feature surfaces.

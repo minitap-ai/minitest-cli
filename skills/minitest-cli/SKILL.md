@@ -1600,6 +1600,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Generate a secret   | `minitest --json --app ID secret create <NAME> --kind password --generate [--length N] [--charset alnum]` |
 | Ask a human for a secret | `minitest --json --app ID secret create <NAME> --kind K --empty --reason "..." [--scenario ID]` |
 | Link a secret to a persona | `minitest --json --app ID test-profile update <id> --password-secret <NAME> \| --otp-secret <NAME> \| --card-secret <NAME>` |
+| One run at a time on an account | `minitest --json --app ID test-profile update <id> --exclusive` (`--no-exclusive` to turn it off) |
 | Lint secret references | `minitest --app ID secret lint --scenario ID \| --file PATH \| --text "..."` (exit 1 on leak or missing) |
 | Set / remove / rename a secret (humans only) | `secret set <NAME> --kind K` (stdin), `secret unset <NAME>`, `secret rename <OLD> <NEW>`, `secret extract <scenario_id> --as <NAME> --kind K` |
 | List env vars       | `minitest --json --app ID env list` (values masked; `--show` reveals)                    |

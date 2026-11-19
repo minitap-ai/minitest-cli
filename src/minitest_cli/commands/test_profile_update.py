@@ -22,6 +22,7 @@ from minitest_cli.commands.test_profile_helpers import (
     run_api_call,
     warn_if_qa_inbox_unreadable,
 )
+from minitest_cli.commands.test_profile_exclusive import ExclusiveOption
 from minitest_cli.commands.test_profile_secret_refs import (
     CardSecretOption,
     OtpSecretOption,
@@ -94,6 +95,7 @@ def register(app: typer.Typer) -> None:
         password_secret: PasswordSecretOption = None,
         otp_secret: OtpSecretOption = None,
         card_secret: CardSecretOption = None,
+        exclusive: ExclusiveOption = None,
     ) -> None:
         settings = get_settings()
         json_mode = is_json_mode()
@@ -156,6 +158,8 @@ def register(app: typer.Typer) -> None:
             otp_given=otp is not None,
             card_given=bool(card),
         )
+        if exclusive is not None:
+            body["exclusive_use"] = exclusive
         if not body and not card:
             print_error("Provide at least one field to update.")
             raise typer.Exit(code=1)

@@ -22,6 +22,7 @@ from minitest_cli.commands.test_profile_helpers import (
     run_api_call,
     warn_if_qa_inbox_unreadable,
 )
+from minitest_cli.commands.test_profile_exclusive import ExclusiveOption
 from minitest_cli.commands.test_profile_secret_refs import (
     CardSecretOption,
     OtpSecretOption,
@@ -90,6 +91,7 @@ def create_profile(
     password_secret: PasswordSecretOption = None,
     otp_secret: OtpSecretOption = None,
     card_secret: CardSecretOption = None,
+    exclusive: ExclusiveOption = None,
 ) -> None:
     settings = get_settings()
     json_mode = is_json_mode()
@@ -116,6 +118,8 @@ def create_profile(
         body["static_otp_code"] = otp
     if about is not None:
         body["about"] = about
+    if exclusive is not None:
+        body["exclusive_use"] = exclusive
     card = card_fields(
         test_card_number,
         test_card_expiry,

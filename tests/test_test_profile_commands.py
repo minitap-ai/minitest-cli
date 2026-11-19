@@ -364,3 +364,21 @@ class TestGet:
         with patch("minitest_cli.commands.test_profile.ApiClient", return_value=client):
             result = _run(["get", "missing"], settings)
         assert result.exit_code == 4
+
+
+class TestExclusiveUse:
+    def test_create_exclusive_sends_exclusive_use(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        client = _mock_client(post=_mock_response(201, _PROFILE))
+        with patch("minitest_cli.commands.test_profile.ApiClient", return_value=client):
+            result = _run(["create", "--name", "Buyer", "--exclusive"], settings, json_mode=True)
+        assert result.exit_code == 0
+        assert client.post.await_args.kwargs["json"] == {"name": "Buyer", "exclusive_use": True}
+
+    def test_update_no_exclusive_turns_it_off_alone(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        client = _mock_client(patch_=_mock_response(200, _PROFILE))
+        with patch("minitest_cli.commands.test_profile_update.ApiClient", return_value=client):
+            result = _run(["update", "p-111", "--no-exclusive"], settings, json_mode=True)
+        assert result.exit_code == 0
+        assert client.patch.await_args.kwargs["json"] == {"exclusive_use": False}

@@ -1,6 +1,7 @@
 """Tests for minitest_cli.core.auth — credentials, token loading, and refresh."""
 
 import json
+import os
 import time
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
@@ -286,10 +287,6 @@ class TestRefreshToken:
         assert result.access_token == "new-access"
         assert result.refresh_token == "new-refresh"
         assert result.client_id == "client-abc"
-        loaded = load_credentials(settings)
-        assert loaded is not None
-        assert loaded.access_token == "new-access"
-        assert loaded.client_id == "client-abc"
 
     def test_raises_session_revoked_without_client_id(self, tmp_path):
         """A session stored before client_id was persisted can never refresh."""
@@ -384,13 +381,14 @@ class TestDecodeJwtClaims:
 
 
 class TestSingleFlightRefresh:
-    def test_expired_creds_refresh_under_lock(self, tmp_path):
+    def test_expired_creds_refresh_under_lock_and_are_saved(self, tmp_path):
         settings = Settings(config_dir=tmp_path)
         save_credentials(settings, _make_credentials(expires_at=time.time() - 60))
         fresh = _make_credentials(access_token="refreshed")
         with patch("minitest_cli.core.auth.refresh_token", return_value=fresh) as mock_refresh:
             result = load_or_refresh_credentials(settings)
         assert result is fresh
+        assert load_credentials(settings) == fresh
         mock_refresh.assert_called_once()
 
     def test_skips_refresh_when_another_process_already_refreshed(self, tmp_path):
@@ -419,3 +417,39 @@ class TestSingleFlightRefresh:
         path = get_credentials_path(settings)
         assert (path.stat().st_mode & 0o777) == 0o600
         assert not list(tmp_path.glob(".credentials.json.tmp"))
+
+
+def _token_response(access_token: str) -> MagicMock:
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "access_token": access_token,
+        "refresh_token": f"{access_token}-refresh",
+        "expires_in": 3600,
+        "user": {"id": "user-789", "email": "test@example.com"},
+    }
+    return response
+
+
+class TestRefreshResilience:
+    @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores file permissions")
+    def test_read_only_config_dir_refreshes_in_memory(self, tmp_path, capsys):
+        """Agent sandboxes often forbid writes to ~/.minitest: keep working instead of crashing."""
+        settings = _make_settings(tmp_path)
+        stale = _make_credentials(expires_at=time.time() - 60)
+        save_credentials(settings, stale)
+        tmp_path.chmod(0o500)
+        try:
+            with patch(
+                "minitest_cli.core.oauth.httpx.post", return_value=_token_response("in-memory")
+            ) as mock_post:
+                first = load_token(settings)
+                second = load_token(settings)
+        finally:
+            tmp_path.chmod(0o700)
+
+        assert (first, second) == ("in-memory", "in-memory")
+        # One refresh per process, not one per request.
+        assert mock_post.call_count == 1
+        assert load_credentials(settings) == stale
+        assert "read-only" in capsys.readouterr().err

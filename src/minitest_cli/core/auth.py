@@ -7,8 +7,10 @@ Consumers should import from this module:
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import sys
+from pathlib import Path
 from typing import Any, Literal, TypedDict
 
 from minitest_cli.core.config import Settings
@@ -50,6 +52,9 @@ AuthMethod = Literal["api_key", "env_token", "oauth", "none"]
 
 _PRIORITY_WARNING_EMITTED = False
 
+# Refreshed logins that could not be written back, keyed by the stale token still on disk.
+_unsaved_refreshes: dict[tuple[Path, str], Credentials] = {}
+
 
 def _warn_priority_once(settings: Settings) -> None:
     global _PRIORITY_WARNING_EMITTED
@@ -86,6 +91,9 @@ def load_or_refresh_credentials(settings: Settings) -> Credentials | None:
         return None
     if not creds.is_expired:
         return creds
+    unsaved = _unsaved_refreshes.get((get_credentials_path(settings), creds.refresh_token))
+    if unsaved is not None and not unsaved.is_expired:
+        return unsaved
     # Single-flight: Supabase rotates the refresh token on use, so two parallel
     # CLI processes refreshing at once would race each other into a dead token.
     with refresh_lock(settings):
@@ -95,10 +103,27 @@ def load_or_refresh_credentials(settings: Settings) -> Credentials | None:
         if not creds.is_expired:
             return creds
         try:
-            return refresh_token(settings, creds)
+            refreshed = refresh_token(settings, creds)
         except SessionRevokedError:
-            clear_credentials(settings)
+            with contextlib.suppress(OSError):
+                clear_credentials(settings)
             raise
+        if refreshed is not None:
+            _persist_refreshed(settings, creds, refreshed)
+        return refreshed
+
+
+def _persist_refreshed(settings: Settings, stale: Credentials, refreshed: Credentials) -> None:
+    try:
+        save_credentials(settings, refreshed)
+    except OSError:
+        path = get_credentials_path(settings)
+        _unsaved_refreshes[(path, stale.refresh_token)] = refreshed
+        print(
+            f"[minitest] {path} is read-only here (agent sandbox?): the refreshed login "
+            "is used for this command only. Allow writes to it to stop refreshing every time.",
+            file=sys.stderr,
+        )
 
 
 def load_token(settings: Settings) -> str:

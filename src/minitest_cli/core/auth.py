@@ -27,6 +27,7 @@ from minitest_cli.core.token_exchange import (
     EXIT_CODE_AUTH_ERROR,
     SessionRevokedError,
     auth_error,
+    auth_server_unreachable,
 )
 
 __all__ = [
@@ -84,7 +85,8 @@ def load_or_refresh_credentials(settings: Settings) -> Credentials | None:
 
     Returns refreshed credentials, original credentials, or None. When the auth
     server rejects the stored token outright, the dead credentials are cleared
-    and SessionRevokedError propagates so callers can prompt a fresh login.
+    and SessionRevokedError propagates so callers can prompt a fresh login. When
+    the auth server cannot be reached, exits with a network error.
     """
     creds = load_credentials(settings)
     if creds is None:
@@ -108,8 +110,9 @@ def load_or_refresh_credentials(settings: Settings) -> Credentials | None:
             with contextlib.suppress(OSError):
                 clear_credentials(settings)
             raise
-        if refreshed is not None:
-            _persist_refreshed(settings, creds, refreshed)
+        if refreshed is None:
+            auth_server_unreachable(settings)
+        _persist_refreshed(settings, creds, refreshed)
         return refreshed
 
 

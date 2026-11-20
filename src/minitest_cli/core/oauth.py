@@ -27,15 +27,17 @@ from minitest_cli.core.token_exchange import (
 )
 
 _ASSETS = importlib.resources.files("minitest_cli.assets")
+REFRESH_ATTEMPTS = 3
+REFRESH_RETRY_DELAY_SECONDS = 1.0
 
 
 def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
     """Refresh an expired access token; the caller decides whether to persist the result.
 
     OAuth sessions must refresh against the same client that created them, so a
-    persisted client_id is required. Returns None on a transient failure. Raises
-    SessionRevokedError when the token can never succeed (missing client_id, or a
-    4xx rejection) so callers can clear it and re-login.
+    persisted client_id is required. Network errors and 5xx are retried, then None
+    is returned. Raises SessionRevokedError when the token can never succeed
+    (missing client_id, or a 4xx rejection) so callers can clear it and re-login.
     """
     if not settings.supabase_url or not settings.supabase_publishable_key:
         return None
@@ -43,37 +45,37 @@ def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
         raise SessionRevokedError
 
     supabase_url = settings.supabase_url.rstrip("/")
-    try:
-        response = httpx.post(
-            f"{supabase_url}/auth/v1/oauth/token",
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": creds.refresh_token,
-                "client_id": creds.client_id,
-            },
-            headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-                "apikey": settings.supabase_publishable_key,
-            },
-            timeout=15.0,
-        )
-    except httpx.HTTPError:
-        return None
-
-    if 400 <= response.status_code < 500:
-        raise SessionRevokedError
-    if response.status_code >= 500:
-        return None
-
-    try:
-        data = response.json()
-    except ValueError:
-        return None
-
-    if not isinstance(data, dict):
-        return None
-
-    return parse_token_response(data, creds.client_id)
+    for attempt in range(REFRESH_ATTEMPTS):
+        if attempt:
+            time.sleep(REFRESH_RETRY_DELAY_SECONDS * attempt)
+        try:
+            response = httpx.post(
+                f"{supabase_url}/auth/v1/oauth/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": creds.refresh_token,
+                    "client_id": creds.client_id,
+                },
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "apikey": settings.supabase_publishable_key,
+                },
+                timeout=15.0,
+            )
+        except httpx.HTTPError:
+            continue
+        if 400 <= response.status_code < 500:
+            raise SessionRevokedError
+        if response.status_code >= 500:
+            continue
+        try:
+            data = response.json()
+        except ValueError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        return parse_token_response(data, creds.client_id)
+    return None
 
 
 def oauth_pkce_login(settings: Settings) -> Credentials:

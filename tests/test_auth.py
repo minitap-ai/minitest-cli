@@ -25,6 +25,12 @@ from minitest_cli.core.auth import (
 )
 from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import REFRESH_BUFFER_SECONDS
+from minitest_cli.core.token_exchange import EXIT_CODE_NETWORK_ERROR
+
+
+@pytest.fixture
+def no_retry_delay(monkeypatch):
+    monkeypatch.setattr("minitest_cli.core.oauth.REFRESH_RETRY_DELAY_SECONDS", 0)
 
 
 def _make_settings(tmp_path, **overrides):
@@ -152,12 +158,14 @@ class TestGetAuthMethod:
         settings = _make_settings(tmp_path)
         assert get_auth_method(settings) == "none"
 
-    def test_none_when_credentials_expired_and_refresh_fails(self, tmp_path):
+    def test_exits_with_network_error_when_auth_server_unreachable(self, tmp_path):
         settings = _make_settings(tmp_path)
         expired_creds = _make_credentials(expires_at=time.time() - 100)
         save_credentials(settings, expired_creds)
         with patch("minitest_cli.core.auth.refresh_token", return_value=None):
-            assert get_auth_method(settings) == "none"
+            with pytest.raises(SystemExit) as exc_info:
+                get_auth_method(settings)
+        assert exc_info.value.code == EXIT_CODE_NETWORK_ERROR
 
     def test_oauth_when_credentials_expired_but_refresh_succeeds(self, tmp_path):
         settings = _make_settings(tmp_path)
@@ -193,7 +201,7 @@ class TestLoadToken:
             load_token(settings)
         assert exc_info.value.code == EXIT_CODE_AUTH_ERROR
 
-    def test_exits_when_refresh_fails(self, tmp_path):
+    def test_keeps_login_when_auth_server_unreachable(self, tmp_path, capsys):
         settings = _make_settings(tmp_path)
         expired_creds = _make_credentials(expires_at=time.time() - 60)
         save_credentials(settings, expired_creds)
@@ -201,7 +209,12 @@ class TestLoadToken:
         with patch("minitest_cli.core.auth.refresh_token", return_value=None):
             with pytest.raises(SystemExit) as exc_info:
                 load_token(settings)
-            assert exc_info.value.code == EXIT_CODE_AUTH_ERROR
+
+        assert exc_info.value.code == EXIT_CODE_NETWORK_ERROR
+        err = capsys.readouterr().err
+        assert "Could not reach the auth server" in err
+        assert "Not authenticated" not in err
+        assert load_credentials(settings) == expired_creds
 
 
 class TestSessionRevocation:
@@ -296,7 +309,7 @@ class TestRefreshToken:
         with pytest.raises(SessionRevokedError):
             refresh_token(settings, legacy_creds)
 
-    def test_returns_none_on_transient_network_error(self, tmp_path):
+    def test_returns_none_on_transient_network_error(self, tmp_path, no_retry_delay):
         """A network-level failure is transient — creds are worth keeping and retrying."""
         settings = _make_settings(tmp_path)
         old_creds = _make_credentials()
@@ -432,6 +445,33 @@ def _token_response(access_token: str) -> MagicMock:
 
 
 class TestRefreshResilience:
+    def test_refresh_survives_a_transient_network_error(self, tmp_path, no_retry_delay):
+        settings = _make_settings(tmp_path)
+        save_credentials(settings, _make_credentials(expires_at=time.time() - 60))
+
+        with patch(
+            "minitest_cli.core.oauth.httpx.post",
+            side_effect=[httpx.ConnectError("blip"), _token_response("after-blip")],
+        ):
+            assert load_token(settings) == "after-blip"
+
+        saved = load_credentials(settings)
+        assert saved is not None
+        assert saved.access_token == "after-blip"
+
+    def test_refresh_retries_a_5xx(self, tmp_path, no_retry_delay):
+        settings = _make_settings(tmp_path)
+        unavailable = MagicMock(status_code=503)
+
+        with patch(
+            "minitest_cli.core.oauth.httpx.post",
+            side_effect=[unavailable, _token_response("after-503")],
+        ):
+            result = refresh_token(settings, _make_credentials())
+
+        assert result is not None
+        assert result.access_token == "after-503"
+
     @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores file permissions")
     def test_read_only_config_dir_refreshes_in_memory(self, tmp_path, capsys):
         """Agent sandboxes often forbid writes to ~/.minitest: keep working instead of crashing."""

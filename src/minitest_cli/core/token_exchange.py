@@ -14,6 +14,7 @@ from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import Credentials, save_credentials
 
 EXIT_CODE_AUTH_ERROR = 2
+EXIT_CODE_NETWORK_ERROR = 3
 
 
 class SessionRevokedError(Exception):
@@ -135,3 +136,13 @@ def auth_error(message: str) -> NoReturn:
     """Print auth error to stderr and exit with code 2."""
     print(f"Error: {message}", file=sys.stderr)  # noqa: T201
     raise SystemExit(EXIT_CODE_AUTH_ERROR)
+
+
+def auth_server_unreachable(settings: Settings) -> NoReturn:
+    """Exit with a network error: the saved login is fine, it just could not be refreshed."""
+    print(  # noqa: T201
+        f"Error: Could not reach the auth server ({settings.supabase_url}) to refresh your "
+        "login. Your login is kept: check your network and retry.",
+        file=sys.stderr,
+    )
+    raise SystemExit(EXIT_CODE_NETWORK_ERROR)

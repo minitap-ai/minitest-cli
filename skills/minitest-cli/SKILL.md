@@ -496,6 +496,9 @@ Bind every story that requires authentication to its profile at creation time:
 - Must be **specific** and **unambiguous**
 - One assertion per criterion
 - Order them chronologically as they appear in the journey
+- A criterion that turns Wi-Fi or airplane mode off, goes offline or slows the
+  network: mark it with `scenario network-control` right after creating it
+  (see [Criteria that need network control](#criteria-that-need-network-control))
 
 Other scenario commands:
 

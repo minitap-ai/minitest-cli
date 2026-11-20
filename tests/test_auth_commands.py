@@ -227,7 +227,7 @@ class TestStatusCommand:
         assert data["token_configured"] is True
         assert data["method"] == "oauth"
 
-    def test_status_oauth_exits_2_when_refresh_fails(self, tmp_path):
+    def test_status_oauth_exits_3_when_auth_server_unreachable(self, tmp_path):
         settings = _make_settings(tmp_path)
         expired_creds = _make_credentials(expires_at=time.time() - 100)
         save_credentials(settings, expired_creds)
@@ -235,7 +235,7 @@ class TestStatusCommand:
         with patch("minitest_cli.core.auth.refresh_token", return_value=None):
             result = _run_with_context("status", settings, json_mode=False)
 
-        assert result.exit_code == 2
+        assert result.exit_code == 3
 
     def test_status_not_authenticated_json(self, tmp_path):
         settings = _make_settings(tmp_path)

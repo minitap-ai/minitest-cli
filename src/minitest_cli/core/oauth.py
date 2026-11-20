@@ -22,6 +22,7 @@ from minitest_cli.core.token_exchange import (
     SessionRevokedError,
     auth_error,
     parse_and_save_token_response,
+    parse_token_response,
     register_oauth_client,
 )
 
@@ -29,7 +30,7 @@ _ASSETS = importlib.resources.files("minitest_cli.assets")
 
 
 def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
-    """Refresh an expired access token, saving new credentials to disk.
+    """Refresh an expired access token; the caller decides whether to persist the result.
 
     OAuth sessions must refresh against the same client that created them, so a
     persisted client_id is required. Returns None on a transient failure. Raises
@@ -72,7 +73,7 @@ def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
     if not isinstance(data, dict):
         return None
 
-    return parse_and_save_token_response(settings, data, creds.client_id)
+    return parse_token_response(data, creds.client_id)
 
 
 def oauth_pkce_login(settings: Settings) -> Credentials:

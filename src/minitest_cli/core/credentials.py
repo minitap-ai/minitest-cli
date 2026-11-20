@@ -70,7 +70,13 @@ def save_credentials(settings: Settings, credentials: Credentials) -> None:
 def refresh_lock(settings: Settings) -> Iterator[None]:
     """Serialise token refresh across processes sharing this config dir."""
     lock_path = settings.ensure_config_dir() / LOCK_FILE_NAME
-    fd = os.open(lock_path, os.O_WRONLY | os.O_CREAT, CREDENTIALS_FILE_MODE)
+    try:
+        fd = os.open(lock_path, os.O_WRONLY | os.O_CREAT, CREDENTIALS_FILE_MODE)
+    except OSError:
+        # Read-only config dir (agent sandbox): refreshing unlocked is safe, the auth
+        # server hands every refresher of the same token the same successor.
+        yield
+        return
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)
         yield

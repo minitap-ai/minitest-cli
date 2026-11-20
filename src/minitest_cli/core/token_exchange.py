@@ -51,6 +51,14 @@ def parse_and_save_token_response(
     client_id is the OAuth client that owns the session; it must be persisted
     so refresh_token can re-authenticate against the same client.
     """
+    creds = parse_token_response(data, client_id)
+    if creds is not None:
+        save_credentials(settings, creds)
+    return creds
+
+
+def parse_token_response(data: dict[str, Any], client_id: str | None = None) -> Credentials | None:
+    """Build Credentials from a Supabase token response, or None when it is malformed."""
     try:
         user = data.get("user", {})
         if not isinstance(user, dict):
@@ -65,7 +73,7 @@ def parse_and_save_token_response(
             user_id = user_id or claims.get("sub", "")
             email = email or claims.get("email", "")
 
-        creds = Credentials(
+        return Credentials(
             access_token=data["access_token"],
             refresh_token=data["refresh_token"],
             expires_at=time.time() + int(expires_in),
@@ -73,8 +81,6 @@ def parse_and_save_token_response(
             email=email,
             client_id=client_id,
         )
-        save_credentials(settings, creds)
-        return creds
     except (KeyError, TypeError, ValueError):
         return None
 

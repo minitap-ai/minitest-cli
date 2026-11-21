@@ -78,6 +78,12 @@ SESSIONS = [
         logUrl=None,
         cases=[],
     ),
+    _session(
+        "44444444-4444-4444-8444-444444444444",
+        "Sign in on iPhone",
+        platform="ios",
+        device={"provider": "limrun", "model": "iPhone 16 Pro", "osVersion": "27.2"},
+    ),
 ]
 
 
@@ -150,6 +156,16 @@ class TestGet:
         assert "device_unavailable: no Android 15 phone emulator was free" in table
         assert "Pixel 7 · Android 15" in table
 
+    def test_each_test_shows_its_platform_and_platform_keeps_only_its_tests(self, server, tmp_path):
+        everything = _plain(_invoke(server, tmp_path, "get", RUN_ID).stdout)
+        ios = _invoke(server, tmp_path, "get", RUN_ID, "--platform", "ios", json_mode=True)
+
+        assert "Sign in on iPhone │ iOS │ passed │ iPhone 16 Pro · iOS 27.2" in everything
+        assert "Sign in │ Android │ passed │ Pixel 7 · Android 15" in everything
+        assert ios.exit_code == 0, ios.output
+        sessions = json.loads(ios.stdout)["sessions"]
+        assert [(s["name"], s["platform"]) for s in sessions] == [("Sign in on iPhone", "ios")]
+
     def test_unknown_run_says_runs_are_kept_90_days(self, server, tmp_path):
         result = _invoke(server, tmp_path, "get", "00000000-0000-4000-8000-000000000000")
 
@@ -177,7 +193,7 @@ class TestDownloads:
         result = _invoke(server, tmp_path, "appium-log", RUN_ID)
 
         assert result.exit_code == 1
-        assert "This run has 3 tests; pick one with --test" in _plain(result.stderr)
+        assert "This run has 4 tests; pick one with --test" in _plain(result.stderr)
         assert "Checkout total" in result.stderr
 
     def test_missing_appium_log_names_its_retention(self, server, tmp_path):

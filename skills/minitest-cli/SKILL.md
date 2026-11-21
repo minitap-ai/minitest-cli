@@ -1506,15 +1506,17 @@ read a missing run as all clear. Every flag, `--from-file` for agents, and
 
 ### 11. The team's own test suites (`minitest script-runs`)
 
-When the team runs its own Appium suite on the Minitest Appium hub, each WebDriver
+When the team runs its own Appium suite on the Minitest Appium hub (Android with
+UiAutomator2, iOS with XCUITest on iPhone simulators), each WebDriver
 session is one test, and sessions sharing `minitap:runName` (else the commit) form
 one script run (Results → Script runs in the webapp). Read them like the webapp does:
 
 ```bash
 # Runs, newest first; filter by status (running|passed|failed|unmarked), framework, name/commit
 minitest --json --app $APP script-runs list --status failed --search nightly
-# One run: every test with its status, cases, failure reason, device and Minitap-side issue
-minitest --json --app $APP script-runs get <run_id>
+# One run: every test with its platform, status, cases, failure reason, device and Minitap-side
+# issue; --platform android|ios keeps only that platform's tests (a run can mix both)
+minitest --json --app $APP script-runs get <run_id> [--platform ios]
 # A test's screen recording (MP4) and Appium log; --test takes its id, hub session id or name
 minitest --json --app $APP script-runs recording <run_id> --test "Checkout total" [--out f.mp4]
 minitest --json --app $APP script-runs appium-log <run_id> --test <test_id> [--out f.log]
@@ -1678,7 +1680,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Schedule history    | `minitest --json --app ID schedules fires <schedule> [--limit 5]` (verdict, new / still open / `fixed[]`, or `skipReason`) |
 | Delete a schedule   | `minitest --json --app ID schedules delete <schedule> --yes` (`schedules restore <id>` undoes) |
 | List script runs (own suites) | `minitest --json --app ID script-runs list [--status S] [--framework F] [--search Q] [--limit N] [--offset N]` |
-| Show a script run   | `minitest --json --app ID script-runs get <run_id>` (tests, failure reasons, Minitap-side issues) |
+| Show a script run   | `minitest --json --app ID script-runs get <run_id> [--platform android\|ios]` (tests with platform, failure reasons, Minitap-side issues) |
 | Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log <run_id> [--test T] [--out F]`, `script-runs junit <run_id> [--out F]` |
 | Auth                | `minitest auth login`, `minitest --json auth status`, `minitest auth logout`      |
 | Refresh this skill  | `minitest skill` (prints the latest skill markdown)                               |

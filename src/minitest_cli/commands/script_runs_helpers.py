@@ -66,6 +66,34 @@ def minitap_issue(session: ScriptSession) -> str | None:
 _PLATFORM_NAMES = {"android": "Android", "ios": "iOS", "web": "Web"}
 
 
+_WORST_FIRST = ("failed", "error", "running", "unmarked", "skipped", "passed")
+
+
+def group_by_test(sessions: list[ScriptSession]) -> list[list[ScriptSession]]:
+    """One group per test across devices, as the webapp; the same test twice on a device is two."""
+    groups: list[list[ScriptSession]] = []
+    for session in sessions:
+        name, device = test_label(session), device_label(session)
+        group = next(
+            (
+                g
+                for g in groups
+                if test_label(g[0]) == name and all(device_label(o) != device for o in g)
+            ),
+            None,
+        )
+        if group is None:
+            groups.append([session])
+        else:
+            group.append(session)
+    return groups
+
+
+def worst_status(sessions: list[ScriptSession]) -> str:
+    statuses = {session.status for session in sessions}
+    return next((s for s in _WORST_FIRST if s in statuses), sessions[0].status)
+
+
 def platform_label(session: ScriptSession) -> str:
     return _PLATFORM_NAMES.get(session.platform or "", session.platform or "")
 

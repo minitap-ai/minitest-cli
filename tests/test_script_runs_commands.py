@@ -52,7 +52,17 @@ SUMMARY: dict[str, Any] = {
     "startedAt": "2026-11-21T16:05:00Z",
 }
 SESSIONS = [
-    _session("11111111-1111-4111-8111-111111111111", "Sign in"),
+    _session(
+        "11111111-1111-4111-8111-111111111111",
+        "Sign in",
+        device={"provider": "limrun", "model": "limdroid_x86_64_only", "osVersion": "15"},
+        deviceTarget={
+            "platform": "android",
+            "backend": "emulator",
+            "model": "tablet",
+            "osVersion": "14",
+        },
+    ),
     _session(
         "22222222-2222-4222-8222-222222222222",
         "Checkout total",
@@ -155,13 +165,15 @@ class TestGet:
         assert "AssertionError: cart $28.99 but checkout $30.49" in table
         assert "device_unavailable: no Android 15 phone emulator was free" in table
         assert "Pixel 7 · Android 15" in table
+        assert "Tablet emulator · Android 14" in table
+        assert "limdroid" not in table
 
     def test_each_test_shows_its_platform_and_platform_keeps_only_its_tests(self, server, tmp_path):
         everything = _plain(_invoke(server, tmp_path, "get", RUN_ID).stdout)
         ios = _invoke(server, tmp_path, "get", RUN_ID, "--platform", "ios", json_mode=True)
 
-        assert "Sign in on iPhone │ iOS │ passed │ iPhone 16 Pro · iOS 27.2" in everything
-        assert "Sign in │ Android │ passed │ Pixel 7 · Android 15" in everything
+        assert "Sign in on iPhone │ iOS │ passed │ iPhone 16 Pro simulator · iOS 27.2" in everything
+        assert "Sign in │ Android │ passed │ Tablet emulator · Android 14" in everything
         assert ios.exit_code == 0, ios.output
         sessions = json.loads(ios.stdout)["sessions"]
         assert [(s["name"], s["platform"]) for s in sessions] == [("Sign in on iPhone", "ios")]

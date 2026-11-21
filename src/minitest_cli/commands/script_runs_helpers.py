@@ -71,9 +71,23 @@ def platform_label(session: ScriptSession) -> str:
 
 
 def device_label(session: ScriptSession) -> str:
-    device = session.device
-    if device is None:
-        return ""
+    """The device as the webapp names it: the target given, else what the device reported."""
     os_name = _PLATFORM_NAMES.get(session.platform or "", "OS")
-    os_version = f"{os_name} {device.os_version}" if device.os_version else None
-    return " · ".join(part for part in (device.model, os_version) if part)
+    target = session.device_target
+    version = target.os_version if target else None
+    reported = session.device.model if session.device else None
+    if session.platform == "ios" and (target is None or target.backend != "physical"):
+        model = f"{reported} simulator" if reported else "iPhone simulator"
+    elif target is not None:
+        model = target.model if target.backend == "physical" else _emulator(target.model)
+    else:
+        model = reported
+    version = version or (session.device.os_version if session.device else None)
+    if model is None:
+        return ""
+    os_version = f"{os_name} {version}" if version else None
+    return " · ".join(part for part in (model, os_version) if part)
+
+
+def _emulator(form_factor: str) -> str:
+    return f"{form_factor[:1].upper()}{form_factor[1:]} emulator"

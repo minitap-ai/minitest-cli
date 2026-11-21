@@ -1504,6 +1504,30 @@ A night that didn't run is a fire with `status: "skipped"` and **always a
 read a missing run as all clear. Every flag, `--from-file` for agents, and
 `update` semantics: [`commands/schedules.md`](commands/schedules.md).
 
+### 11. The team's own test suites (`minitest script-runs`)
+
+When the team runs its own Appium suite on the Minitest Appium hub, each WebDriver
+session is one test, and sessions sharing `minitap:runName` (else the commit) form
+one script run (Results → Script runs in the webapp). Read them like the webapp does:
+
+```bash
+# Runs, newest first; filter by status (running|passed|failed|unmarked), framework, name/commit
+minitest --json --app $APP script-runs list --status failed --search nightly
+# One run: every test with its status, cases, failure reason, device and Minitap-side issue
+minitest --json --app $APP script-runs get <run_id>
+# A test's screen recording (MP4) and Appium log; --test takes its id, hub session id or name
+minitest --json --app $APP script-runs recording <run_id> --test "Checkout total" [--out f.mp4]
+minitest --json --app $APP script-runs appium-log <run_id> --test <test_id> [--out f.log]
+# The run as JUnit XML, one suite per test
+minitest --json --app $APP script-runs junit <run_id> [--out report.xml]
+```
+
+A test's `status` is the team's own verdict (`minitap:setStatus`; `unmarked` when
+the suite never set one). How Minitap's side went is apart, in `infraOutcome` /
+`infraDetail` (`device_unavailable`, `appium_crashed`, `idle_timeout`…): a test
+that failed with an infra outcome other than `ok` is a Minitap-side problem, not
+an app bug. Script runs and their recordings are kept 90 days, Appium logs 30.
+
 ## CI / Automation Pattern
 
 ```bash
@@ -1653,6 +1677,9 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Run a schedule now  | `minitest --json --app ID schedules run <schedule>` (returns the fire: started + `batchId`, or skipped + `skipReason`) |
 | Schedule history    | `minitest --json --app ID schedules fires <schedule> [--limit 5]` (verdict, new / still open / `fixed[]`, or `skipReason`) |
 | Delete a schedule   | `minitest --json --app ID schedules delete <schedule> --yes` (`schedules restore <id>` undoes) |
+| List script runs (own suites) | `minitest --json --app ID script-runs list [--status S] [--framework F] [--search Q] [--limit N] [--offset N]` |
+| Show a script run   | `minitest --json --app ID script-runs get <run_id>` (tests, failure reasons, Minitap-side issues) |
+| Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log <run_id> [--test T] [--out F]`, `script-runs junit <run_id> [--out F]` |
 | Auth                | `minitest auth login`, `minitest --json auth status`, `minitest auth logout`      |
 | Refresh this skill  | `minitest skill` (prints the latest skill markdown)                               |
 | Read a reference doc | `minitest reference` (list topics) / `minitest reference <topic>` (markdown; bundled copy offline) |

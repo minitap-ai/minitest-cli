@@ -25,6 +25,7 @@ from minitest_cli.commands import (
     reference,
     run,
     schedules,
+    script_runs,
     screens,
     secret,
     skill,
@@ -75,6 +76,7 @@ app.add_typer(schedules.app)
 app.add_typer(targets_catalog.app)
 app.add_typer(issues.app)
 app.add_typer(batch.app)
+app.add_typer(script_runs.app)
 app.add_typer(skill.app)
 app.command(name="reference", help=reference.HELP)(reference.reference)
 app.add_typer(upgrade.app)

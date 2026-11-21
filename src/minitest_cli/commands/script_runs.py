@@ -18,6 +18,7 @@ from minitest_cli.commands.script_runs_helpers import (
     failure_reason,
     fetch_run,
     minitap_issue,
+    platform_label,
     script_runs_path,
     test_label,
 )
@@ -28,6 +29,11 @@ app = typer.Typer(
     name="script-runs",
     help="List and inspect your own test suites run on Minitap (Script runs in the webapp).",
 )
+
+
+class Platform(StrEnum):
+    android = "android"
+    ios = "ios"
 
 
 class RunStatus(StrEnum):
@@ -104,11 +110,17 @@ def list_runs(
 @app.command(name="get")
 def get_run(
     run_id: Annotated[str, typer.Argument(help="Script run ID.")],
+    platform: Annotated[
+        Platform | None, typer.Option(help="Only the tests that ran on this platform.")
+    ] = None,
 ) -> None:
-    """Get one script run: each test with its status, failure reason and Minitap-side issue."""
+    """Get one script run: each test with its platform, device, status, failure reason and
+    Minitap-side issue."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="script run id")
     run: ScriptRunDetail = run_api_call(fetch_run(settings, app_id, run_id))
+    if platform is not None:
+        run.sessions = [s for s in run.sessions if s.platform == platform]
     if json_mode:
         output(run.model_dump(mode="json", by_alias=True), json_mode=True)
         return
@@ -119,6 +131,7 @@ def get_run(
         [
             session.scripted_run_id,
             _shorten(test_label(session), 40),
+            platform_label(session),
             session.status,
             device_label(session),
             _shorten(failure_reason(session)),
@@ -127,7 +140,7 @@ def get_run(
         for session in run.sessions
     ]
     print_table(
-        ["Test ID", "Test", "Status", "Device", "Failure", "Minitap issue"],
+        ["Test ID", "Test", "Platform", "Status", "Device", "Failure", "Minitap issue"],
         rows,
         title=f"Tests ({len(rows)})",
     )

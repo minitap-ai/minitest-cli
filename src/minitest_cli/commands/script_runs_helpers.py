@@ -63,10 +63,17 @@ def minitap_issue(session: ScriptSession) -> str | None:
     return session.infra_outcome
 
 
+_PLATFORM_NAMES = {"android": "Android", "ios": "iOS", "web": "Web"}
+
+
+def platform_label(session: ScriptSession) -> str:
+    return _PLATFORM_NAMES.get(session.platform or "", session.platform or "")
+
+
 def device_label(session: ScriptSession) -> str:
     device = session.device
     if device is None:
         return ""
-    os_name = {"android": "Android", "ios": "iOS"}.get(session.platform or "", "OS")
+    os_name = _PLATFORM_NAMES.get(session.platform or "", "OS")
     os_version = f"{os_name} {device.os_version}" if device.os_version else None
     return " · ".join(part for part in (device.model, os_version) if part)

@@ -86,7 +86,26 @@ def group_by_test(sessions: list[ScriptSession]) -> list[list[ScriptSession]]:
             groups.append([session])
         else:
             group.append(session)
-    return groups
+    return [sorted(group, key=_device_order) for group in groups]
+
+
+_PLATFORM_ORDER = ("android", "ios", "web")
+
+
+def _device_order(session: ScriptSession) -> tuple[int, int, float]:
+    """Android before iOS, phones before tablets, newest OS first: as the webapp lists them."""
+    target = session.device_target
+    platform = session.platform or ""
+    rank = _PLATFORM_ORDER.index(platform) if platform in _PLATFORM_ORDER else len(_PLATFORM_ORDER)
+    tablet = int(target is not None and target.model == "tablet")
+    version = (target.os_version if target else None) or (
+        session.device.os_version if session.device else None
+    )
+    try:
+        os_version = float(version or 0)
+    except ValueError:
+        os_version = 0.0
+    return rank, tablet, -os_version
 
 
 def worst_status(sessions: list[ScriptSession]) -> str:

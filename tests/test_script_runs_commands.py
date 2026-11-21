@@ -212,6 +212,16 @@ class TestGet:
         ]
         assert tests[0]["devices"][1]["failure"] == "no Pay button"
 
+    def test_a_tests_devices_read_android_first_whatever_order_they_ran(self, server, tmp_path):
+        server.sessions = [
+            _session("77777777-7777-4777-8777-777777777777", "Sign in", platform="ios"),
+            _session("88888888-8888-4888-8888-888888888888", "Sign in"),
+        ]
+
+        tests = json.loads(_invoke(server, tmp_path, "get", RUN_ID, json_mode=True).stdout)["tests"]
+
+        assert [d["platform"] for d in tests[0]["devices"]] == ["android", "ios"]
+
     def test_unknown_run_says_runs_are_kept_90_days(self, server, tmp_path):
         result = _invoke(server, tmp_path, "get", "00000000-0000-4000-8000-000000000000")
 

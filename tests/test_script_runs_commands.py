@@ -100,6 +100,7 @@ SESSIONS = [
 class FakeTestingService:
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
+        self.sessions = SESSIONS
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -111,7 +112,7 @@ class FakeTestingService:
         if path == f"{BASE}/{RUN_ID}" and request.url.params.get("format") == "junit":
             return httpx.Response(200, content=b'<testsuites><testsuite name="x"/></testsuites>')
         if path == f"{BASE}/{RUN_ID}":
-            return httpx.Response(200, json={**SUMMARY, "sessions": SESSIONS})
+            return httpx.Response(200, json={**SUMMARY, "sessions": self.sessions})
         return httpx.Response(404, json={"detail": "Script run not found"})
 
 
@@ -177,6 +178,39 @@ class TestGet:
         assert ios.exit_code == 0, ios.output
         sessions = json.loads(ios.stdout)["sessions"]
         assert [(s["name"], s["platform"]) for s in sessions] == [("Sign in on iPhone", "ios")]
+
+    def test_a_test_on_android_and_iphone_is_one_line_with_each_device_status(
+        self, server, tmp_path
+    ):
+        server.sessions = [
+            _session("55555555-5555-4555-8555-555555555555", "Checkout total"),
+            _session(
+                "66666666-6666-4666-8666-666666666666",
+                "Checkout total",
+                platform="ios",
+                status="failed",
+                device={"provider": "limrun", "model": "iPhone 16 Pro", "osVersion": "27.2"},
+                cases=[
+                    {
+                        "position": 0,
+                        "name": "Checkout total",
+                        "status": "failed",
+                        "failureMessage": "no Pay button",
+                    }
+                ],
+            ),
+        ]
+
+        table = _plain(_invoke(server, tmp_path, "get", RUN_ID).stdout)
+        tests = json.loads(_invoke(server, tmp_path, "get", RUN_ID, json_mode=True).stdout)["tests"]
+
+        assert "Tests (1)" in table
+        assert "Pixel 7 · Android 15: passed" in table
+        assert "iPhone 16 Pro simulator · iOS 27.2: failed" in table
+        assert [(t["name"], t["status"], len(t["devices"])) for t in tests] == [
+            ("Checkout total", "failed", 2)
+        ]
+        assert tests[0]["devices"][1]["failure"] == "no Pay button"
 
     def test_unknown_run_says_runs_are_kept_90_days(self, server, tmp_path):
         result = _invoke(server, tmp_path, "get", "00000000-0000-4000-8000-000000000000")

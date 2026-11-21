@@ -20,6 +20,13 @@ class ScriptDevice(CamelModel):
     os_version: str | None = None
 
 
+class ScriptDeviceTarget(CamelModel):
+    platform: str
+    backend: str
+    model: str
+    os_version: str | None = None
+
+
 class ScriptCase(CamelModel):
     position: int
     classname: str | None = None
@@ -46,6 +53,7 @@ class ScriptSession(CamelModel):
     infra_outcome: str | None = None
     infra_detail: str | None = None
     capabilities: dict[str, Any] | None = None
+    device_target: ScriptDeviceTarget | None = None
     video_url: str | None = None
     log_url: str | None = None
     cases: list[ScriptCase] = []

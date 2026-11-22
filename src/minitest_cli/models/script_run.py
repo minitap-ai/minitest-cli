@@ -84,3 +84,24 @@ class ScriptRunList(CamelModel):
 
 class ScriptRunDetail(ScriptRunSummary):
     sessions: list[ScriptSession] = []
+
+
+class CreatedScriptJob(CamelModel):
+    job_id: str
+    upload_url: str
+    max_bundle_bytes: int
+
+
+class ScriptJobUnit(ScriptSession):
+    unit: str | None = None
+    state: str
+
+
+class ScriptJob(CamelModel):
+    job_id: str
+    run_id: str
+    run_name: str
+    framework: str
+    platform: str
+    status: str
+    units: list[ScriptJobUnit] = []

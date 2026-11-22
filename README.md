@@ -249,7 +249,7 @@ app defaults.
 | `minitest run`   | Start runs and inspect their scenario runs |
 | `minitest batch` | List, inspect, cancel and delete runs (a batch is a Run in the webapp) |
 | `minitest schedules` | Scheduled runs: run scenarios at a set time and post a Slack summary |
-| `minitest script-runs` | Your own test suites run on Minitap (Appium hub): runs, tests, recordings, Appium logs, JUnit |
+| `minitest script-runs` | Your own test suites run on Minitap (Appium hub, Maestro and Espresso jobs with `submit`): runs, tests, recordings, Appium logs, JUnit |
 | `minitest issues` | Read app issues and their fix prompts, mark them fixed |
 | `minitest skill` | Print the CLI skill for your AI coding agent (not app skills) |
 | `minitest reference` | List or print the reference documents behind the skill (test-suite design method, suite schema), from Minitest or the bundled copy offline |

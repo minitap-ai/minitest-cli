@@ -214,6 +214,7 @@ Treat `MINITEST_API_KEY` as a credential. Never commit it; rotate on suspected l
 | 4    | Resource not found                      |
 | 5    | Build rejected as invalid               |
 | 6    | Conflict — re-read, rebuild, retry once |
+| 7    | `script-runs submit`: Minitap could not run some tests (no device, the app did not install…) |
 
 Credentials rejected on a normal command exit 1, not 2 — only the `auth`
 commands themselves use 2.
@@ -1524,6 +1525,10 @@ minitest --json --app $APP script-runs recording <run_id> --test "Checkout total
 minitest --json --app $APP script-runs appium-log <run_id> --test <test_id> [--out f.log]
 # The run as JUnit XML, one suite per test
 minitest --json --app $APP script-runs junit <run_id> [--out report.xml]
+# Run a Maestro flows folder (or zip), or an Espresso test APK, on Minitap devices and wait:
+# one device per flow / test class; exit 0 all passed, 1 a test failed, 7 Minitap could not run some
+minitest --json --app $APP script-runs submit --framework maestro --tests ./flows \
+  --build-id <build_id> [--run-name "CI #42"] [--commit-sha SHA] [--model tablet] [--no-wait]
 ```
 
 A test's `status` is the team's own verdict (`minitap:setStatus`; `unmarked` when
@@ -1683,6 +1688,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Delete a schedule   | `minitest --json --app ID schedules delete <schedule> --yes` (`schedules restore <id>` undoes) |
 | List script runs (own suites) | `minitest --json --app ID script-runs list [--status S] [--framework F] [--search Q] [--limit N] [--offset N]` |
 | Show a script run   | `minitest --json --app ID script-runs get <run_id> [--platform android\|ios]` (one line per test with each device's status, failure reasons, Minitap-side issues) |
+| Run a Maestro / Espresso suite | `minitest --json --app ID script-runs submit --framework maestro\|espresso --tests PATH --build-id ID [--run-name N] [--commit-sha S] [--no-wait]` (waits; exit 1 on a failed test, 7 when Minitap could not run some) |
 | Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log <run_id> [--test T] [--out F]`, `script-runs junit <run_id> [--out F]` |
 | Auth                | `minitest auth login`, `minitest --json auth status`, `minitest auth logout`      |
 | Refresh this skill  | `minitest skill` (prints the latest skill markdown)                               |

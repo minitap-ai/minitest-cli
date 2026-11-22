@@ -13,9 +13,10 @@ import typer
 
 from minitest_cli.api.client import UPLOAD_TIMEOUT, ApiClient
 from minitest_cli.commands.run_helpers import handle_response_error, resolve_app, run_api_call
-from minitest_cli.commands.script_runs_helpers import failure_reason, minitap_issue
+from minitest_cli.commands.script_jobs_output import print_failures, result_rows
+from minitest_cli.commands.script_runs_helpers import minitap_issue
 from minitest_cli.core.config import Settings
-from minitest_cli.models.script_run import CreatedScriptJob, ScriptJob, ScriptJobUnit
+from minitest_cli.models.script_run import CreatedScriptJob, ScriptJob
 from minitest_cli.utils.output import err_console, output, print_error, print_info, print_table
 
 EXIT_TESTS_FAILED = 1
@@ -66,23 +67,6 @@ def exit_code(job: ScriptJob) -> int:
     if job.status == "failed" or any(minitap_issue(unit) for unit in job.units):
         return EXIT_MINITAP_ISSUE
     return 0
-
-
-def _rows(units: list[ScriptJobUnit]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for unit in units:
-        tests = unit.cases or [None]
-        for case in tests:
-            rows.append(
-                [
-                    unit.unit or "",
-                    case.name if case else (unit.name or ""),
-                    case.status if case else unit.state,
-                    (case.failure_message if case else failure_reason(unit)) or "",
-                    minitap_issue(unit) or "",
-                ]
-            )
-    return rows
 
 
 async def _submit(
@@ -187,9 +171,10 @@ def submit(
         if wait:
             print_table(
                 ["Unit", "Test", "Status", "Failure", "Minitap issue"],
-                _rows(job.units),
+                result_rows(job.units),
                 title=f"{job.run_name} — {job.status}",
             )
+            print_failures(job.units)
         print_info(link)
     if wait:
         raise typer.Exit(code=exit_code(job))

@@ -138,6 +138,18 @@ def test_a_failing_test_exits_1_with_its_reason(flows, tmp_path):
     assert 'Assertion is false: "$28.99" is visible' in " ".join(unstyle(result.stdout).split())
 
 
+def test_a_stack_trace_shows_whole_after_the_table_with_its_first_line_in_it(flows, tmp_path):
+    trace = "java.lang.AssertionError: Got: Count: 2\n\tat CounterTest.plusTwice(CounterTest.kt:21)"
+    server = FakeJobs([_job("failed", [_unit("CounterTest", "failed", trace)])])
+
+    result = _submit(server, tmp_path, flows)
+
+    assert result.exit_code == 1, result.output
+    table, details = unstyle(result.stdout).split("flows/CounterTest.yaml CounterTest", 1)
+    assert "Got: Count: 2" in table and "CounterTest.kt:21" not in table
+    assert "at CounterTest.plusTwice(CounterTest.kt:21)" in details
+
+
 def test_a_unit_minitap_could_not_run_exits_7(flows, tmp_path):
     refused = {
         **_unit("a", "error"),

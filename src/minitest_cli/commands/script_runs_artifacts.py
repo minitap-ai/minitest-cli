@@ -17,6 +17,7 @@ from minitest_cli.commands.run_helpers import (
 )
 from minitest_cli.commands.run_recording_helpers import download
 from minitest_cli.commands.script_jobs import submit
+from minitest_cli.commands.script_runs_report import report
 from minitest_cli.commands.script_runs_helpers import (
     RUN_RETENTION,
     fetch_run,
@@ -143,3 +144,4 @@ def register_artifact_commands(app: typer.Typer) -> None:
     app.command(name="trace")(trace)
     app.command(name="junit")(junit)
     app.command(name="submit")(submit)
+    app.command(name="report")(report)

@@ -1530,6 +1530,9 @@ minitest --json --app $APP script-runs appium-log <run_id> --test <test_id> [--o
 minitest --json --app $APP script-runs driver-log <run_id> --test <test_id> [--out f.log]
 minitest --json --app $APP script-runs browser-log <run_id> --test <test_id> [--out f.json]
 minitest --json --app $APP script-runs trace <run_id> --test <test_id> [--out trace.zip]
+# A Playwright suite run without the Minitap reporter: send its JSON (--reporter=json) or JUnit
+# report as the tests of a hub session (batches of 500; re-sending replaces the same attempts)
+minitest --json --app $APP script-runs report <run_id> --file results.json [--test <test_id>]
 # The run as JUnit XML, one suite per test
 minitest --json --app $APP script-runs junit <run_id> [--out report.xml]
 # Run a Maestro flows folder (or zip), or an Espresso test APK, on Minitap devices and wait:
@@ -1700,7 +1703,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | List script runs (own suites) | `minitest --json --app ID script-runs list [--status S] [--framework F] [--search Q] [--limit N] [--offset N]` |
 | Show a script run   | `minitest --json --app ID script-runs get <run_id> [--platform android\|ios]` (one line per test with each device's status, failure reasons, Minitap-side issues) |
 | Run a Maestro / Espresso suite | `minitest --json --app ID script-runs submit --framework maestro\|espresso --tests PATH --build-id ID [--run-name N] [--commit-sha S] [-e KEY[=VALUE]] [--env-file F] [--no-wait]` (waits; exit 1 on a failed test, 7 when Minitap could not run some) |
-| Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log\|driver-log\|browser-log\|trace <run_id> [--test T] [--out F]`, `script-runs junit <run_id> [--out F]` |
+| Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log\|driver-log\|browser-log\|trace <run_id> [--test T] [--out F]`, `script-runs report <run_id> --file F [--test T]`, `script-runs junit <run_id> [--out F]` |
 | Auth                | `minitest auth login`, `minitest --json auth status`, `minitest auth logout`      |
 | Refresh this skill  | `minitest skill` (prints the latest skill markdown)                               |
 | Read a reference doc | `minitest reference` (list topics) / `minitest reference <topic>` (markdown; bundled copy offline) |

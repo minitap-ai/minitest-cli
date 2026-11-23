@@ -42,6 +42,12 @@ class ScriptCase(CamelModel):
     duration_ms: int | None = None
     failure_message: str | None = None
     properties: dict[str, str] | None = None
+    # A reporter's test (Playwright): its attempts share test_key; trace and video are its own.
+    test_key: str | None = None
+    retry: int | None = None
+    failure_stack: str | None = None
+    trace_url: str | None = None
+    video_url: str | None = None
 
 
 class ScriptSession(CamelModel):

@@ -18,6 +18,9 @@ from minitest_cli.commands.script_runs_helpers import (
     failure_reason,
     fetch_run,
     group_by_test,
+    reported_tests,
+    shorten,
+    status_label,
     worst_status,
     minitap_issue,
     platform_label,
@@ -57,11 +60,6 @@ def _run_label(run: ScriptRunSummary) -> str:
     return f"commit {run.commit_sha[:10]}" if run.commit_sha else run.run_id
 
 
-def _shorten(text: str | None, width: int = 80) -> str:
-    line = " ".join((text or "").split())
-    return line if len(line) <= width else f"{line[: width - 1]}…"
-
-
 @app.command(name="list")
 def list_runs(
     status: Annotated[RunStatus | None, typer.Option(help="Only runs in this status.")] = None,
@@ -96,7 +94,7 @@ def list_runs(
     rows = [
         [
             run.run_id,
-            _shorten(_run_label(run), 40),
+            shorten(_run_label(run), 40),
             run.status,
             f"{run.totals.tests - run.totals.failures - run.totals.errors}/{run.totals.tests}",
             str(run.session_count),
@@ -126,7 +124,7 @@ def get_run(
     Minitap-side issue."""
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="script run id")
-    run: ScriptRunDetail = run_api_call(fetch_run(settings, app_id, run_id))
+    run: ScriptRunDetail = reported_tests(run_api_call(fetch_run(settings, app_id, run_id)))
     if platform is not None:
         run.sessions = [s for s in run.sessions if s.platform == platform]
     groups = group_by_test(run.sessions)
@@ -152,27 +150,27 @@ def _test_row(group: list[ScriptSession]) -> list[str]:
         (session,) = group
         return [
             session.scripted_run_id,
-            _shorten(test_label(session), 40),
+            shorten(test_label(session), 40),
             platform_label(session),
-            session.status,
+            status_label(session),
             device_label(session),
-            _shorten(failure_reason(session)),
-            _shorten(minitap_issue(session)),
+            shorten(failure_reason(session)),
+            shorten(minitap_issue(session)),
         ]
     failures = [(s, r) for s in group if (r := failure_reason(s))]
     if len({reason for _, reason in failures}) > 1:
-        failure = "\n".join(_shorten(f"{platform_label(s)}: {r}") for s, r in failures)
+        failure = "\n".join(shorten(f"{platform_label(s)}: {r}") for s, r in failures)
     else:
-        failure = _shorten(failures[0][1]) if failures else ""
+        failure = shorten(failures[0][1]) if failures else ""
     return [
         "\n".join(session.scripted_run_id for session in group),
-        _shorten(test_label(group[0]), 40),
+        shorten(test_label(group[0]), 40),
         "\n".join(platform_label(session) for session in group),
         worst_status(group),
-        "\n".join(f"{device_label(session)}: {session.status}" for session in group),
+        "\n".join(f"{device_label(session)}: {status_label(session)}" for session in group),
         failure,
         "\n".join(
-            _shorten(f"{platform_label(session)}: {issue}")
+            shorten(f"{platform_label(session)}: {issue}")
             for session in group
             if (issue := minitap_issue(session))
         ),
@@ -189,6 +187,7 @@ def _test_json(group: list[ScriptSession]) -> dict[str, object]:
                 "platform": session.platform,
                 "device": device_label(session),
                 "status": session.status,
+                "retries": max((c.retry or 0 for c in session.cases), default=0),
                 "failure": failure_reason(session),
                 "minitapIssue": minitap_issue(session),
             }

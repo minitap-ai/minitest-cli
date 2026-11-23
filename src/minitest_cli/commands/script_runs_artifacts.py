@@ -22,6 +22,7 @@ from minitest_cli.commands.script_runs_helpers import (
     RUN_RETENTION,
     fetch_run,
     pick_test,
+    reported_tests,
     script_runs_path,
     test_label,
 )
@@ -61,7 +62,7 @@ def _download_artifact(
 ) -> None:
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="script run id")
-    session = pick_test(run_api_call(fetch_run(settings, app_id, run_id)), test)
+    session = pick_test(reported_tests(run_api_call(fetch_run(settings, app_id, run_id))), test)
     url = _URLS[kind](session)
     if url is None:
         print_error(_missing(session, kind, kept))

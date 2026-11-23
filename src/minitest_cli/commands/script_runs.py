@@ -41,6 +41,7 @@ app = typer.Typer(
 class Platform(StrEnum):
     android = "android"
     ios = "ios"
+    web = "web"
 
 
 class RunStatus(StrEnum):
@@ -65,7 +66,7 @@ def _shorten(text: str | None, width: int = 80) -> str:
 def list_runs(
     status: Annotated[RunStatus | None, typer.Option(help="Only runs in this status.")] = None,
     framework: Annotated[
-        str | None, typer.Option(help="Only runs with a test of this framework (e.g. appium).")
+        str | None, typer.Option(help="Only runs with a test of this framework (e.g. selenium).")
     ] = None,
     search: Annotated[
         str | None, typer.Option(help="Run or test name contains it, or commit starts with it.")
@@ -139,7 +140,7 @@ def get_run(
         print_info(f"  commit: {run.commit_sha}")
     rows = [_test_row(group) for group in groups]
     print_table(
-        ["Test ID", "Test", "Platform", "Status", "Device", "Failure", "Minitap issue"],
+        ["Test ID", "Test", "Platform", "Status", "Device or browser", "Failure", "Minitap issue"],
         rows,
         title=f"Tests ({len(rows)})",
     )

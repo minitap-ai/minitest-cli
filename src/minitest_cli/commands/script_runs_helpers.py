@@ -117,15 +117,32 @@ def platform_label(session: ScriptSession) -> str:
     return _PLATFORM_NAMES.get(session.platform or "", session.platform or "")
 
 
+_BROWSER_NAMES = {"chrome": "Chrome", "edge": "Edge", "firefox": "Firefox"}
+
+
+def browser_label(session: ScriptSession) -> str | None:
+    """ "Chrome 157 · 1280×800", as the webapp; None for a session that got no browser."""
+    target = session.device_target
+    if target is None or target.backend != "browser" or target.browser_name is None:
+        return None
+    name = _BROWSER_NAMES.get(target.browser_name, target.browser_name)
+    browser = f"{name} {target.browser_version}" if target.browser_version else name
+    size = target.viewport.replace("x", "×") if target.viewport else None
+    return " · ".join(part for part in (browser, size) if part)
+
+
 def device_label(session: ScriptSession) -> str:
     """The device as the webapp names it: the target given, else what the device reported."""
+    browser = browser_label(session)
+    if browser is not None:
+        return browser
     os_name = _PLATFORM_NAMES.get(session.platform or "", "OS")
     target = session.device_target
     version = target.os_version if target else None
     reported = session.device.model if session.device else None
     if session.platform == "ios" and (target is None or target.backend != "physical"):
         model = f"{reported} simulator" if reported else "iPhone simulator"
-    elif target is not None:
+    elif target is not None and target.model is not None:
         model = target.model if target.backend == "physical" else _emulator(target.model)
     else:
         model = reported

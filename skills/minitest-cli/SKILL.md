@@ -1510,19 +1510,26 @@ read a missing run as all clear. Every flag, `--from-file` for agents, and
 When the team runs its own Appium suite on the Minitest Appium hub (Android with
 UiAutomator2, iOS with XCUITest on iPhone simulators), each WebDriver
 session is one test, and sessions sharing `minitap:runName` (else the commit) form
-one script run (Results → Script runs in the webapp). Read them like the webapp does:
+one script run (Results → Script runs in the webapp). Selenium and Playwright suites run
+the same way on Minitap browsers (Chrome, Edge, Firefox): their tests have platform `web`
+and a browser in place of a device (`Chrome 157 · 1280×800`). Read them like the webapp does:
 
 ```bash
 # Runs, newest first; filter by status (running|passed|failed|unmarked), framework, name/commit
 minitest --json --app $APP script-runs list --status failed --search nightly
 # One run: every test with its platform, status, cases, failure reason, device and Minitap-side
-# issue; --platform android|ios keeps only that platform's tests (a run can mix both)
+# issue; --platform android|ios|web keeps only that platform's tests (a run can mix them)
 # `tests` groups them: one entry per test with its status (worst of its devices) and each
 # device's testId, status and failure; pass a device's testId to --test below
 minitest --json --app $APP script-runs get <run_id> [--platform ios]
 # A test's screen recording (MP4) and Appium log; --test takes its id, hub session id or name
 minitest --json --app $APP script-runs recording <run_id> --test "Checkout total" [--out f.mp4]
 minitest --json --app $APP script-runs appium-log <run_id> --test <test_id> [--out f.log]
+# Web tests: the WebDriver log (Selenium), the browser console and network log (JSON), the
+# Playwright trace (open with `npx playwright show-trace trace.zip`); kept 30 days
+minitest --json --app $APP script-runs driver-log <run_id> --test <test_id> [--out f.log]
+minitest --json --app $APP script-runs browser-log <run_id> --test <test_id> [--out f.json]
+minitest --json --app $APP script-runs trace <run_id> --test <test_id> [--out trace.zip]
 # The run as JUnit XML, one suite per test
 minitest --json --app $APP script-runs junit <run_id> [--out report.xml]
 # Run a Maestro flows folder (or zip), or an Espresso test APK, on Minitap devices and wait:
@@ -1693,7 +1700,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | List script runs (own suites) | `minitest --json --app ID script-runs list [--status S] [--framework F] [--search Q] [--limit N] [--offset N]` |
 | Show a script run   | `minitest --json --app ID script-runs get <run_id> [--platform android\|ios]` (one line per test with each device's status, failure reasons, Minitap-side issues) |
 | Run a Maestro / Espresso suite | `minitest --json --app ID script-runs submit --framework maestro\|espresso --tests PATH --build-id ID [--run-name N] [--commit-sha S] [-e KEY[=VALUE]] [--env-file F] [--no-wait]` (waits; exit 1 on a failed test, 7 when Minitap could not run some) |
-| Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log <run_id> [--test T] [--out F]`, `script-runs junit <run_id> [--out F]` |
+| Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log\|driver-log\|browser-log\|trace <run_id> [--test T] [--out F]`, `script-runs junit <run_id> [--out F]` |
 | Auth                | `minitest auth login`, `minitest --json auth status`, `minitest auth logout`      |
 | Refresh this skill  | `minitest skill` (prints the latest skill markdown)                               |
 | Read a reference doc | `minitest reference` (list topics) / `minitest reference <topic>` (markdown; bundled copy offline) |

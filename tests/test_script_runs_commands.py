@@ -266,3 +266,71 @@ class TestDownloads:
 
         assert result.exit_code == 0, result.output
         assert out.read_bytes() == b'<testsuites><testsuite name="x"/></testsuites>'
+
+
+def _web_session(session_id: str, name: str, browser: str, version: str, **fields: Any):
+    return _session(
+        session_id,
+        name,
+        framework="playwright",
+        platform="web",
+        device=None,
+        deviceTarget={
+            "platform": "web",
+            "backend": "browser",
+            "browserName": browser,
+            "browserVersion": version,
+            "viewport": "1280x800",
+            "attachMode": "connect",
+            "playwrightVersion": "1.65",
+        },
+        traceUrl=f"{STORAGE}/{session_id}/trace.zip?token=signed",
+        browserLogUrl=f"{STORAGE}/{session_id}/browser-log.json?token=signed",
+        driverLogUrl=None,
+        **fields,
+    )
+
+
+class TestWeb:
+    def test_a_playwright_test_lists_each_browser_it_ran_on(self, server, tmp_path):
+        server.sessions = [
+            _web_session(
+                "99999999-9999-4999-8999-999999999999", "checkout › pays", "chrome", "157"
+            ),
+            _web_session(
+                "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "checkout › pays",
+                "firefox",
+                "159",
+                status="failed",
+            ),
+            SESSIONS[0],
+        ]
+
+        table = _plain(_invoke(server, tmp_path, "get", RUN_ID).stdout)
+        web = json.loads(
+            _invoke(server, tmp_path, "get", RUN_ID, "--platform", "web", json_mode=True).stdout
+        )
+
+        assert "Chrome 157 · 1280×800: passed" in table
+        assert "Firefox 159 · 1280×800: failed" in table
+        assert [d["device"] for d in web["tests"][0]["devices"]] == [
+            "Chrome 157 · 1280×800",
+            "Firefox 159 · 1280×800",
+        ]
+        assert {s["platform"] for s in web["sessions"]} == {"web"}
+
+    def test_trace_and_browser_log_download_from_storage(self, server, tmp_path):
+        session_id = "99999999-9999-4999-8999-999999999999"
+        server.sessions = [_web_session(session_id, "checkout › pays", "chrome", "157")]
+        trace, log = tmp_path / "t.zip", tmp_path / "b.json"
+
+        traced = _invoke(server, tmp_path, "trace", RUN_ID, "--out", str(trace))
+        logged = _invoke(server, tmp_path, "browser-log", RUN_ID, "--out", str(log))
+        driver = _invoke(server, tmp_path, "driver-log", RUN_ID)
+
+        assert (traced.exit_code, logged.exit_code) == (0, 0), traced.output + logged.output
+        assert trace.read_bytes() == f"bytes of /{session_id}/trace.zip".encode()
+        assert log.read_bytes() == f"bytes of /{session_id}/browser-log.json".encode()
+        assert driver.exit_code == 4
+        assert "logs and traces are kept 30 days" in _plain(driver.stderr)

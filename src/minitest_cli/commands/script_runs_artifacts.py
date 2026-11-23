@@ -1,5 +1,7 @@
-"""Downloads of a script run: a test's recording and Appium log, the run's JUnit report."""
+"""Downloads of a script run: a test's recording and logs, a Playwright trace, the run's JUnit
+report."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
@@ -43,13 +45,23 @@ def _saved(path: Path, json_mode: bool, **extra: str) -> None:
         print_success(f"Saved {path}")
 
 
+_URLS: dict[str, Callable[[ScriptSession], str | None]] = {
+    "recording": lambda s: s.video_url,
+    "Appium log": lambda s: s.log_url,
+    "driver log": lambda s: s.driver_log_url,
+    "browser log": lambda s: s.browser_log_url,
+    "trace": lambda s: s.trace_url,
+}
+_SENSITIVE_KEPT = "logs and traces are kept 30 days"
+
+
 def _download_artifact(
     run_id: str, test: str | None, out: Path | None, *, kind: str, kept: str, suffix: str
 ) -> None:
     settings, app_id, json_mode = resolve_app()
     ensure_uuid(run_id, kind="script run id")
     session = pick_test(run_api_call(fetch_run(settings, app_id, run_id)), test)
-    url = session.video_url if kind == "recording" else session.log_url
+    url = _URLS[kind](session)
     if url is None:
         print_error(_missing(session, kind, kept))
         raise typer.Exit(code=EXIT_NOT_FOUND)
@@ -81,6 +93,25 @@ def appium_log(run_id: RunArg, test: TestOpt = None, out: OutOpt = None) -> None
     )
 
 
+def driver_log(run_id: RunArg, test: TestOpt = None, out: OutOpt = None) -> None:
+    """Download a Selenium test's WebDriver log (chromedriver, msedgedriver, geckodriver)."""
+    _download_artifact(
+        run_id, test, out, kind="driver log", kept=_SENSITIVE_KEPT, suffix="-driver.log"
+    )
+
+
+def browser_log(run_id: RunArg, test: TestOpt = None, out: OutOpt = None) -> None:
+    """Download a web test's browser console and network log (JSON)."""
+    _download_artifact(
+        run_id, test, out, kind="browser log", kept=_SENSITIVE_KEPT, suffix="-browser-log.json"
+    )
+
+
+def trace(run_id: RunArg, test: TestOpt = None, out: OutOpt = None) -> None:
+    """Download a Playwright test's trace; open it with `npx playwright show-trace <file>`."""
+    _download_artifact(run_id, test, out, kind="trace", kept=_SENSITIVE_KEPT, suffix="-trace.zip")
+
+
 def junit(run_id: RunArg, out: OutOpt = None) -> None:
     """Download the run as a JUnit XML report, one suite per test."""
     settings, app_id, json_mode = resolve_app()
@@ -107,5 +138,8 @@ def junit(run_id: RunArg, out: OutOpt = None) -> None:
 def register_artifact_commands(app: typer.Typer) -> None:
     app.command(name="recording")(recording)
     app.command(name="appium-log")(appium_log)
+    app.command(name="driver-log")(driver_log)
+    app.command(name="browser-log")(browser_log)
+    app.command(name="trace")(trace)
     app.command(name="junit")(junit)
     app.command(name="submit")(submit)

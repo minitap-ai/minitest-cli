@@ -101,6 +101,7 @@ class FakeTestingService:
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
         self.sessions = SESSIONS
+        self.reported: list[tuple[str, list[dict[str, Any]]]] = []
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -113,6 +114,12 @@ class FakeTestingService:
             return httpx.Response(200, content=b'<testsuites><testsuite name="x"/></testsuites>')
         if path == f"{BASE}/{RUN_ID}":
             return httpx.Response(200, json={**SUMMARY, "sessions": self.sessions})
+        if request.method == "POST" and path.endswith("/cases"):
+            cases = json.loads(request.content)["cases"]
+            self.reported.append((path, cases))
+            return httpx.Response(
+                200, json={"status": "failed", "tests": 2, "failures": 1, "errors": 0, "skipped": 0}
+            )
         return httpx.Response(404, json={"detail": "Script run not found"})
 
 
@@ -334,3 +341,87 @@ class TestWeb:
         assert log.read_bytes() == f"bytes of /{session_id}/browser-log.json".encode()
         assert driver.exit_code == 4
         assert "logs and traces are kept 30 days" in _plain(driver.stderr)
+
+
+PLAYWRIGHT_REPORT = {
+    "suites": [
+        {
+            "title": "checkout.spec.ts",
+            "specs": [
+                {
+                    "title": "pays with a saved card",
+                    "id": "abc123",
+                    "tests": [
+                        {
+                            "projectName": "chrome",
+                            "annotations": [{"type": "testCaseId", "description": "TC-42"}],
+                            "results": [
+                                {
+                                    "retry": 0,
+                                    "status": "timedOut",
+                                    "duration": 30000,
+                                    "error": {"message": "Timeout", "stack": "at checkout:42"},
+                                },
+                                {"retry": 1, "status": "passed", "duration": 9000},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+}
+
+
+class TestReport:
+    def test_a_playwright_report_becomes_each_attempt_of_the_picked_session(self, server, tmp_path):
+        report = tmp_path / "results.json"
+        report.write_text(json.dumps(PLAYWRIGHT_REPORT))
+
+        result = _invoke(
+            server, tmp_path, "report", RUN_ID, "--file", str(report), "--test", "Sign in"
+        )
+
+        assert result.exit_code == 0, result.output
+        ((path, cases),) = server.reported
+        assert (
+            path
+            == f"/api/v1/apps/{APP_ID}/scripted-runs/11111111-1111-4111-8111-111111111111/cases"
+        )
+        assert [(c["testKey"], c["retry"], c["status"]) for c in cases] == [
+            ("abc123@chrome", 0, "failed"),
+            ("abc123@chrome", 1, "passed"),
+        ]
+        assert cases[0]["failureStack"] == "at checkout:42"
+        assert cases[0]["properties"] == {"testCaseId": "TC-42"}
+        assert cases[0]["classname"] == "checkout.spec.ts"
+
+    def test_a_large_junit_report_goes_in_batches_of_500(self, server, tmp_path):
+        rows = "".join(f'<testcase classname="Suite" name="t{i}" time="0.1"/>' for i in range(501))
+        report = tmp_path / "junit.xml"
+        report.write_text(f"<testsuites><testsuite>{rows}</testsuite></testsuites>")
+
+        result = _invoke(
+            server, tmp_path, "report", RUN_ID, "--file", str(report), "--test", "Sign in"
+        )
+
+        assert result.exit_code == 0, result.output
+        assert [len(cases) for _, cases in server.reported] == [500, 1]
+        assert server.reported[0][1][0] == {
+            "testKey": "Suite::t0",
+            "retry": 0,
+            "classname": "Suite",
+            "name": "t0",
+            "status": "passed",
+            "durationMs": 100,
+        }
+
+    def test_a_file_that_is_no_report_is_refused_before_any_call(self, server, tmp_path):
+        report = tmp_path / "notes.txt"
+        report.write_text("hello")
+
+        result = _invoke(server, tmp_path, "report", RUN_ID, "--file", str(report))
+
+        assert result.exit_code == 1
+        assert "neither Playwright JSON nor JUnit XML" in _plain(result.stderr)
+        assert server.requests == []

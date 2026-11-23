@@ -13,6 +13,7 @@ import typer
 
 from minitest_cli.api.client import UPLOAD_TIMEOUT, ApiClient
 from minitest_cli.commands.run_helpers import handle_response_error, resolve_app, run_api_call
+from minitest_cli.commands.script_jobs_env import test_env
 from minitest_cli.commands.script_jobs_output import print_failures, result_rows
 from minitest_cli.commands.script_runs_helpers import minitap_issue
 from minitest_cli.core.config import Settings
@@ -136,6 +137,19 @@ def submit(
     branch: Annotated[str | None, typer.Option(help="Branch under test.")] = None,
     wait: Annotated[bool, typer.Option("--wait/--no-wait", help="Wait for the verdict.")] = True,
     timeout: Annotated[float, typer.Option(min=60, help="Seconds to wait for the verdict.")] = 3600,
+    env: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-e",
+            "--env",
+            help="A value for the tests, KEY=VALUE, or KEY to take it from your shell. Repeatable."
+            " Maestro reads it as ${KEY}, Espresso as an instrumentation argument. Never printed.",
+        ),
+    ] = None,
+    env_file: Annotated[
+        Path | None,
+        typer.Option(exists=True, dir_okay=False, help="KEY=VALUE lines to pass like -e."),
+    ] = None,
 ) -> None:
     """Run a Maestro or Espresso suite on Minitap devices, one device per flow or test class.
 
@@ -149,7 +163,10 @@ def submit(
         "model": model,
         "osVersion": os_version,
     }
-    start = {"runName": run_name, "commitSha": commit_sha, "branch": branch}
+    start: dict[str, object] = {"runName": run_name, "commitSha": commit_sha, "branch": branch}
+    values = test_env(env or [], env_file)
+    if values:
+        start["env"] = values
     bundle = bundle_bytes(tests)
     job = run_api_call(
         _submit(
@@ -163,6 +180,8 @@ def submit(
     link = run_link(settings, app_id, job.run_id)
     if not json_mode:
         print_info(f"Job {job.job_id}: {len(job.units)} unit(s) on {job.platform} — {link}")
+        if values:
+            print_info(f"Values passed to the tests: {', '.join(sorted(values))}")
     if wait:
         job = run_api_call(_wait(settings, app_id, job, timeout))
     if json_mode:

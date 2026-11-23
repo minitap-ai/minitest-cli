@@ -1529,6 +1529,10 @@ minitest --json --app $APP script-runs junit <run_id> [--out report.xml]
 # one device per flow / test class; exit 0 all passed, 1 a test failed, 7 Minitap could not run some
 minitest --json --app $APP script-runs submit --framework maestro --tests ./flows \
   --build-id <build_id> [--run-name "CI #42"] [--commit-sha SHA] [--model tablet] [--no-wait]
+# Values for the tests (test accounts...): -e KEY=VALUE, -e KEY (taken from the shell), --env-file f.env.
+# Maestro reads ${KEY}, Espresso gets them as instrumentation arguments. Never printed; reads show names only.
+minitest --json --app $APP script-runs submit --framework maestro --tests ./flows --build-id <build_id> \
+  -e TEST_EMAIL -e TEST_PASSWORD
 ```
 
 A test's `status` is the team's own verdict (`minitap:setStatus`; `unmarked` when
@@ -1688,7 +1692,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Delete a schedule   | `minitest --json --app ID schedules delete <schedule> --yes` (`schedules restore <id>` undoes) |
 | List script runs (own suites) | `minitest --json --app ID script-runs list [--status S] [--framework F] [--search Q] [--limit N] [--offset N]` |
 | Show a script run   | `minitest --json --app ID script-runs get <run_id> [--platform android\|ios]` (one line per test with each device's status, failure reasons, Minitap-side issues) |
-| Run a Maestro / Espresso suite | `minitest --json --app ID script-runs submit --framework maestro\|espresso --tests PATH --build-id ID [--run-name N] [--commit-sha S] [--no-wait]` (waits; exit 1 on a failed test, 7 when Minitap could not run some) |
+| Run a Maestro / Espresso suite | `minitest --json --app ID script-runs submit --framework maestro\|espresso --tests PATH --build-id ID [--run-name N] [--commit-sha S] [-e KEY[=VALUE]] [--env-file F] [--no-wait]` (waits; exit 1 on a failed test, 7 when Minitap could not run some) |
 | Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log <run_id> [--test T] [--out F]`, `script-runs junit <run_id> [--out F]` |
 | Auth                | `minitest auth login`, `minitest --json auth status`, `minitest auth logout`      |
 | Refresh this skill  | `minitest skill` (prints the latest skill markdown)                               |

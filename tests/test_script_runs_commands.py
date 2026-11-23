@@ -425,3 +425,51 @@ class TestReport:
         assert result.exit_code == 1
         assert "neither Playwright JSON nor JUnit XML" in _plain(result.stderr)
         assert server.requests == []
+
+
+def _reported(position: int, key: str, name: str, retry: int, status: str, **fields: Any):
+    return {
+        "position": position,
+        "name": name,
+        "status": status,
+        "testKey": key,
+        "retry": retry,
+        "traceUrl": f"{STORAGE}/traces/{key}-{retry}.zip?token=signed",
+        **fields,
+    }
+
+
+class TestReportedTests:
+    def test_a_playwright_worker_lists_each_test_once_with_its_retries_and_own_trace(
+        self, server, tmp_path
+    ):
+        session_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        worker = {**_web_session(session_id, "", "chrome", "157"), "name": None}
+        worker["cases"] = [
+            _reported(0, "pays@chrome", "checkout › pays", 0, "failed", failureMessage="flaky"),
+            _reported(1, "promo@chrome", "cart › promo", 0, "failed", failureMessage="no promo"),
+        ]
+        retry_worker = {
+            **_web_session("cccccccc-cccc-4ccc-8ccc-cccccccccccc", "", "chrome", "157"),
+            "name": None,
+            "cases": [_reported(0, "pays@chrome", "checkout › pays", 1, "passed")],
+        }
+        server.sessions = [worker, retry_worker]
+        trace = tmp_path / "t.zip"
+
+        table = _plain(_invoke(server, tmp_path, "get", RUN_ID).stdout)
+        tests = json.loads(_invoke(server, tmp_path, "get", RUN_ID, json_mode=True).stdout)["tests"]
+        got = _invoke(
+            server, tmp_path, "trace", RUN_ID, "--test", "checkout › pays", "--out", str(trace)
+        )
+
+        assert "Tests (2)" in table
+        assert "passed (retry 1)" in table
+        assert sorted((t["name"], t["status"], t["devices"][0]["retries"]) for t in tests) == [
+            ("cart › promo", "failed", 0),
+            ("checkout › pays", "passed", 1),
+        ]
+        promo = next(t for t in tests if t["name"] == "cart › promo")
+        assert promo["devices"][0]["failure"] == "no promo"
+        assert got.exit_code == 0, got.output
+        assert trace.read_bytes() == b"bytes of /traces/pays@chrome-1.zip"

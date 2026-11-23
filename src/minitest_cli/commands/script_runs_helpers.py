@@ -5,7 +5,7 @@ import typer
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.run_helpers import EXIT_NOT_FOUND, handle_response_error
 from minitest_cli.core.config import Settings
-from minitest_cli.models.script_run import ScriptRunDetail, ScriptSession
+from minitest_cli.models.script_run import ScriptCase, ScriptRunDetail, ScriptSession
 from minitest_cli.utils.output import print_error
 
 RUN_RETENTION = "script runs are kept 90 days"
@@ -13,6 +13,34 @@ RUN_RETENTION = "script runs are kept 90 days"
 
 def script_runs_path(app_id: str) -> str:
     return f"/api/v1/apps/{app_id}/script-runs"
+
+
+def reported_tests(run: ScriptRunDetail) -> ScriptRunDetail:
+    """Each test a reporter sent (Playwright) becomes one test: its last attempt, whichever worker
+    session ran it (a retry runs in a new worker), with its own trace and video. Sessions without
+    reported tests stay one test each."""
+    last: dict[str, tuple[ScriptSession, ScriptCase]] = {}
+    for session in run.sessions:
+        for case in session.cases:
+            if case.test_key and (case.retry or 0) >= (
+                last.get(case.test_key, (session, case))[1].retry or 0
+            ):
+                last[case.test_key] = (session, case)
+    tests = [s for s in run.sessions if not any(c.test_key for c in s.cases)]
+    tests += [
+        session.model_copy(
+            update={
+                "scripted_run_id": f"{session.scripted_run_id}#{case.position}",
+                "name": case.name,
+                "status": case.status,
+                "cases": [case],
+                "video_url": case.video_url or session.video_url,
+                "trace_url": case.trace_url or session.trace_url,
+            }
+        )
+        for session, case in last.values()
+    ]
+    return run.model_copy(update={"sessions": tests})
 
 
 async def fetch_run(settings: Settings, app_id: str, run_id: str) -> ScriptRunDetail:
@@ -52,6 +80,12 @@ def pick_test(run: ScriptRunDetail, test: str | None) -> ScriptSession:
 def failure_reason(session: ScriptSession) -> str | None:
     failed = next((c for c in session.cases if c.status in ("failed", "error")), None)
     return failed.failure_message if failed else None
+
+
+def status_label(session: ScriptSession) -> str:
+    """Its status, and the retries a reported test took to get there."""
+    retry = max((c.retry or 0 for c in session.cases), default=0)
+    return f"{session.status} (retry {retry})" if retry else session.status
 
 
 def minitap_issue(session: ScriptSession) -> str | None:
@@ -155,3 +189,8 @@ def device_label(session: ScriptSession) -> str:
 
 def _emulator(form_factor: str) -> str:
     return f"{form_factor[:1].upper()}{form_factor[1:]} emulator"
+
+
+def shorten(text: str | None, width: int = 80) -> str:
+    line = " ".join((text or "").split())
+    return line if len(line) <= width else f"{line[: width - 1]}…"

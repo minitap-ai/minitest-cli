@@ -186,3 +186,58 @@ def test_an_espresso_test_apk_is_sent_as_it_is(tmp_path):
 
     assert result.exit_code == 0, result.output
     assert server.bundle == b"PK\x03\x04 test apk"
+
+
+def test_values_reach_start_and_only_their_names_are_shown(flows, tmp_path, monkeypatch):
+    env_file = tmp_path / "test.env"
+    env_file.write_text(
+        '# test account\nexport TEST_EMAIL="qa@food.test"\n\nTEST_PASSWORD=s3cr3t-file\n'
+    )
+    monkeypatch.setenv("API_TOKEN", "tok-from-shell")
+    server = FakeJobs([{**_job("passed", [_unit("a", "passed")]), "envKeys": ["API_TOKEN"]}])
+
+    result = _submit(
+        server,
+        tmp_path,
+        flows,
+        "--env-file",
+        str(env_file),
+        "-e",
+        "TEST_PASSWORD=s3cr3t-flag",
+        "-e",
+        "API_TOKEN",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert server.started is not None
+    assert server.started["env"] == {
+        "TEST_EMAIL": "qa@food.test",
+        "TEST_PASSWORD": "s3cr3t-flag",
+        "API_TOKEN": "tok-from-shell",
+    }
+    shown = unstyle(result.output)
+    assert "API_TOKEN, TEST_EMAIL, TEST_PASSWORD" in shown
+    for secret in ("qa@food.test", "s3cr3t", "tok-from-shell"):
+        assert secret not in shown
+
+
+def test_json_lists_the_names_never_the_values(flows, tmp_path):
+    server = FakeJobs([])
+
+    result = _submit(server, tmp_path, flows, "-e", "PIN=4242", "--no-wait", json_mode=True)
+
+    assert result.exit_code == 0, result.output
+    assert "4242" not in result.output
+
+
+@pytest.mark.parametrize(
+    "args",
+    [["-e", "1BAD=x"], ["-e", "NOT_IN_SHELL_XYZ"]],
+)
+def test_a_bad_value_stops_before_anything_is_sent(flows, tmp_path, args):
+    server = FakeJobs([])
+
+    result = _submit(server, tmp_path, flows, *args)
+
+    assert result.exit_code == 1
+    assert server.requests == []

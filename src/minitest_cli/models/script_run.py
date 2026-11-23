@@ -105,3 +105,5 @@ class ScriptJob(CamelModel):
     platform: str
     status: str
     units: list[ScriptJobUnit] = []
+    # The names of the values passed to the tests; their values are never returned.
+    env_keys: list[str] = []

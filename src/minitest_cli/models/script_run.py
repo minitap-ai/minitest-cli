@@ -21,10 +21,17 @@ class ScriptDevice(CamelModel):
 
 
 class ScriptDeviceTarget(CamelModel):
+    """A device (emulator, simulator, physical phone) or, for web, a Minitap browser."""
+
     platform: str
     backend: str
-    model: str
+    model: str | None = None
     os_version: str | None = None
+    browser_name: str | None = None
+    browser_version: str | None = None
+    viewport: str | None = None
+    attach_mode: str | None = None
+    playwright_version: str | None = None
 
 
 class ScriptCase(CamelModel):
@@ -34,6 +41,7 @@ class ScriptCase(CamelModel):
     status: str
     duration_ms: int | None = None
     failure_message: str | None = None
+    properties: dict[str, str] | None = None
 
 
 class ScriptSession(CamelModel):
@@ -56,6 +64,9 @@ class ScriptSession(CamelModel):
     device_target: ScriptDeviceTarget | None = None
     video_url: str | None = None
     log_url: str | None = None
+    driver_log_url: str | None = None
+    browser_log_url: str | None = None
+    trace_url: str | None = None
     cases: list[ScriptCase] = []
 
 

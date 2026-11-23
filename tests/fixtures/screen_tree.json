@@ -1,0 +1,728 @@
+{
+  "appId": "f7b0f9ad-3c1e-4b8a-9e2d-6a5f4c3b2a10",
+  "trees": [
+    {
+      "platform": "android",
+      "rootScreenKey": "notification permission",
+      "counts": {
+        "screens": 8,
+        "explored": 12,
+        "pending": 4,
+        "blocked": 2,
+        "skipped": 2
+      },
+      "screens": [
+        {
+          "screenKey": "notification permission",
+          "displayName": "Notification permission",
+          "area": "onboarding",
+          "notes": null,
+          "context": {
+            "requires_auth": false,
+            "persona_ref": null,
+            "preconditions": [],
+            "reachable_via": "walk",
+            "deeplink_uri": null,
+            "cheaply_reachable": false,
+            "cheaply_reachable_reason": "needs a fresh install to show again"
+          },
+          "screenshotPath": "android/notification-permission.png",
+          "screenshotUrl": "https://storage.example/signed/android/notification-permission.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:03:00Z",
+          "depth": 0,
+          "parentTransitionId": null,
+          "childTransitionIds": [
+            "t01"
+          ],
+          "outgoingTransitionIds": [
+            "t01",
+            "t02"
+          ],
+          "incomingTransitionIds": [],
+          "counts": {
+            "explored": 2,
+            "pending": 0,
+            "blocked": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "screenKey": "sign in",
+          "displayName": "Sign in",
+          "area": "auth",
+          "notes": "Phone-first auth; Google and Apple SSO sit below the fold.",
+          "context": {
+            "requires_auth": false,
+            "persona_ref": null,
+            "preconditions": [],
+            "reachable_via": "walk",
+            "deeplink_uri": null,
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "android/sign-in.png",
+          "screenshotUrl": "https://storage.example/signed/android/sign-in.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:04:00Z",
+          "depth": 1,
+          "parentTransitionId": "t01",
+          "childTransitionIds": [
+            "t03",
+            "t04",
+            "t05"
+          ],
+          "outgoingTransitionIds": [
+            "t03",
+            "t04",
+            "t05",
+            "t06",
+            "t19"
+          ],
+          "incomingTransitionIds": [
+            "t01",
+            "t02",
+            "t07",
+            "t17"
+          ],
+          "counts": {
+            "explored": 4,
+            "pending": 1,
+            "blocked": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "screenKey": "google sign-in consent",
+          "displayName": "Google sign-in consent",
+          "area": "auth",
+          "notes": null,
+          "context": {
+            "requires_auth": false,
+            "persona_ref": null,
+            "preconditions": [],
+            "reachable_via": "walk",
+            "deeplink_uri": null,
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "android/google-sign-in-consent.png",
+          "screenshotUrl": "https://storage.example/signed/android/google-sign-in-consent.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:05:00Z",
+          "depth": 2,
+          "parentTransitionId": "t03",
+          "childTransitionIds": [],
+          "outgoingTransitionIds": [
+            "t07",
+            "t08"
+          ],
+          "incomingTransitionIds": [
+            "t03"
+          ],
+          "counts": {
+            "explored": 1,
+            "pending": 0,
+            "blocked": 1,
+            "skipped": 0
+          }
+        },
+        {
+          "screenKey": "phone verification",
+          "displayName": "Phone verification",
+          "area": "auth",
+          "notes": null,
+          "context": {
+            "requires_auth": false,
+            "persona_ref": null,
+            "preconditions": [],
+            "reachable_via": "walk",
+            "deeplink_uri": null,
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "android/phone-verification.png",
+          "screenshotUrl": "https://storage.example/signed/android/phone-verification.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:06:00Z",
+          "depth": 2,
+          "parentTransitionId": "t04",
+          "childTransitionIds": [],
+          "outgoingTransitionIds": [
+            "t09",
+            "t10"
+          ],
+          "incomingTransitionIds": [
+            "t04"
+          ],
+          "counts": {
+            "explored": 0,
+            "pending": 1,
+            "blocked": 1,
+            "skipped": 0
+          }
+        },
+        {
+          "screenKey": "home",
+          "displayName": "Home",
+          "area": "main",
+          "notes": "Swipe deck; the first card is always a sample profile.",
+          "context": {
+            "requires_auth": true,
+            "persona_ref": "swiper",
+            "preconditions": [
+              {
+                "kind": "signed_in",
+                "ref": "swiper"
+              }
+            ],
+            "reachable_via": "deeplink",
+            "deeplink_uri": "tinder://home",
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "android/home.png",
+          "screenshotUrl": "https://storage.example/signed/android/home.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:07:00Z",
+          "depth": 2,
+          "parentTransitionId": "t05",
+          "childTransitionIds": [
+            "t11",
+            "t12"
+          ],
+          "outgoingTransitionIds": [
+            "t11",
+            "t12",
+            "t13"
+          ],
+          "incomingTransitionIds": [
+            "t05",
+            "t15",
+            "t19"
+          ],
+          "counts": {
+            "explored": 2,
+            "pending": 1,
+            "blocked": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "screenKey": "listing detail",
+          "displayName": "Listing detail",
+          "area": "main",
+          "notes": null,
+          "context": {
+            "requires_auth": true,
+            "persona_ref": "swiper",
+            "preconditions": [
+              {
+                "kind": "signed_in",
+                "ref": "swiper"
+              }
+            ],
+            "reachable_via": "deeplink",
+            "deeplink_uri": "tinder://home",
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "android/listing-detail.png",
+          "screenshotUrl": "https://storage.example/signed/android/listing-detail.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:08:00Z",
+          "depth": 3,
+          "parentTransitionId": "t11",
+          "childTransitionIds": [],
+          "outgoingTransitionIds": [
+            "t14",
+            "t15"
+          ],
+          "incomingTransitionIds": [
+            "t11"
+          ],
+          "counts": {
+            "explored": 1,
+            "pending": 0,
+            "blocked": 0,
+            "skipped": 1
+          }
+        },
+        {
+          "screenKey": "profile",
+          "displayName": "Profile",
+          "area": "account",
+          "notes": null,
+          "context": {
+            "requires_auth": true,
+            "persona_ref": "swiper",
+            "preconditions": [
+              {
+                "kind": "signed_in",
+                "ref": "swiper"
+              }
+            ],
+            "reachable_via": "deeplink",
+            "deeplink_uri": "tinder://home",
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "android/profile.png",
+          "screenshotUrl": "https://storage.example/signed/android/profile.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:09:00Z",
+          "depth": 3,
+          "parentTransitionId": "t12",
+          "childTransitionIds": [],
+          "outgoingTransitionIds": [
+            "t16",
+            "t17",
+            "t18"
+          ],
+          "incomingTransitionIds": [
+            "t12"
+          ],
+          "counts": {
+            "explored": 2,
+            "pending": 0,
+            "blocked": 0,
+            "skipped": 1
+          }
+        },
+        {
+          "screenKey": "legacy orphan",
+          "displayName": "Legacy orphan",
+          "area": null,
+          "notes": null,
+          "context": null,
+          "screenshotPath": "android/legacy-orphan.png",
+          "screenshotUrl": "https://storage.example/signed/android/legacy-orphan.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:10:00Z",
+          "depth": null,
+          "parentTransitionId": null,
+          "childTransitionIds": [],
+          "outgoingTransitionIds": [
+            "t20"
+          ],
+          "incomingTransitionIds": [],
+          "counts": {
+            "explored": 0,
+            "pending": 1,
+            "blocked": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "id": "t01",
+          "fromScreenKey": "notification permission",
+          "elementKey": "(auto)",
+          "elementLabel": "(auto)",
+          "elementKind": "auto",
+          "toScreenKey": "sign in",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:03:00Z",
+          "lastWalkedAt": "2026-09-24T13:03:00Z",
+          "isTreeEdge": true
+        },
+        {
+          "id": "t02",
+          "fromScreenKey": "notification permission",
+          "elementKey": "allow",
+          "elementLabel": "Allow",
+          "elementKind": "button",
+          "toScreenKey": "sign in",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:04:00Z",
+          "lastWalkedAt": "2026-09-24T13:04:00Z",
+          "isTreeEdge": false
+        },
+        {
+          "id": "t03",
+          "fromScreenKey": "sign in",
+          "elementKey": "log in with google",
+          "elementLabel": "LOG IN WITH GOOGLE",
+          "elementKind": "button",
+          "toScreenKey": "google sign-in consent",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:05:00Z",
+          "lastWalkedAt": "2026-09-24T13:05:00Z",
+          "isTreeEdge": true
+        },
+        {
+          "id": "t04",
+          "fromScreenKey": "sign in",
+          "elementKey": "continue with phone",
+          "elementLabel": "Continue with phone",
+          "elementKind": "button",
+          "toScreenKey": "phone verification",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:06:00Z",
+          "lastWalkedAt": "2026-09-24T13:06:00Z",
+          "isTreeEdge": true
+        },
+        {
+          "id": "t05",
+          "fromScreenKey": "sign in",
+          "elementKey": "skip",
+          "elementLabel": "Skip",
+          "elementKind": "link",
+          "toScreenKey": "home",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:07:00Z",
+          "lastWalkedAt": "2026-09-24T13:07:00Z",
+          "isTreeEdge": true
+        },
+        {
+          "id": "t06",
+          "fromScreenKey": "sign in",
+          "elementKey": "trouble logging in?",
+          "elementLabel": "Trouble logging in?",
+          "elementKind": "link",
+          "toScreenKey": null,
+          "status": "pending",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        },
+        {
+          "id": "t07",
+          "fromScreenKey": "google sign-in consent",
+          "elementKey": "cancel",
+          "elementLabel": "Cancel",
+          "elementKind": "button",
+          "toScreenKey": "sign in",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:09:00Z",
+          "lastWalkedAt": "2026-09-24T13:09:00Z",
+          "isTreeEdge": false
+        },
+        {
+          "id": "t08",
+          "fromScreenKey": "google sign-in consent",
+          "elementKey": "choose an account",
+          "elementLabel": "Choose an account",
+          "elementKind": "list_item",
+          "toScreenKey": null,
+          "status": "blocked",
+          "reason": "Google account picker needs a real device account",
+          "personaRef": "",
+          "gatedBy": "5b0c9a51-6d8e-4f7a-9d61-2f3c1e0a7b44",
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        },
+        {
+          "id": "t09",
+          "fromScreenKey": "phone verification",
+          "elementKey": "continue",
+          "elementLabel": "Continue",
+          "elementKind": "button",
+          "toScreenKey": null,
+          "status": "blocked",
+          "reason": "sends an SMS code this crawl cannot read",
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        },
+        {
+          "id": "t10",
+          "fromScreenKey": "phone verification",
+          "elementKey": "country code",
+          "elementLabel": "Country code",
+          "elementKind": "input",
+          "toScreenKey": null,
+          "status": "pending",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        },
+        {
+          "id": "t11",
+          "fromScreenKey": "home",
+          "elementKey": "listing card",
+          "elementLabel": "Listing card",
+          "elementKind": "list_item",
+          "toScreenKey": "listing detail",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:13:00Z",
+          "lastWalkedAt": "2026-09-24T13:13:00Z",
+          "isTreeEdge": true
+        },
+        {
+          "id": "t12",
+          "fromScreenKey": "home",
+          "elementKey": "profile",
+          "elementLabel": "Profile",
+          "elementKind": "tab",
+          "toScreenKey": "profile",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:14:00Z",
+          "lastWalkedAt": "2026-09-24T13:14:00Z",
+          "isTreeEdge": true
+        },
+        {
+          "id": "t13",
+          "fromScreenKey": "home",
+          "elementKey": "settings",
+          "elementLabel": "Settings",
+          "elementKind": "icon",
+          "toScreenKey": null,
+          "status": "pending",
+          "reason": null,
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        },
+        {
+          "id": "t14",
+          "fromScreenKey": "listing detail",
+          "elementKey": "book now",
+          "elementLabel": "Book now",
+          "elementKind": "button",
+          "toScreenKey": null,
+          "status": "skipped",
+          "reason": "payment",
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        },
+        {
+          "id": "t15",
+          "fromScreenKey": "listing detail",
+          "elementKey": "back",
+          "elementLabel": "Back",
+          "elementKind": "icon",
+          "toScreenKey": "home",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:17:00Z",
+          "lastWalkedAt": "2026-09-24T13:17:00Z",
+          "isTreeEdge": false
+        },
+        {
+          "id": "t16",
+          "fromScreenKey": "profile",
+          "elementKey": "delete account",
+          "elementLabel": "Delete account",
+          "elementKind": "button",
+          "toScreenKey": null,
+          "status": "skipped",
+          "reason": "delete_account",
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        },
+        {
+          "id": "t17",
+          "fromScreenKey": "profile",
+          "elementKey": "log out",
+          "elementLabel": "Log out",
+          "elementKind": "button",
+          "toScreenKey": "sign in",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:19:00Z",
+          "lastWalkedAt": "2026-09-24T13:19:00Z",
+          "isTreeEdge": false
+        },
+        {
+          "id": "t18",
+          "fromScreenKey": "profile",
+          "elementKey": "help",
+          "elementLabel": "Help",
+          "elementKind": "link",
+          "toScreenKey": "help center",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:20:00Z",
+          "lastWalkedAt": "2026-09-24T13:20:00Z",
+          "isTreeEdge": false
+        },
+        {
+          "id": "t19",
+          "fromScreenKey": "sign in",
+          "elementKey": "skip",
+          "elementLabel": "Skip",
+          "elementKind": "link",
+          "toScreenKey": "home",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "swiper",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:21:00Z",
+          "lastWalkedAt": "2026-09-24T13:21:00Z",
+          "isTreeEdge": false
+        },
+        {
+          "id": "t20",
+          "fromScreenKey": "legacy orphan",
+          "elementKey": "open",
+          "elementLabel": "Open",
+          "elementKind": "button",
+          "toScreenKey": null,
+          "status": "pending",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        }
+      ],
+      "detachedScreenKeys": [
+        "legacy orphan"
+      ]
+    },
+    {
+      "platform": "ios",
+      "rootScreenKey": "welcome",
+      "counts": {
+        "screens": 2,
+        "explored": 1,
+        "pending": 1,
+        "blocked": 0,
+        "skipped": 0
+      },
+      "screens": [
+        {
+          "screenKey": "welcome",
+          "displayName": "Welcome",
+          "area": "onboarding",
+          "notes": null,
+          "context": {
+            "requires_auth": false,
+            "persona_ref": null,
+            "preconditions": [],
+            "reachable_via": "walk",
+            "deeplink_uri": null,
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "ios/welcome.png",
+          "screenshotUrl": "https://storage.example/signed/ios/welcome.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:40:00Z",
+          "depth": 0,
+          "parentTransitionId": null,
+          "childTransitionIds": [
+            "i01"
+          ],
+          "outgoingTransitionIds": [
+            "i01"
+          ],
+          "incomingTransitionIds": [],
+          "counts": {
+            "explored": 1,
+            "pending": 0,
+            "blocked": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "screenKey": "sign in",
+          "displayName": "Sign in",
+          "area": "auth",
+          "notes": null,
+          "context": {
+            "requires_auth": false,
+            "persona_ref": null,
+            "preconditions": [],
+            "reachable_via": "walk",
+            "deeplink_uri": null,
+            "cheaply_reachable": true,
+            "cheaply_reachable_reason": null
+          },
+          "screenshotPath": "ios/sign-in.png",
+          "screenshotUrl": "https://storage.example/signed/ios/sign-in.png?token=abc",
+          "firstReachedAt": "2026-09-24T13:41:00Z",
+          "depth": 1,
+          "parentTransitionId": "i01",
+          "childTransitionIds": [],
+          "outgoingTransitionIds": [
+            "i02"
+          ],
+          "incomingTransitionIds": [
+            "i01"
+          ],
+          "counts": {
+            "explored": 0,
+            "pending": 1,
+            "blocked": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "id": "i01",
+          "fromScreenKey": "welcome",
+          "elementKey": "get started",
+          "elementLabel": "Get started",
+          "elementKind": "button",
+          "toScreenKey": "sign in",
+          "status": "explored",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": "2026-09-24T13:40:00Z",
+          "lastWalkedAt": "2026-09-24T13:40:00Z",
+          "isTreeEdge": true
+        },
+        {
+          "id": "i02",
+          "fromScreenKey": "sign in",
+          "elementKey": "continue",
+          "elementLabel": "Continue",
+          "elementKind": "button",
+          "toScreenKey": null,
+          "status": "pending",
+          "reason": null,
+          "personaRef": "",
+          "gatedBy": null,
+          "firstWalkedAt": null,
+          "lastWalkedAt": null,
+          "isTreeEdge": false
+        }
+      ],
+      "detachedScreenKeys": []
+    }
+  ]
+}

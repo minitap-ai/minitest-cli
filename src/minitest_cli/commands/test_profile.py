@@ -34,7 +34,9 @@ from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_success
 
 app = typer.Typer(
-    name="test-profile", help="Manage the app's test profiles (Test accounts in the webapp)."
+    name="test-profile",
+    help="Manage test profiles: the test accounts, one by one. Prefer `minitest persona` "
+    "(who Mini plays) and `minitest test-account` (its logins).",
 )
 test_profile_list.register(app)
 test_profile_default.register(app)

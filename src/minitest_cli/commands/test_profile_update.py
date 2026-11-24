@@ -34,11 +34,11 @@ from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_success
 
 
-def register(app: typer.Typer) -> None:
+def register(app: typer.Typer, *, label: str = "Test profile") -> None:
 
     @app.command(name="update")
     def update_profile(
-        profile_id: Annotated[str, typer.Argument(help="Test profile ID.")],
+        profile_id: Annotated[str, typer.Argument(help=f"{label} ID.")],
         name: Annotated[str | None, typer.Option("--name", help="New profile name.")] = None,
         username: Annotated[str | None, typer.Option("--username", help="New username.")] = None,
         clear_username: Annotated[
@@ -177,6 +177,6 @@ def register(app: typer.Typer) -> None:
 
         data = run_api_call(_run())
         if not json_mode:
-            print_success(f"Test profile updated: {profile_id}")
+            print_success(f"{label} updated: {profile_id}")
         warn_if_qa_inbox_unreadable(data)
         output(data, json_mode=json_mode)

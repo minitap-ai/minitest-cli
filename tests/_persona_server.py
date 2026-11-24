@@ -52,6 +52,8 @@ class FakePersonaApi:
             return httpx.Response(200, json={**self._account(account), "qaInboxShared": False})
         if parts[0] == "user-stories" and parts[2:] == ["personas"]:
             return self._story(method, parts[1], request, body)
+        if parts[0] == "user-stories":
+            return self._scenario(method, parts[1:], body)
         return _error(404, f"unexpected {method} {path}")
 
     def _personas(self, method: str, rest: list[str], body: Any) -> httpx.Response:
@@ -139,19 +141,31 @@ class FakePersonaApi:
         draft = body["draftFeatureId"] if body else request.url.params.get("draftFeatureId")
         if method == "PUT":
             self.bindings[(story, draft)] = body["personaIds"]
-        ids = self.bindings.get((story, draft), [])
-        items = [
-            {
-                "id": p,
-                "name": self.personas[p]["name"],
-                "kind": "standard",
-                "exclusiveUse": self.personas[p]["exclusiveUse"],
-            }
-            for p in ids
-        ]
+        items = self._played(story, draft)
         return httpx.Response(
             200, json={"userStoryId": story, "draftFeatureId": draft, "items": items}
         )
+
+    def _scenario(self, method: str, rest: list[str], body: Any) -> httpx.Response:
+        story = rest[0] if rest else str(uuid.uuid4())
+        unknown = [p for p in (body or {}).get("personaIds", []) if p not in self.personas]
+        if unknown:
+            return _error(404, f"Persona {unknown[0]} not found.")
+        if body and "personaIds" in body:
+            self.bindings[(story, None)] = body["personaIds"]
+        status = 201 if method == "POST" else 200
+        return httpx.Response(status, json={"id": story, "personas": self._played(story, None)})
+
+    def _played(self, story: str, draft: str | None) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": p,
+                "name": self.personas[p]["name"],
+                "kind": self.personas[p]["kind"],
+                "exclusiveUse": self.personas[p]["exclusiveUse"],
+            }
+            for p in self.bindings.get((story, draft), [])
+        ]
 
     def _taken(self, name: str) -> bool:
         return any(p["name"].casefold() == name.casefold() for p in self.personas.values())

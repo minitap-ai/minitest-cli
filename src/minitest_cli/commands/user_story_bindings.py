@@ -16,11 +16,11 @@ from minitest_cli.commands.user_story_helpers import (
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
-from minitest_cli.utils.output import output, print_error, print_info, print_success, print_table
+from minitest_cli.utils.output import output, print_error, print_info, print_table
 
 app = typer.Typer(
     name="scenario-binding",
-    help="Bind personas, test accounts, test files or app skills to scenarios.",
+    help="Bind personas, test files or app skills to scenarios.",
 )
 
 _FILE_BINDING_HEADERS = ["ID", "Name", "Kind"]
@@ -36,54 +36,6 @@ def _normalize_items(data: Any) -> list[dict[str, Any]]:
     if isinstance(data, list):
         return data
     return []
-
-
-@app.command(name="set-profile")
-def set_profile(
-    user_story_id: Annotated[str, typer.Argument(help="Scenario ID.")],
-    profile_ids: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--profile",
-            help="Test profile ID to bind (repeatable). Replaces the full set. "
-            "Use --clear instead to remove them all.",
-        ),
-    ] = None,
-    clear: Annotated[
-        bool,
-        typer.Option("--clear", help="Remove all bindings; the scenario then runs as New user."),
-    ] = False,
-) -> None:
-    settings = get_settings()
-    json_mode = is_json_mode()
-    require_auth(settings)
-    app_id = resolve_app_id(settings, get_app_flag())
-
-    if profile_ids and clear:
-        print_error("Use either --profile or --clear, not both.")
-        raise typer.Exit(code=1)
-    if not profile_ids and not clear:
-        print_error("Provide --profile <id> (repeatable) or --clear.")
-        raise typer.Exit(code=1)
-
-    body: dict[str, Any] = {"testProfileIds": [] if clear else list(profile_ids or [])}
-
-    async def _run() -> dict[str, Any]:
-        async with ApiClient(settings) as client:
-            resp = await client.patch(f"{base_path(app_id)}/{user_story_id}", json=body)
-            handle_response_error(resp)
-            return resp.json()
-
-    data = run_api_call(_run())
-    if not json_mode:
-        if clear:
-            print_success(
-                f"Test profiles cleared on scenario {user_story_id}; it now runs as New user."
-            )
-        else:
-            bound = ", ".join(profile_ids or [])
-            print_success(f"Test profiles [{bound}] bound to scenario {user_story_id}.")
-    output(data, json_mode=json_mode)
 
 
 @app.command(name="set-files")

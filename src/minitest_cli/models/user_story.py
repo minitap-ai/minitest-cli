@@ -36,13 +36,9 @@ class CriterionUpsertItem(CamelModel):
     platform_overrides: dict[Platform, str] | None = None
 
 
-class TestProfileSummary(CamelModel):
-    """Lightweight test-profile reference embedded in user-story responses."""
-
+class PersonaSummary(CamelModel):
     id: str
     name: str
-    source: str | None = None
-    avatar_url: str | None = None
 
 
 class UserStoryResponse(CamelModel):
@@ -53,9 +49,7 @@ class UserStoryResponse(CamelModel):
     type: str | None = None
     created_at: datetime
     depends_on: list[str] = []
-    test_profile_id: str | None = None
-    test_profile: TestProfileSummary | None = None
-    test_profiles: list[TestProfileSummary] = []
+    personas: list[PersonaSummary] = []
     camera_media_file_id: str | None = None
     tags: list[TagRef] = []
 
@@ -76,7 +70,7 @@ class CreateUserStoryRequest(CamelModel):
     description: str | None = None
     type: str = "other"
     acceptance_criteria: list[str] = []
-    test_profile_ids: list[str] | None = None
+    persona_ids: list[str] | None = None
     camera_media_file_id: str | None = None
 
 
@@ -86,7 +80,7 @@ class UpdateUserStoryRequest(CamelModel):
     tags: list[str] | None = None
     acceptance_criteria: list[CriterionUpsertItem] | None = None
     depends_on: list[str] | None = None
-    test_profile_ids: list[str] | None = None
+    persona_ids: list[str] | None = None
     # ``None`` means "leave untouched"; an explicit-null clear is injected into
     # the payload post-``to_payload()`` because it uses ``exclude_none=True``.
     camera_media_file_id: str | None = None

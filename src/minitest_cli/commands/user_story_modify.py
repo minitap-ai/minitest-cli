@@ -94,16 +94,20 @@ def update_user_story(
             ),
         ),
     ] = None,
-    profile: Annotated[
+    persona: Annotated[
         list[str] | None,
         typer.Option(
-            "--profile",
-            help="Replace bound test profiles with these IDs (repeatable). Omit to leave as-is.",
+            "--persona",
+            help="Replace the personas Mini plays with these IDs or names (repeatable). "
+            "Omit to leave as-is.",
         ),
     ] = None,
-    clear_profiles: Annotated[
+    clear_personas: Annotated[
         bool,
-        typer.Option("--clear-profiles", help="Unbind all test profiles. Excludes --profile."),
+        typer.Option(
+            "--clear-personas",
+            help="Play no persona: the scenario runs as New user. Excludes --persona.",
+        ),
     ] = False,
     device_count: DeviceCountUpdateOption = None,
     camera_media: CameraMediaOption = None,
@@ -124,8 +128,8 @@ def update_user_story(
     guard_conflicting_flags(
         criteria=criteria,
         add_criteria=add_criteria,
-        profile=profile,
-        clear_profiles=clear_profiles,
+        persona=persona,
+        clear_personas=clear_personas,
         camera_media=camera_media,
         clear_camera_media=clear_camera_media,
         has_overrides=bool(set_overrides or clear_overrides),
@@ -153,8 +157,8 @@ def update_user_story(
         tags=tags,
         description=description,
         depends_on=depends_on,
-        profile=profile,
-        clear_profiles=clear_profiles,
+        persona=persona,
+        clear_personas=clear_personas,
         device_count_provided=device_count_provided,
         device_count_value=device_count_value,
         camera_source=camera_source,
@@ -185,8 +189,8 @@ def update_user_story(
         print_update_summary(
             data,
             user_story_id=user_story_id,
-            clear_profiles=clear_profiles,
-            profile=profile,
+            clear_personas=clear_personas,
+            persona=persona,
             device_count_provided=device_count_provided,
             device_count_value=device_count_value,
             clear_camera_media=clear_camera_media,

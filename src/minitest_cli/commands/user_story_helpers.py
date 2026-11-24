@@ -10,7 +10,7 @@ import typer
 from minitest_cli.api.errors import format_network_error
 from minitest_cli.commands.user_story_device_count import effective_device_count
 from minitest_cli.commands.user_story_iap import requires_in_app_purchases
-from minitest_cli.commands.user_story_profiles import format_bound_profiles
+from minitest_cli.commands.user_story_personas import format_bound_personas
 from minitest_cli.api.client import ApiClient
 from minitest_cli.core.config import Settings
 from minitest_cli.models.user_story import (
@@ -23,7 +23,7 @@ from minitest_cli.utils.output import print_error
 EXIT_NETWORK_ERROR = 3
 EXIT_NOT_FOUND = 4
 
-USER_STORY_TABLE_HEADERS = ["ID", "Name", "Tags", "Description", "Acceptance Criteria", "Profiles"]
+USER_STORY_TABLE_HEADERS = ["ID", "Name", "Tags", "Description", "Acceptance Criteria", "Personas"]
 
 
 def get_settings() -> Settings:
@@ -129,7 +129,7 @@ def format_user_story_row(
         ", ".join(str(tag.get("name", "")) for tag in story.get("tags") or []),
         story.get("description", "") or "",
         criteria_str,
-        format_bound_profiles(story),
+        format_bound_personas(story),
     ]
     if show_devices:
         count = effective_device_count(story)

@@ -6,6 +6,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.persona_helpers import resolve_persona_id
 from minitest_cli.commands.user_story_camera import (
     CameraMediaOption,
     resolve_camera_media_file_id,
@@ -22,7 +23,7 @@ from minitest_cli.commands.user_story_helpers import (
     is_json_mode,
     run_api_call,
 )
-from minitest_cli.commands.user_story_profiles import format_bound_profiles
+from minitest_cli.commands.user_story_personas import format_bound_personas
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_info, print_success
@@ -49,11 +50,12 @@ def create_user_story(
             ),
         ),
     ] = None,
-    profile: Annotated[
+    persona: Annotated[
         list[str] | None,
         typer.Option(
-            "--profile",
-            help="Test profile ID to bind (repeatable). Omit to use the server's default profile.",
+            "--persona",
+            help="Persona ID or name Mini plays (repeatable); it signs in with one of its "
+            "test accounts.",
         ),
     ] = None,
     device_count: DeviceCountCreateOption = None,
@@ -86,8 +88,6 @@ def create_user_story(
         payload["description"] = description
     if criteria:
         payload["acceptance_criteria"] = list(criteria)
-    if profile:
-        payload["test_profile_ids"] = list(profile)
     if device_count is not None:
         payload["deviceCount"] = device_count
     if isinstance(camera_source, str):
@@ -101,6 +101,10 @@ def create_user_story(
                 payload["camera_media_file_id"] = await resolve_camera_media_file_id(
                     client, app_id, camera_source
                 )
+            if persona:
+                payload["personaIds"] = [
+                    await resolve_persona_id(client, app_id, ref) for ref in persona
+                ]
             request_options: dict[str, Any] = {"json": payload}
             if idempotency_key is not None:
                 request_options["headers"] = {"Idempotency-Key": idempotency_key}
@@ -123,9 +127,8 @@ def create_user_story(
     data = run_api_call(_run())
     if not json_mode:
         print_success(f"Scenario created: {data.get('id', '')}")
-        bound = format_bound_profiles(data)
+        bound = format_bound_personas(data)
         if bound:
-            label = "Default profile auto-assigned" if not profile else "Profiles bound"
-            print_info(f"{label}: {bound}")
+            print_info(f"Personas: {bound}")
         report_in_app_purchases(data, in_app_purchases)
     output(data, json_mode=json_mode)

@@ -22,8 +22,8 @@ def guard_conflicting_flags(
     *,
     criteria: list[str] | None,
     add_criteria: list[str] | None,
-    profile: list[str] | None,
-    clear_profiles: bool,
+    persona: list[str] | None,
+    clear_personas: bool,
     camera_media: str | None,
     clear_camera_media: bool,
     has_overrides: bool,
@@ -31,8 +31,8 @@ def guard_conflicting_flags(
     if criteria is not None and add_criteria is not None:
         print_error("Use either --criteria or --add-criteria, not both.")
         raise typer.Exit(code=1)
-    if profile and clear_profiles:
-        print_error("Use either --profile or --clear-profiles, not both.")
+    if persona and clear_personas:
+        print_error("Use either --persona or --clear-personas, not both.")
         raise typer.Exit(code=1)
     if camera_media is not None and clear_camera_media:
         print_error("Use either --camera-media or --clear-camera-media, not both.")

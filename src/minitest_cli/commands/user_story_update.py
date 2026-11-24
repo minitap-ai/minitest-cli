@@ -6,6 +6,7 @@ from typing import Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands.persona_helpers import resolve_persona_id
 from minitest_cli.commands.user_story_camera import resolve_camera_media_file_id
 from minitest_cli.commands.user_story_criteria import apply_current_story_fields
 from minitest_cli.commands.user_story_criterion_edits import RevertCriterion, SetCriterion
@@ -13,7 +14,7 @@ from minitest_cli.commands.user_story_device_count import describe_device_count_
 from minitest_cli.commands.user_story_helpers import base_path, handle_response_error
 from minitest_cli.commands.user_story_iap import report_in_app_purchases
 from minitest_cli.commands.user_story_overrides import ClearOverride, SetOverride
-from minitest_cli.commands.user_story_profiles import format_bound_profiles
+from minitest_cli.commands.user_story_personas import format_bound_personas
 from minitest_cli.core.config import Settings
 from minitest_cli.models.user_story import UpdateUserStoryRequest
 from minitest_cli.utils.output import print_error, print_info, print_success
@@ -25,8 +26,8 @@ def build_update_payload(
     tags: list[str] | None,
     description: str | None,
     depends_on: list[str] | None,
-    profile: list[str] | None,
-    clear_profiles: bool,
+    persona: list[str] | None,
+    clear_personas: bool,
     device_count_provided: bool,
     device_count_value: int | None,
     camera_source: Path | str | None,
@@ -35,12 +36,7 @@ def build_update_payload(
     needs_current_story: bool,
 ) -> dict[str, Any]:
     """Assemble the PATCH body from scalar edits, erroring if nothing would change."""
-    if clear_profiles:
-        test_profile_ids: list[str] | None = []
-    elif profile:
-        test_profile_ids = list(profile)
-    else:
-        test_profile_ids = None
+    persona_refs = [] if clear_personas else list(persona) if persona else None
 
     req = UpdateUserStoryRequest(
         name=name,
@@ -48,7 +44,7 @@ def build_update_payload(
         description=description,
         acceptance_criteria=None,
         depends_on=list(depends_on) if depends_on is not None else None,
-        test_profile_ids=test_profile_ids,
+        persona_ids=persona_refs,
     )
     has_camera_change = camera_source is not None or clear_camera_media
     if not (
@@ -98,6 +94,10 @@ async def patch_user_story(
             payload["cameraMediaFileId"] = await resolve_camera_media_file_id(
                 client, app_id, camera_source
             )
+        if payload.get("personaIds"):
+            payload["personaIds"] = [
+                await resolve_persona_id(client, app_id, ref) for ref in payload["personaIds"]
+            ]
         if needs_current_story:
             await apply_current_story_fields(
                 client,
@@ -122,18 +122,18 @@ def print_update_summary(
     data: dict[str, Any],
     *,
     user_story_id: str,
-    clear_profiles: bool,
-    profile: list[str] | None,
+    clear_personas: bool,
+    persona: list[str] | None,
     device_count_provided: bool,
     device_count_value: int | None,
     clear_camera_media: bool,
     in_app_purchases: bool | None,
 ) -> None:
     print_success(f"Scenario updated: {user_story_id}")
-    if clear_profiles:
-        print_info("Test profiles cleared.")
-    elif profile:
-        print_info(f"Bound profiles: {format_bound_profiles(data) or ', '.join(profile)}")
+    if clear_personas:
+        print_info("Personas cleared: the scenario runs as New user.")
+    elif persona:
+        print_info(f"Personas: {format_bound_personas(data) or ', '.join(persona)}")
     if device_count_provided:
         print_info(describe_device_count_change(data, device_count_value))
     if clear_camera_media:

@@ -62,60 +62,6 @@ def _mock_client(get=None, put=None, patch_=None):
     return client
 
 
-class TestSetProfile:
-    def test_set_profile_ok(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        resp = _mock_response(200, {"id": "s-1", "testProfileIds": ["p-1"]})
-        client = _mock_client(patch_=resp)
-        with patch("minitest_cli.commands.user_story_bindings.ApiClient", return_value=client):
-            result = _run(["set-profile", "s-1", "--profile", "p-1"], settings, json_mode=True)
-        assert result.exit_code == 0
-        body = client.patch.await_args.kwargs["json"]
-        assert body == {"testProfileIds": ["p-1"]}
-
-    def test_set_profile_multiple(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        resp = _mock_response(200, {"id": "s-1", "testProfileIds": ["p-1", "p-2"]})
-        client = _mock_client(patch_=resp)
-        with patch("minitest_cli.commands.user_story_bindings.ApiClient", return_value=client):
-            result = _run(
-                ["set-profile", "s-1", "--profile", "p-1", "--profile", "p-2"],
-                settings,
-                json_mode=True,
-            )
-        assert result.exit_code == 0
-        body = client.patch.await_args.kwargs["json"]
-        assert body == {"testProfileIds": ["p-1", "p-2"]}
-
-    def test_set_profile_clear(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        resp = _mock_response(200, {"id": "s-1", "testProfileIds": []})
-        client = _mock_client(patch_=resp)
-        with patch("minitest_cli.commands.user_story_bindings.ApiClient", return_value=client):
-            result = _run(["set-profile", "s-1", "--clear"], settings, json_mode=True)
-        assert result.exit_code == 0
-        body = client.patch.await_args.kwargs["json"]
-        assert body == {"testProfileIds": []}
-
-    def test_set_profile_mutex(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        client = _mock_client()
-        with patch("minitest_cli.commands.user_story_bindings.ApiClient", return_value=client):
-            result = _run(
-                ["set-profile", "s-1", "--profile", "p-1", "--clear"],
-                settings,
-            )
-        assert result.exit_code == 1
-        client.patch.assert_not_awaited()
-
-    def test_set_profile_requires_arg(self, tmp_path):
-        settings = _make_settings(tmp_path)
-        client = _mock_client()
-        with patch("minitest_cli.commands.user_story_bindings.ApiClient", return_value=client):
-            result = _run(["set-profile", "s-1"], settings)
-        assert result.exit_code == 1
-
-
 class TestSetFiles:
     def test_set_files_atomic(self, tmp_path):
         settings = _make_settings(tmp_path)

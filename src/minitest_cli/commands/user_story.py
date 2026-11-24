@@ -33,7 +33,7 @@ from minitest_cli.commands.user_story_helpers import (
     page_items,
     run_api_call,
 )
-from minitest_cli.commands.user_story_profiles import format_bound_profiles
+from minitest_cli.commands.user_story_personas import format_bound_personas
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_info, print_table
@@ -131,7 +131,7 @@ def get_user_story(
 
     data = run_api_call(_run())
     if not json_mode:
-        print_info(f"Bound profiles: {format_bound_profiles(data) or 'none'}")
+        print_info(f"Personas: {format_bound_personas(data) or 'none'}")
         effective = effective_device_count(data)
         if effective > 1:
             print_info(f"Devices per run: {effective}")

@@ -335,6 +335,22 @@ CLI:** if `connectors` lists none (or none online), ask a workspace owner or
 admin to create one in the web app under **Workspace settings → Private
 network** and start it inside their network.
 
+**A place per criterion, during the run.** When what you test depends on where
+the network is (a GDPR consent banner, a US state's "Do Not Sell or Share"
+opt-out, prices or a catalog decided from the IP address, not the GPS), you do
+not need the setting above: write the place into the criterion and Mini moves
+the domains that decide it there during the run, as often as the scenario
+needs, on cloud Android and iOS devices where the workspace has it. Name the
+place, not the hosts; when the app's own consent or geo service is not obvious,
+name its domain in an app skill (`minitest app-skill`). For example:
+
+```bash
+minitest --json --app <app_id> scenario create --name "Consent when arriving in Europe" \
+  --tag privacy \
+  --criteria "With the network outside Europe (Japan), a fresh install opens Home with no consent modal" \
+  --criteria "After moving the network to the UK, relaunching shows the 'We Need Your Consent' modal"
+```
+
 #### Backend API
 
 When the app has a backend you own with an OpenAPI document, Mini can search

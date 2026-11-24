@@ -22,6 +22,7 @@ from minitest_cli.commands import (
     issues,
     knowledge,
     knowledge_documents,
+    persona,
     reference,
     run,
     schedules,
@@ -31,6 +32,7 @@ from minitest_cli.commands import (
     skill,
     tags,
     targets_catalog,
+    test_account,
     test_file,
     test_profile,
     upgrade,
@@ -57,6 +59,8 @@ app.add_typer(user_story.legacy_app)
 app.add_typer(user_story_bindings.legacy_app)
 app.add_typer(draft.app)
 app.add_typer(draft_feature.app)
+app.add_typer(persona.app)
+app.add_typer(test_account.app)
 app.add_typer(test_profile.app)
 app.add_typer(test_file.app)
 app.add_typer(tags.app)

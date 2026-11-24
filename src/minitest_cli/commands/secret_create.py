@@ -160,7 +160,7 @@ def register(app: typer.Typer) -> None:
 
         --empty --reason: only a human has the value; runs that need it wait until it is set.
 
-        Reference it as {{secret:NAME}} or link it with test-profile --password-secret.
+        Reference it as {{secret:NAME}} or link it with test-account --password-secret.
 
         Never prints a value. Allowed inside a test run.
         """

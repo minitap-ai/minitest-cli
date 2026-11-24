@@ -6,7 +6,7 @@ CardNumberOption = Annotated[
     str | None,
     typer.Option(
         "--test-card-number",
-        help="Sandbox payment card number the persona pays with (e.g. 4242 4242 4242 4242).",
+        help="Sandbox payment card number the test account pays with (e.g. 4242 4242 4242 4242).",
     ),
 ]
 CardExpiryOption = Annotated[

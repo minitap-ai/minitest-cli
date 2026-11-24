@@ -5,7 +5,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands import test_profile_update
+from minitest_cli.commands import test_account_update
 from minitest_cli.commands.persona_helpers import (
     current_app_id,
     accounts_path,
@@ -13,7 +13,7 @@ from minitest_cli.commands.persona_helpers import (
     personas_path,
     resolve_persona_id,
 )
-from minitest_cli.commands.test_profile_card import (
+from minitest_cli.commands.test_account_card import (
     CardCvcOption,
     CardExpiryOption,
     CardHolderNameOption,
@@ -21,13 +21,13 @@ from minitest_cli.commands.test_profile_card import (
     CardPostalCodeOption,
     card_fields,
 )
-from minitest_cli.commands.test_profile_helpers import (
+from minitest_cli.commands.test_account_helpers import (
     get_settings,
     is_json_mode,
     read_stdin_secret,
     run_api_call,
 )
-from minitest_cli.commands.test_profile_secret_refs import (
+from minitest_cli.commands.test_account_secret_refs import (
     CardSecretOption,
     OtpSecretOption,
     PasswordSecretOption,
@@ -40,7 +40,7 @@ app = typer.Typer(
     help="Manage test accounts: the real logins of a persona (`minitest persona`). "
     "Mini signs in with one of a persona's accounts, spreading runs across them.",
 )
-test_profile_update.register(app, label="Test account")
+test_account_update.register(app)
 
 PersonaOption = Annotated[str, typer.Option("--persona", help="Persona ID or name.")]
 AccountArg = Annotated[str, typer.Argument(help="Test account ID.")]

@@ -49,6 +49,25 @@ class TimelineAction(CamelModel):
     target: str | None = None
     url: str | None = None
     intent: str | None = None
+    # The webapp's one-line English label, e.g. ``Tap on “Sign in”``.
+    label: str | None = None
+    x: int | None = None
+    y: int | None = None
+    identifier: str | None = None
+    text: str | None = None
+    network_condition: str | None = None
+    network_change: str | None = None
+    orientation: str | None = None
+    location_mode: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    route: list[list[float]] | None = None
+    speed_mps: float | None = None
+    method: str | None = None
+    status_code: int | None = None
+    error: str | None = None
+    duration_ms: int | float | None = None
+    key: str | None = None
 
 
 class RecordingTimeline(CamelModel):

@@ -6,10 +6,10 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.run_helpers import is_uuid
-from minitest_cli.commands.test_profile_helpers import (
+from minitest_cli.commands.test_account_helpers import (
     get_app_flag,
     get_settings,
-    handle_profile_response,
+    handle_api_response,
 )
 from minitest_cli.core.app_context import resolve_app_id
 from minitest_cli.core.auth import require_auth
@@ -35,7 +35,7 @@ def accounts_path(app_id: str) -> str:
 
 
 def handle_persona_response(resp: Any, *, resource: str = "Persona") -> None:
-    handle_profile_response(resp, resource=resource)
+    handle_api_response(resp, resource=resource)
 
 
 async def resolve_persona_id(client: ApiClient, app_id: str, ref: str) -> str:

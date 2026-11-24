@@ -1,4 +1,4 @@
-"""``--password-secret/--otp-secret/--card-secret``: point a persona at vault secrets."""
+"""``--password-secret/--otp-secret/--card-secret``: point a test account at vault secrets."""
 
 from typing import Annotated, Any
 

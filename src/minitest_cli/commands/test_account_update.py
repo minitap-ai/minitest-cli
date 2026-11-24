@@ -3,7 +3,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands.test_profile_card import (
+from minitest_cli.commands.test_account_card import (
     CardCvcOption,
     CardExpiryOption,
     CardHolderNameOption,
@@ -12,18 +12,17 @@ from minitest_cli.commands.test_profile_card import (
     card_fields,
     merged_card,
 )
-from minitest_cli.commands.test_profile_helpers import (
-    app_base_path,
+from minitest_cli.commands.test_account_helpers import (
+    account_credentials_path,
     get_app_flag,
     get_settings,
-    handle_profile_response,
+    handle_api_response,
     is_json_mode,
     read_stdin_secret,
     run_api_call,
     warn_if_qa_inbox_unreadable,
 )
-from minitest_cli.commands.test_profile_exclusive import ExclusiveOption
-from minitest_cli.commands.test_profile_secret_refs import (
+from minitest_cli.commands.test_account_secret_refs import (
     CardSecretOption,
     OtpSecretOption,
     PasswordSecretOption,
@@ -34,12 +33,12 @@ from minitest_cli.core.auth import require_auth
 from minitest_cli.utils.output import output, print_error, print_success
 
 
-def register(app: typer.Typer, *, label: str = "Test profile") -> None:
+def register(app: typer.Typer) -> None:
 
     @app.command(name="update")
-    def update_profile(
-        profile_id: Annotated[str, typer.Argument(help=f"{label} ID.")],
-        name: Annotated[str | None, typer.Option("--name", help="New profile name.")] = None,
+    def update_account(
+        account_id: Annotated[str, typer.Argument(help="Test account ID.")],
+        name: Annotated[str | None, typer.Option("--name", help="New account label.")] = None,
         username: Annotated[str | None, typer.Option("--username", help="New username.")] = None,
         clear_username: Annotated[
             bool,
@@ -95,8 +94,8 @@ def register(app: typer.Typer, *, label: str = "Test profile") -> None:
         password_secret: PasswordSecretOption = None,
         otp_secret: OtpSecretOption = None,
         card_secret: CardSecretOption = None,
-        exclusive: ExclusiveOption = None,
     ) -> None:
+        """Change a test account's login or credentials (exclusive use: `persona exclusive`)."""
         settings = get_settings()
         json_mode = is_json_mode()
         require_auth(settings)
@@ -158,25 +157,23 @@ def register(app: typer.Typer, *, label: str = "Test profile") -> None:
             otp_given=otp is not None,
             card_given=bool(card),
         )
-        if exclusive is not None:
-            body["exclusive_use"] = exclusive
         if not body and not card:
             print_error("Provide at least one field to update.")
             raise typer.Exit(code=1)
 
         async def _run() -> dict[str, Any]:
             async with ApiClient(settings) as client:
-                path = f"{app_base_path(app_id)}/{profile_id}"
+                path = account_credentials_path(app_id, account_id)
                 if card:
                     current = await client.get(path)
-                    handle_profile_response(current)
+                    handle_api_response(current, resource="Test account")
                     body["test_card"] = merged_card(current.json().get("testCard"), card)
                 resp = await client.patch(path, json=body)
-                handle_profile_response(resp)
+                handle_api_response(resp, resource="Test account")
                 return resp.json()
 
         data = run_api_call(_run())
         if not json_mode:
-            print_success(f"{label} updated: {profile_id}")
+            print_success(f"Test account updated: {account_id}")
         warn_if_qa_inbox_unreadable(data)
         output(data, json_mode=json_mode)

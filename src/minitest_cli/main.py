@@ -34,7 +34,6 @@ from minitest_cli.commands import (
     targets_catalog,
     test_account,
     test_file,
-    test_profile,
     upgrade,
     user_story,
     user_story_bindings,
@@ -61,7 +60,6 @@ app.add_typer(draft.app)
 app.add_typer(draft_feature.app)
 app.add_typer(persona.app)
 app.add_typer(test_account.app)
-app.add_typer(test_profile.app)
 app.add_typer(test_file.app)
 app.add_typer(tags.app)
 app.add_typer(flow_types.app)

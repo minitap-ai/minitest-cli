@@ -18,7 +18,7 @@ from minitest_cli.commands.persona_helpers import (
     personas_path,
     resolve_persona_id,
 )
-from minitest_cli.commands.test_profile_helpers import (
+from minitest_cli.commands.test_account_helpers import (
     get_settings,
     is_json_mode,
     run_api_call,

@@ -452,6 +452,33 @@ or account-specific state, ensure the user provides test credentials via the
 Minitest web app's test configuration. Scenarios should only cover journeys
 the test account can actually perform.
 
+### Personas and test accounts
+
+Three words, one meaning each:
+
+- **Persona**: who Mini plays in a scenario ("Denmark buyer", "Seller", "New user"). Scenarios pick personas, never logins.
+- **Test account**: one real login of a persona. A persona has one or more; Mini signs in with one of them and spreads runs across them. "New user" gets a fresh account every run.
+- **Credentials**: the secrets of a test account (password, OTP code or seed, test card).
+
+Which command for what:
+
+| You want to… | Use |
+|---|---|
+| Add a role / starting state | `persona create --name "Seller" --about "..."`, then `test-account add --persona Seller ...` |
+| Let more runs of a persona go in parallel | `test-account add --persona <persona> ...` (another login of the same person) |
+| Bind a scenario to who it plays | `scenario-binding set-personas <scenario_id> --persona <id\|name> [--persona ...]` (`--clear` unbinds) |
+| Do the same on a draft feature branch | add `--draft-feature <df_id>` (scenario's main ID), or put `"personaIds": [...]` on a `story.create`/`story.edit` op of `df apply` |
+| See which accounts are free, in use or cooling down | `persona pool <persona>` |
+| Keep each account to one run at a time | `persona exclusive <persona> on` (`off` again; refused on New user) |
+| Change a login or password | `test-account update <account_id> --password-stdin ...` (same flags as `test-profile update`) |
+| Regroup accounts | `test-account move <account_id> --persona <persona>` |
+| Retire a login | `test-account remove <account_id> --force` |
+| Put a cooled-down account back into rotation | `test-account clear-cooldown <account_id>` |
+
+Commands take a persona ID or its name (case-insensitive; names are unique per app). Binding a persona binds one of its test accounts, so a persona needs at least one before a scenario can play it, and a persona is deleted only once no scenario plays it and it has no account left (removing its last account deletes it). Moving or removing an account first hands its scenarios to another account of the same persona. Credentials are never printed back: reads show `hasPassword`, `hasStaticOtpCode`, `hasTestCard`. Full reference: [`commands/personas.md`](commands/personas.md).
+
+`test-profile` still works and shows the same test accounts one by one; the credential rules below apply to `test-account add` as they do to `test-profile create`.
+
 ### Test Profiles
 
 When generating scenarios, create a test profile for every distinct role or subscription tier the app requires. Each profile represents a unique starting state the agent needs to run a story (e.g. "Free User", "Pro User", "Admin", "Driver").
@@ -1728,6 +1755,15 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Mint API key        | `minitest auth api-key mint --tenant <id> --name <label> --json` (OAuth only)            |
 | List API keys       | `minitest auth api-key list --tenant <id> --json`                                        |
 | Revoke API key      | `minitest auth api-key revoke --tenant <id> --key <id> --json`                           |
+| List personas       | `minitest --json --app ID persona list` (accounts, free / in use / cooling down, scenarios) |
+| Show a persona      | `minitest --json --app ID persona get <id\|name>` / `persona pool <id\|name>` |
+| Create / edit a persona | `minitest --json --app ID persona create --name "..." [--about ...] [--exclusive]` / `persona update <id\|name> [--name ...] [--about ...]` |
+| Exclusive use on a persona | `minitest --json --app ID persona exclusive <id\|name> on\|off` |
+| Delete a persona    | `minitest --json --app ID persona delete <id\|name> --force` (no scenario, no account left) |
+| Add a test account  | `minitest --json --app ID test-account add --persona <id\|name> --username "..." [--password-stdin]` |
+| Update / move / remove a test account | `test-account update <id> ...` / `test-account move <id> --persona <id\|name>` / `test-account remove <id> --force` |
+| Clear a cooldown    | `minitest --json --app ID test-account clear-cooldown <id>` |
+| Bind personas to a scenario | `minitest --json --app ID scenario-binding set-personas <scenario_id> --persona <id\|name> [--draft-feature <df_id>]` / `list-personas <scenario_id>` |
 | List test profiles  | `minitest --json --app ID test-profile list`                                             |
 | Get test profile    | `minitest --json --app ID test-profile get <profile_id>`                                 |
 | List shared profiles| `minitest --json test-profile list-shared` (Minitap-provided pool; currently Google account only) |

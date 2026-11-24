@@ -36,25 +36,22 @@ carry the same counts (`freeCount`, `inUseCount`, `coolingDownCount`, `accountCo
 
 `scenario-binding set-personas <scenario> --persona A --persona B` replaces the personas a
 scenario plays (`--clear` unbinds them all; the scenario then runs as New user).
-`list-personas` reads them. Each persona is bound through one of its test accounts (the
-one already bound, else its oldest), so a persona needs at least one account first (409
-otherwise). Shared Minitap profiles bound to the scenario are left alone.
+`list-personas` reads them. A persona needs at least one test account before a scenario
+can play it (409 otherwise). `scenario create|update --persona` set them too
+(`update --clear-personas` unbinds them all).
 
 On a draft feature branch, pass `--draft-feature <df_id>` with the scenario's **main** ID.
-In a changeset (`df apply`), `story.create` and `story.edit` ops accept
-`"personaIds": ["…"]` instead of `"testProfileIds"` (never both). `df show --view diff`
-still reports the accounts the branch binds as `test_profile_ids`.
+In a changeset (`df apply`), `story.create` and `story.edit` ops take
+`"personaIds": ["…"]`; `df show --view diff` reports them as `persona_ids`.
 
 ## Changing accounts
 
-- `test-account update <id>`: credentials, login, label (same flags as
-  `test-profile update`).
-- `test-account move <id> --persona <persona>`: scenarios bound through the account keep
-  their persona through another of its accounts. Moving a persona's last account takes
-  its scenarios along and deletes the emptied persona.
-- `test-account remove <id> --force`: scenarios move to another account of the persona
-  first. Refused for the last account of a persona scenarios still play; removing a
-  persona's last account deletes the persona.
+- `test-account update <id>`: credentials, login, label, notes; `--clear-*` removes one.
+  Exclusive use belongs to the persona (`persona exclusive`), not to an account.
+- `test-account move <id> --persona <persona>`: the account now signs in for the other
+  persona; scenarios keep the personas they play.
+- `test-account remove <id> --force`: refused for the last account of a persona scenarios
+  still play.
 - `persona delete <persona> --force`: refused while a scenario plays it or it still has
   test accounts.
 

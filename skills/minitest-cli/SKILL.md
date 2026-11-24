@@ -136,8 +136,8 @@ the executor envelope. `minitest reference` falls back to the same bundled
 copies on its own when it cannot reach Minitest.
 
 The workflow ends by **applying the suite through the ordinary `minitest` CLI
-commands already documented in this SKILL.md** — `test-profile create`,
-`scenario create` (with `--criteria`, `--profile`, `--depends-on`),
+commands already documented in this SKILL.md** — `persona create` and
+`test-account add`, `scenario create` (with `--criteria`, `--persona`, `--depends-on`),
 `app-knowledge update` (or `brief` / `app-guide` / `glossary` on Knowledge v2
 workspaces), and so on. There is no special apply command: the
 reviewed suite is replayed as regular CLI calls in dependency order.
@@ -397,13 +397,13 @@ or browser).
 > fields keep their `story` names (`userStoryId`, `storyRuns`); flags say
 > `--scenario`.
 
-`--profile <profile_id>` is optional and repeatable: a scenario can bind several test accounts (one per role it needs, e.g. a buyer and a seller on two devices). If omitted, Minitest binds the app's default test account, or "New user" when there is no default.
+`--persona <persona>` (ID or name) is optional and repeatable: a scenario can play several personas (one per role it needs, e.g. a buyer and a seller on two devices). A scenario that plays no persona runs as "New user".
 
 ```bash
 minitest --json --app <app_id> scenario create \
   --name "User Login" \
   --tag auth \
-  --profile <profile_id> \
+  --persona "Pro User" \
   --description "Email/password login from welcome screen" \
   --criteria "The login screen shows email and password fields" \
   --criteria "After submitting valid credentials, a loading indicator appears" \
@@ -470,69 +470,66 @@ Which command for what:
 | Do the same on a draft feature branch | add `--draft-feature <df_id>` (scenario's main ID), or put `"personaIds": [...]` on a `story.create`/`story.edit` op of `df apply` |
 | See which accounts are free, in use or cooling down | `persona pool <persona>` |
 | Keep each account to one run at a time | `persona exclusive <persona> on` (`off` again; refused on New user) |
-| Change a login or password | `test-account update <account_id> --password-stdin ...` (same flags as `test-profile update`) |
+| Change a login or password | `test-account update <account_id> --password-stdin ...` |
 | Regroup accounts | `test-account move <account_id> --persona <persona>` |
 | Retire a login | `test-account remove <account_id> --force` |
 | Put a cooled-down account back into rotation | `test-account clear-cooldown <account_id>` |
 
-Commands take a persona ID or its name (case-insensitive; names are unique per app). Binding a persona binds one of its test accounts, so a persona needs at least one before a scenario can play it, and a persona is deleted only once no scenario plays it and it has no account left (removing its last account deletes it). Moving or removing an account first hands its scenarios to another account of the same persona. Credentials are never printed back: reads show `hasPassword`, `hasStaticOtpCode`, `hasTestCard`. Full reference: [`commands/personas.md`](commands/personas.md).
+Commands take a persona ID or its name (case-insensitive; names are unique per app). A persona needs at least one test account before a scenario can play it, and is deleted only once no scenario plays it and it has no account left. Exclusive use belongs to the persona, never to one account. Credentials are never printed back: reads show `hasPassword`, `hasStaticOtpCode`, `hasTestCard`. Full reference: [`commands/personas.md`](commands/personas.md).
 
-`test-profile` still works and shows the same test accounts one by one; the credential rules below apply to `test-account add` as they do to `test-profile create`.
+### Test accounts and their credentials
 
-### Test Profiles
-
-When generating scenarios, create a test profile for every distinct role or subscription tier the app requires. Each profile represents a unique starting state the agent needs to run a story (e.g. "Free User", "Pro User", "Admin", "Driver").
-
-**Default to email-OTP personas.** Give each profile a `<prefix>@qa.minitap.ai` username and NO password. Every `@qa.minitap.ai` address delivers into a shared inbox the tester agent reads at run time, so it can sign in (or sign up) by pulling the login/verification code itself — no real credentials to manage:
+When generating scenarios, create a persona for every distinct role or subscription tier the app requires, and give it at least one test account. Each persona is a unique starting state the agent needs to run a story (e.g. "Free User", "Pro User", "Admin", "Driver").
 
 ```bash
-minitest --json --app $APP test-profile create \
-  --name "Pro User" --username "pro@qa.minitap.ai" \
+minitest --json --app $APP persona create --name "Pro User" \
   --about "Pro subscription active, has saved items, payment method on file"
 ```
 
-A non-`@qa.minitap.ai` username with no password is rejected *unless* the profile also carries `--phone-number` or `--static-otp-code` — those personas have their own way to sign in, so keep the address as given. Otherwise keep the `@qa.minitap.ai` domain (or leave the username blank to auto-generate one).
+**Default to email-OTP test accounts.** Give each account a `<prefix>@qa.minitap.ai` username and NO password. Every `@qa.minitap.ai` address delivers into a shared inbox the tester agent reads at run time, so it can sign in (or sign up) by pulling the login/verification code itself — no real credentials to manage:
+
+```bash
+minitest --json --app $APP test-account add --persona "Pro User" --username "pro@qa.minitap.ai"
+```
+
+A non-`@qa.minitap.ai` username with no password is rejected *unless* the account also carries `--phone-number` or `--static-otp-code` — those accounts have their own way to sign in, so keep the address as given. Otherwise keep the `@qa.minitap.ai` domain (or leave the username blank to auto-generate one).
 
 **Bring-your-own account.** Only when the user supplies a real account they own (and the app needs a password) pass both, via stdin:
 
 ```bash
-printf "%s" "$PASSWORD" | minitest --json --app $APP test-profile create \
-  --name "Pro User" --username "real-user@example.com" --password-stdin --about "..."
+printf "%s" "$PASSWORD" | minitest --json --app $APP test-account add \
+  --persona "Pro User" --username "real-user@example.com" --password-stdin
 ```
 
-**Specific account state (e.g. premium).** To exercise a flow that needs a particular state, proactively create a `<something>@qa.minitap.ai` persona WITH an explicit password, then ask the user to link that exact email+password combo to a pro/specific-state account in their backend. The `@qa.minitap.ai` address keeps the inbox readable for any OTP while the password lets them pre-provision the account state.
+**Specific account state (e.g. premium).** To exercise a flow that needs a particular state, proactively add a `<something>@qa.minitap.ai` test account WITH an explicit password, then ask the user to link that exact email+password combo to a pro/specific-state account in their backend. The `@qa.minitap.ai` address keeps the inbox readable for any OTP while the password lets them pre-provision the account state.
 
-**Credentials as secrets.** Instead of a literal password, OTP seed or card, a persona can point at an app secret: `--password-secret`, `--otp-secret`, `--card-secret` (generated, or still waiting for the user's value). See [Secrets](#secrets-minitest-secret).
+**Credentials as secrets.** Instead of a literal password, OTP seed or card, a test account can point at an app secret: `--password-secret`, `--otp-secret`, `--card-secret` (generated, or still waiting for the user's value). See [Secrets](#secrets-minitest-secret).
 
-**No persona bound.** A scenario created without a profile gets the app's default test account, or the system **"New user"** account when there is none (clearing the bindings also binds "New user"). As "New user" the agent proceeds anonymously where the app allows it. If a flow forces authentication, it self-generates a `<random>@qa.minitap.ai` with a runtime password, signs up, and reads the inbox for the confirmation/OTP code — so unbound scenarios still work without you provisioning anything.
+**No persona.** A scenario that plays no persona runs as the system **"New user"** (`scenario-binding set-personas --clear` does the same). As "New user" the agent proceeds anonymously where the app allows it. If a flow forces authentication, it self-generates a `<random>@qa.minitap.ai` with a runtime password, signs up, and reads the inbox for the confirmation/OTP code — so such scenarios still work without you provisioning anything.
 
-**Phone-OTP personas.** If the app authenticates via SMS one-time codes instead of email, set `--phone-number` (E.164, e.g. `+14155551234`) and `--static-otp-code` (the fixed code the customer's backend accepts for that number) instead of `--username`/`--password`:
+**Phone-OTP test accounts.** If the app authenticates via SMS one-time codes instead of email, set `--phone-number` (E.164, e.g. `+14155551234`) and `--static-otp-code` (the fixed code the customer's backend accepts for that number) instead of `--username`/`--password`:
 
 ```bash
-printf "%s" "$OTP_CODE" | minitest --json --app $APP test-profile create \
-  --name "Driver" --phone-number "+14155551234" --static-otp-code-stdin \
-  --about "Verified driver, active delivery in progress"
+printf "%s" "$OTP_CODE" | minitest --json --app $APP test-account add --persona "Driver" \
+  --phone-number "+14155551234" --static-otp-code-stdin
 ```
 
-Ask the user for the whitelisted phone number and its fixed OTP code — these must be pre-provisioned in the customer's backend, the same way a bring-your-own-account password is. A phone or static-OTP persona keeps whatever `--username` you give it (a real customer address, or none at all) — it is never forced onto `@qa.minitap.ai` and never has one invented for it, since it already has its own way to sign in.
+Ask the user for the whitelisted phone number and its fixed OTP code — these must be pre-provisioned in the customer's backend, the same way a bring-your-own-account password is. A phone or static-OTP account keeps whatever `--username` you give it (a real customer address, or none at all) — it is never forced onto `@qa.minitap.ai` and never has one invented for it, since it already has its own way to sign in.
 
-**Personas that pay.** When a scenario goes through checkout, give the persona that runs it a sandbox payment card with the `--test-card-*` options. Every field is optional; set the ones the app's payment form asks for. Ask the user which test card their staging payment provider accepts (Stripe test mode takes `4242 4242 4242 4242` with any future expiry and CVC); never invent one. The card is stored encrypted like a password and hidden from `test-profile list` (check `hasTestCard`).
+**Test accounts that pay.** When a scenario goes through checkout, give the persona's test accounts a sandbox payment card with the `--test-card-*` options. Every field is optional; set the ones the app's payment form asks for. Ask the user which test card their staging payment provider accepts (Stripe test mode takes `4242 4242 4242 4242` with any future expiry and CVC); never invent one. The card is stored encrypted like a password and never shown back (check `hasTestCard` in `persona get`).
 
 ```bash
-minitest --json --app $APP test-profile update <id> \
+minitest --json --app $APP test-account update <account_id> \
   --test-card-number "4242 4242 4242 4242" --test-card-expiry "12/34" --test-card-cvc "123"
 ```
 
 On `update`, the options you pass change those fields and keep the rest of the stored card; `--clear-test-card` removes it (not combinable with `--test-card-*`).
 
-Fill the `about` field with what makes each profile distinct (e.g. "Pro subscription active, has saved items, payment method on file"). This context is injected into the tester agent's prompt at run time.
+Fill the persona's `--about` with what makes it distinct (e.g. "Pro subscription active, has saved items, payment method on file"). This context is injected into the tester agent's prompt at run time.
 
-If the app uses a third-party auth provider (e.g. Google OAuth), a shared Minitap account covers that flow — bind it to the relevant story instead of creating a new profile. Those shared pool addresses are also `@qa.minitap.ai`, so their inboxes are readable the same way.
+If the app uses a third-party auth provider (e.g. Google OAuth), a shared Minitap account covers that flow: do not create a persona for it. Those shared pool addresses are also `@qa.minitap.ai`, so their inboxes are readable the same way.
 
-Bind every story that requires authentication to its profile at creation time:
-- Use `scenario create --profile <profile_id>` when you need a specific profile.
-- If you omit `--profile`, ensure the app default profile is already configured so story creation auto-binds it.
-- If needed, use `scenario-binding set-profile` immediately after creation.
+Bind every story that requires authentication to its personas at creation time with `scenario create --persona <persona>` (repeatable), or right after with `scenario-binding set-personas <scenario_id> --persona <persona>`.
 
 **Acceptance criteria rules:**
 
@@ -1627,7 +1624,7 @@ minitest --json --app $APP batch list | jq '.items[] | {id, status}'
 
 Two shapes to expect: **list endpoints are paginated envelopes**
 (`{items, page, pageSize, total}`) — `scenario`, `build`, `run`, `batch`,
-`test-profile`, `test-file` — while `apps list` and `tags list` return
+`test-file` — while `apps list` and `tags list` return
 **bare arrays**. Reach for `.items[]` first and fall back to `.[]`.
 
 `batch list` returns `storyRuns: []` for every batch; only `batch get` populates
@@ -1654,7 +1651,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | List run targets (devices, OS, browsers) | `minitest --json --app ID targets catalog [--tenant ID]` |
 | Several devices / versions in one run | `run start\|all\|from-commit ... --target platform=ios,os=26 --target platform=ios,os=27` (or `--targets-file F`) |
 | Create scenario   | `minitest --json --app ID scenario create --name "..." --tag auth --criteria "..."` |
-| Create scenario with profile | `minitest --json --app ID scenario create --name "..." --tag auth --profile <profile_id> --criteria "..."` |
+| Create scenario with personas | `minitest --json --app ID scenario create --name "..." --tag auth --persona <id\|name> --criteria "..."` |
 | List scenarios   | `minitest --json --app ID scenario list`                                               |
 | Update scenario   | `minitest --json --app ID scenario update <id> --add-criteria "..."`                   |
 | Reword one criterion (keep history) | `minitest --json --app ID scenario update <id> --set-criterion <crit_id>="text"` |
@@ -1692,8 +1689,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | List / inspect secrets | `minitest --json --app ID secret list [--missing]` / `secret describe <NAME>` — see [Secrets](#secrets-minitest-secret) |
 | Generate a secret   | `minitest --json --app ID secret create <NAME> --kind password --generate [--length N] [--charset alnum]` |
 | Ask a human for a secret | `minitest --json --app ID secret create <NAME> --kind K --empty --reason "..." [--scenario ID]` |
-| Link a secret to a persona | `minitest --json --app ID test-profile update <id> --password-secret <NAME> \| --otp-secret <NAME> \| --card-secret <NAME>` |
-| One run at a time on an account | `minitest --json --app ID test-profile update <id> --exclusive` (`--no-exclusive` to turn it off) |
+| Link a secret to a test account | `minitest --json --app ID test-account update <id> --password-secret <NAME> \| --otp-secret <NAME> \| --card-secret <NAME>` |
 | Lint secret references | `minitest --app ID secret lint --scenario ID \| --file PATH \| --text "..."` (exit 1 on leak or missing) |
 | Set / remove / rename a secret (humans only) | `secret set <NAME> --kind K` (stdin), `secret unset <NAME>`, `secret rename <OLD> <NEW>`, `secret extract <scenario_id> --as <NAME> --kind K` |
 | List env vars       | `minitest --json --app ID env list` (values masked; `--show` reveals)                    |
@@ -1764,23 +1760,15 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Update / move / remove a test account | `test-account update <id> ...` / `test-account move <id> --persona <id\|name>` / `test-account remove <id> --force` |
 | Clear a cooldown    | `minitest --json --app ID test-account clear-cooldown <id>` |
 | Bind personas to a scenario | `minitest --json --app ID scenario-binding set-personas <scenario_id> --persona <id\|name> [--draft-feature <df_id>]` / `list-personas <scenario_id>` |
-| List test profiles  | `minitest --json --app ID test-profile list`                                             |
-| Get test profile    | `minitest --json --app ID test-profile get <profile_id>`                                 |
-| List shared profiles| `minitest --json test-profile list-shared` (Minitap-provided pool; currently Google account only) |
-| Create test profile | `minitest --json --app ID test-profile create --name "..." --username "..." --password-stdin` |
-| Create phone-OTP profile | `minitest --json --app ID test-profile create --name "..." --phone-number "+1..." --static-otp-code-stdin` |
-| Set a persona's test card | `minitest --json --app ID test-profile update <id> [--test-card-number ...] [--test-card-expiry MM/YY] [--test-card-cvc ...] [--test-card-holder-name ...] [--test-card-postal-code ...]` |
-| Set default profile | `minitest --json --app ID test-profile set-default <profile_id>` |
-| Clear default profile | `minitest --json --app ID test-profile clear-default` |
-| Update test profile | `minitest --json --app ID test-profile update <id> [--name ...] [--clear-password] [--phone-number ...] [--clear-static-otp-code] [--clear-username] [--clear-phone-number] [--clear-about] [--clear-test-card]` |
-| Delete test profile | `minitest --json --app ID test-profile delete <id> --force`                              |
+| Add a phone-OTP test account | `minitest --json --app ID test-account add --persona <id\|name> --phone-number "+1..." --static-otp-code-stdin` |
+| Set a test account's card | `minitest --json --app ID test-account update <id> [--test-card-number ...] [--test-card-expiry MM/YY] [--test-card-cvc ...] [--test-card-holder-name ...] [--test-card-postal-code ...]` |
+| Clear test account fields | `minitest --json --app ID test-account update <id> [--name ...] [--clear-password] [--clear-static-otp-code] [--clear-username] [--clear-phone-number] [--clear-about] [--clear-test-card]` |
 | List test files     | `minitest --json --app ID test-file list [--kind image\|document\|video\|audio\|other]`  |
 | Upload test file    | `minitest --json --app ID test-file upload ./local/file.pdf --note "..."`                |
 | Get test file       | `minitest --json --app ID test-file get <id>` (returns short-lived download URL)         |
 | Update test file    | `minitest --json --app ID test-file update <id> [--name ...] [--clear-note]`             |
 | Delete test file    | `minitest --json --app ID test-file delete <id> --force`                                 |
-| Bind profile to story | `minitest --json --app ID scenario-binding set-profile <story_id> --profile <id>`    |
-| Clear story profile | `minitest --json --app ID scenario-binding set-profile <story_id> --clear`             |
+| Clear a scenario's personas | `minitest --json --app ID scenario-binding set-personas <story_id> --clear` (runs as New user) |
 | Bind files to story | `minitest --json --app ID scenario-binding set-files <story_id> --file <id> --file <id>` |
 | List story files    | `minitest --json --app ID scenario-binding list-files <story_id>`                      |
 | Ask Mini for a suite change | `minitest --json --app ID draft create --message "..." [--auto-check] [--auto-merge]` — see [`commands/drafts.md`](commands/drafts.md) |
@@ -1790,23 +1778,22 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Prove a draft on an open PR | `minitest --json --app ID draft link-pr <id> <pr_number>` then `draft check <id>` (`--again` after new pushes) |
 | Branch the test suite yourself (low level) | `minitest --json --app ID df list\|create\|show\|apply\|delete` — see [`commands/draft-features.md`](commands/draft-features.md) |
 
-## Test profiles, test files, and story bindings
+## Personas, test files, and story bindings
 
-Test profiles let you store credentials (username/password/about, or
-phone-number/static-otp-code for phone-OTP personas) that the agent will use
-when running a scenario. They are app-scoped by default. Shared profiles are
-Minitap-provided accounts available to all test-enabled tenants and surface via
-`list-shared` (currently only a Google account).
+Test accounts store the credentials (username/password/about, or
+phone-number/static-otp-code for phone-OTP logins) the agent signs in with when
+it plays their persona. They belong to one app; see
+[Personas and test accounts](#personas-and-test-accounts).
 
 Test files are arbitrary blobs (max 25 MB; image/video/audio/document/other) that
 get pushed into the test environment before the agent runs the story. Use them
 for things like profile photos, sample PDFs, or recordings the story under test
 depends on.
 
-Bindings link profiles or files to a specific scenario:
+Bindings link personas or files to a specific scenario:
 
-- Profile binding: several profiles per story. `set-profile` is **atomic
-  replace** (repeat `--profile`); `--clear` leaves the story on "New user".
+- Persona binding: several personas per story. `set-personas` is **atomic
+  replace** (repeat `--persona`); `--clear` leaves the story on "New user".
 - File binding: many files per story. `set-files` is **atomic replace** — pass
   every file id you want bound; omitted ids are unbound. `--clear` unbinds all.
 - Skill binding: `set-app-skills` is atomic replace by skill name; Mini loads the
@@ -1849,13 +1836,13 @@ minitest --json --app $APP secret create STAGING_CARD --kind card --empty \
   --scenario <scenario_id>
 ```
 
-**Link it to a persona** by name (it may still be waiting for a value); pass an
-empty string on `update` to unlink:
+**Link it to a test account** by name (it may still be waiting for a value); pass
+an empty string on `update` to unlink:
 
 ```bash
-minitest --json --app $APP test-profile create --name "New User" \
+minitest --json --app $APP test-account add --persona "Signed-up user" \
   --username "signup@qa.minitap.ai" --password-secret SIGNUP_PASSWORD
-minitest --json --app $APP test-profile update <id> \
+minitest --json --app $APP test-account update <account_id> \
   --otp-secret ADMIN_TOTP --card-secret STAGING_CARD
 ```
 
@@ -1958,8 +1945,8 @@ with nothing configured both exit `4` (not found).
 `--password-stdin` and pipe the secret in:
 
 ```bash
-printf "%s" "$MY_PASSWORD" | `minitest --json --app $APP test-profile create \
-  --name "Customer A" --username alice --password-stdin
+printf "%s" "$MY_PASSWORD" | minitest --json --app $APP test-account add \
+  --persona "Customer" --username alice --password-stdin
 ```
 
 The two flags are mutually exclusive. To wipe an existing password, use
@@ -1967,13 +1954,13 @@ The two flags are mutually exclusive. To wipe an existing password, use
 
 ### Static OTP codes on the CLI
 
-Same pattern for phone-OTP personas: `--static-otp-code` accepts an inline
+Same pattern for phone-OTP test accounts: `--static-otp-code` accepts an inline
 value, `--static-otp-code-stdin` reads it from stdin instead (mutually
 exclusive with each other). `--phone-number` is not a secret and can be passed
 inline safely.
 
 ```bash
-printf "%s" "$OTP_CODE" | minitest --json --app $APP test-profile update <id> \
+printf "%s" "$OTP_CODE" | minitest --json --app $APP test-account update <account_id> \
   --phone-number "+14155551234" --static-otp-code-stdin
 ```
 
@@ -1981,14 +1968,14 @@ To wipe an existing static OTP code, use `update --clear-static-otp-code`
 (mutually exclusive with `--static-otp-code`/`--static-otp-code-stdin` on the
 same invocation).
 
-### Clearing other test profile fields
+### Clearing other test account fields
 
 `update` can also wipe `username`, `phone_number`, and `about` individually,
 with the same mutual-exclusion rule as passwords: pass the new value OR the
 matching `--clear-*` flag, never both.
 
 ```bash
-minitest --json --app $APP test-profile update <id> \
+minitest --json --app $APP test-account update <account_id> \
   --clear-username --clear-phone-number --clear-about
 ```
 
@@ -1996,7 +1983,7 @@ minitest --json --app $APP test-profile update <id> \
 - `--clear-phone-number` (mutually exclusive with `--phone-number`)
 - `--clear-about` (mutually exclusive with `--about`)
 
-A profile can end up with no username, no phone number, and no password at
+A test account can end up with no username, no phone number, and no password at
 all — that's a valid state; the tester agent still runs it anonymously (skip
 login) unless a flow forces authentication, in which case it self-generates a
 throwaway `@qa.minitap.ai` identity at run time the same way it does for an

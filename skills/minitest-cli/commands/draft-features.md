@@ -92,10 +92,10 @@ conflicts` is what tells you why:
       "kind": "story_field_edit_edit",
       "reason": "both sides changed the same story fields",
       "storyId": "3ff0cb0e-…",
-      "fields": ["test_profile_ids", "name"],
-      "base":   { "name": "as pinned", "test_profile_ids": [] },
-      "main":   { "name": "as pinned", "test_profile_ids": ["890408de-…"] },
-      "branch": { "name": "renamed on the branch", "test_profile_ids": [] }
+      "fields": ["persona_ids", "name"],
+      "base":   { "name": "as pinned", "persona_ids": [] },
+      "main":   { "name": "as pinned", "persona_ids": ["890408de-…"] },
+      "branch": { "name": "renamed on the branch", "persona_ids": [] }
     }
   ]
 }
@@ -116,7 +116,7 @@ now, and the branch. You never have to go and read them yourself.
     {
       "op": "story.edit",
       "storyId": "3ff0cb0e-…",
-      "fields": { "test_profile_ids": ["890408de-…"], "name": "as pinned" }
+      "fields": { "persona_ids": ["890408de-…"], "name": "as pinned" }
     }
   ]
 }
@@ -124,7 +124,7 @@ now, and the branch. You never have to go and read them yourself.
 
 The inner keys of the three sides are already in the apply vocabulary, so the
 copy is mechanical — that holds for every key `fields` can name, including
-`test_profile_ids` and `test_file_ids`.
+`persona_ids` and `test_file_ids`.
 
 Three things to know:
 

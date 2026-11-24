@@ -232,10 +232,11 @@ app defaults.
 | `minitest auth`  | Authentication management |
 | `minitest apps`  | List, inspect, and create apps; residential proxy and private network settings |
 | `minitest scenario` | Create, update, list and delete scenarios |
-| `minitest scenario-binding` | Bind test accounts, test files or app skills to scenarios |
+| `minitest scenario-binding` | Bind personas, test files or app skills to scenarios |
 | `minitest draft` | Ask Mini for a suite change, follow it, check and merge it (drafts in the webapp) |
 | `minitest df` | Low-level suite branches Mini writes (draft features) |
-| `minitest test-profile` | Test profiles (Test accounts in the webapp) |
+| `minitest persona` | Personas: who Mini plays in a scenario (Test accounts in the webapp) |
+| `minitest test-account` | A persona's test accounts and their credentials (Logins in the webapp) |
 | `minitest tags`  | List, create, update and delete scenario tags |
 | `minitest brief` | Product brief: what the app is, who uses it, its core flows (Knowledge v2) |
 | `minitest app-guide` | App guide: how to use the app when testing it (Knowledge v2) |
@@ -348,7 +349,7 @@ minitest secret list [--missing]                         # names, kinds, state (
 minitest secret describe ADMIN_PASSWORD                  # usages + reference to copy
 minitest secret lint --scenario <id>                     # exit 1 on leaks or missing; warns on pending
 minitest secret extract <id> --as ADMIN_PASSWORD --kind password [--dry-run]
-minitest test-profile update <id> --password-secret ADMIN_PASSWORD
+minitest test-account update <id> --password-secret ADMIN_PASSWORD
 ```
 
 `set` reads stdin only and refuses a terminal (`--interactive` opens a hidden
@@ -357,7 +358,7 @@ prompt) and also fills a secret that is waiting for a value. Inside a test run
 instead, which never handles a value. `--generate` (password, token, text) lets
 the server pick a random value (default 24 chars, 12–64); `--empty --reason`
 creates the secret without a value for a human to fill, and runs that need it
-wait until then. Personas can point at either (`--password-secret` etc.).
+wait until then. Test accounts can point at either (`--password-secret` etc.).
 `secret request` is a deprecated alias of `create --empty`; on servers that
 predate `create`, `--empty` falls back to the old request endpoint.
 `extract` reads the leaked literal from the scenario on your machine, creates

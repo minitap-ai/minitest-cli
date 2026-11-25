@@ -6,6 +6,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
+from minitest_cli.commands import persona_default
 from minitest_cli.commands.persona_helpers import (
     current_app_id,
     ACCOUNT_TABLE_HEADERS,
@@ -30,6 +31,7 @@ app = typer.Typer(
     help="Manage personas: who Mini plays in a scenario (e.g. 'Denmark buyer'). "
     "Each persona has one or more test accounts (`minitest test-account`).",
 )
+persona_default.register(app)
 
 PersonaArg = Annotated[str, typer.Argument(help="Persona ID or name.")]
 

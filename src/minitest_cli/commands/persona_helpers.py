@@ -75,15 +75,23 @@ def credentials_label(account: dict[str, Any]) -> str:
     return ", ".join(held) or "none"
 
 
+_HOLDER_LABELS = {
+    "other_workspace": "another workspace",
+    "exploration": "Mini exploring the app",
+    "validation": "Mini checking a scenario",
+    "device_session": "Mini on a device",
+}
+
+
+def _holder_label(holder: dict[str, Any]) -> str:
+    if holder.get("kind") == "run" and holder.get("subdagRunId"):
+        return f"run {holder['subdagRunId']} · {holder['platform']}"
+    return _HOLDER_LABELS.get(holder.get("kind", ""), "a run")
+
+
 def account_state(state: str, account: dict[str, Any], holders: list[dict[str, Any]]) -> str:
     if state == "in_use":
-        runs = [
-            f"run {h['subdagRunId']} · {h['platform']}"
-            if h.get("subdagRunId")
-            else "another workspace"
-            for h in holders
-        ]
-        return "In use by " + ", ".join(runs)
+        return "In use by " + ", ".join(_holder_label(h) for h in holders)
     if state == "cooling_down":
         return (
             f"Cooling down until {account.get('cooldownUntil')} ({account.get('cooldownReason')})"

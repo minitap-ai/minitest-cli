@@ -93,6 +93,32 @@ class TestPersonaPool:
         assert "In use by another workspace" in out
         assert "Cooling down until 14:20 (rate_limited)" in out
 
+    def test_a_login_mini_holds_says_what_mini_is_doing_with_it(self, server, tmp_path):
+        seller = server.persona("Seller")
+        activities = ("exploration", "validation", "device_session")
+        for activity in activities:
+            _invoke(
+                server,
+                tmp_path,
+                "test-account",
+                "add",
+                "--persona",
+                seller,
+                "--username",
+                f"{activity}@qa.minitap.ai",
+            )
+        for account, activity in zip(server.accounts.values(), activities, strict=True):
+            holder = {"kind": activity, "subdagRunId": None, "batchId": None, "platform": None}
+            account.update(state="in_use", holders=[{**holder, "holderId": "h-1"}])
+
+        pool = _invoke(server, tmp_path, "persona", "pool", seller, json_mode=False)
+
+        out = " ".join(unstyle(pool.stdout).split())
+        assert "In use by Mini exploring the app" in out
+        assert "In use by Mini checking a scenario" in out
+        assert "In use by Mini on a device" in out
+        assert "another workspace" not in out
+
     def test_an_unknown_persona_name_is_not_found(self, server, tmp_path):
         result = _invoke(
             server,

@@ -42,7 +42,11 @@ def login(
     ] = False,
     timeout: Annotated[
         int,
-        typer.Option("--timeout", min=1, help="Seconds to wait for the browser sign-in."),
+        typer.Option(
+            "--timeout",
+            min=1,
+            help=f"Seconds to wait for the sign-in (default {DEFAULT_LOGIN_TIMEOUT_SECONDS}).",
+        ),
     ] = DEFAULT_LOGIN_TIMEOUT_SECONDS,
 ) -> None:
     """Authenticate with the Minitest platform via OAuth PKCE.

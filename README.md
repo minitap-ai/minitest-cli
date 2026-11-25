@@ -203,7 +203,8 @@ app defaults.
 
 | Environment Variable          | Description                                                | Required                           |
 | ----------------------------- | ---------------------------------------------------------- | ---------------------------------- |
-| `MINITEST_TOKEN`              | API authentication token                                   | Yes (or use `minitest auth login`) |
+| `MINITEST_TOKEN`              | API authentication token                                   | No (or use `minitest auth login`)  |
+| `MINITEST_CONFIG_DIR`         | Where the CLI keeps its login and settings (default `~/.minitest`) | No                          |
 | `MINITEST_APP_ID`             | Default app ID                                             | No (can use `--app` flag)          |
 | `MINITEST_API_URL`            | testing-service base URL                                   | No (defaults to production)        |
 | `MINITEST_APPS_MANAGER_URL`   | apps-manager base URL (used by `minitest apps create`)     | No (defaults to production)        |
@@ -215,6 +216,30 @@ app defaults.
 | `MINITEST_NO_AUTO_UPDATE`     | Set to `1` to stop the CLI and agent skill from updating themselves (or run `minitest upgrade auto off`) | No |
 
 > The recommended way to set these is to copy `.env.example` to `.env` — the CLI loads `.env` automatically. The shipped `.env.example` already targets the **dev** environment (see below).
+
+## Login
+
+`minitest auth login` signs you in through a browser on this machine and saves the
+login in `~/.minitest/credentials.json`. The login renews itself: the access token
+lasts about an hour, and the CLI refreshes it from the saved refresh token whenever
+a command needs it, until `minitest auth logout`. `minitest --json auth status` shows
+`expires_at` (the current access token's) and `"refreshable": true`.
+
+For scripts and agents:
+
+```bash
+# Keep a separate login per agent or environment instead of changing HOME
+export MINITEST_CONFIG_DIR=/path/to/agent/minitest
+
+# Print the sign-in URL instead of opening a browser, wait up to 5 minutes
+minitest --json auth login --no-browser --timeout 300
+# stdout, line 1: {"authorize_url": "https://..."}  -> open it in a browser on this machine
+# stdout, then:   {"authenticated": true, "email": "...", "user_id": "..."}  (exit 2 on timeout)
+```
+
+The sign-in callback listens on `127.0.0.1`, ports 41721–41725 (a random port when
+they are all busy), so the browser must run on the same machine. For CI, prefer a
+tenant API key (`MINITEST_API_KEY`).
 
 ## Global Flags
 

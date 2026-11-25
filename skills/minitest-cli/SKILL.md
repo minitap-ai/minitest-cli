@@ -7,6 +7,8 @@ description: >
   manage native builds via the command line. Also use after any code change that
   affects UI, navigation, or user journeys to check if existing tests need
   to be updated.
+metadata:
+  cli-version: "0.56.0"
 ---
 
 # Minitest CLI
@@ -164,7 +166,17 @@ Three credential sources, in priority order:
 
 1. `MINITEST_TOKEN` — raw bearer override (legacy; usually unset).
 2. `MINITEST_API_KEY` — tenant-scoped `mtk_…` key, recommended for CI/scripts.
-3. `minitest auth login` — interactive OAuth.
+3. `minitest auth login` — OAuth in a browser on this machine.
+
+An OAuth login renews itself: `expires_at` in `minitest --json auth status` is
+only the current access token's (about an hour), and the CLI refreshes it from
+the saved refresh token (`"refreshable": true`) until `minitest auth logout`.
+Do not log in again because `expires_at` is near. For an unattended login,
+`minitest --json auth login --no-browser [--timeout 300]` prints
+`{"authorize_url": "..."}` as its first stdout line: open that URL in a browser
+on the same machine, then the command prints the result and exits (code 2 on
+timeout). `MINITEST_CONFIG_DIR=<dir>` keeps a separate login (credentials live
+in `<dir>/credentials.json`, default `~/.minitest`); do not change `HOME` for it.
 
 If both `MINITEST_TOKEN` and `MINITEST_API_KEY` are set, `MINITEST_TOKEN` wins and a stderr warning is emitted once per process.
 
@@ -1634,7 +1646,7 @@ Two shapes to expect: **list endpoints are paginated envelopes**
 the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 
 `auth status` is the one command that answers in snake_case
-(`token_configured`, `method`, `user_id`).
+(`token_configured`, `method`, `user_id`, `expires_at`, `refreshable`).
 
 ## Quick Reference
 
@@ -1746,7 +1758,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Show a script run   | `minitest --json --app ID script-runs get <run_id> [--platform android\|ios]` (one line per test with each device's status, failure reasons, Minitap-side issues) |
 | Run a Maestro / Espresso suite | `minitest --json --app ID script-runs submit --framework maestro\|espresso --tests PATH --build-id ID [--run-name N] [--commit-sha S] [-e KEY[=VALUE]] [--env-file F] [--no-wait]` (waits; exit 1 on a failed test, 7 when Minitap could not run some) |
 | Script run artifacts | `minitest --json --app ID script-runs recording\|appium-log\|driver-log\|browser-log\|trace <run_id> [--test T] [--out F]`, `script-runs report <run_id> --file F [--test T]`, `script-runs junit <run_id> [--out F]` |
-| Auth                | `minitest auth login`, `minitest --json auth status`, `minitest auth logout`      |
+| Auth                | `minitest auth login [--no-browser] [--timeout S]`, `minitest --json auth status`, `minitest auth logout` |
 | Refresh this skill  | `minitest skill` (prints the latest skill markdown)                               |
 | Read a reference doc | `minitest reference` (list topics) / `minitest reference <topic>` (markdown; bundled copy offline) |
 | Upgrade the CLI     | `minitest upgrade`                                                                |

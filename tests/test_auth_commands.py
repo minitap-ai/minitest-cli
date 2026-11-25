@@ -198,6 +198,26 @@ class TestStatusCommand:
         assert data["user_id"] == "uid-1"
         assert data["email"] == "dev@example.com"
         assert data["expires_at"] is not None
+        assert data["refreshable"] is True
+
+    def test_status_oauth_human_labels_access_token_expiry(self, tmp_path):
+        settings = _make_settings(tmp_path)
+        save_credentials(settings, _make_credentials())
+
+        result = _run_with_context("status", settings, json_mode=False)
+
+        assert result.exit_code == 0
+        assert "access_token_expires_at:" in result.stdout
+        assert "renews itself" in result.stderr
+
+    def test_status_api_key_is_authenticated(self, tmp_path):
+        settings = _make_settings(tmp_path, api_key="mtk_test")
+        result = _run_with_context("status", settings, json_mode=True)
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["method"] == "api_key"
+        assert data["token_configured"] is True
+        assert data["refreshable"] is False
 
     def test_status_oauth_refreshes_expired_credentials(self, tmp_path):
         settings = _make_settings(tmp_path)

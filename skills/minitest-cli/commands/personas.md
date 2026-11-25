@@ -25,8 +25,9 @@ and are spread over the accounts. It cannot be turned on for "New user".
 ## Pool
 
 `persona pool` lists every account as `free`, `in_use` (with the run, its batch and its
-platform holding it; a run of another workspace using the same login shows as
-`other_workspace`, without ids) or `cooling_down` (until when, and why: `blocked`,
+platform holding it; Mini exploring the app, checking a scenario or using it on a device
+shows as `exploration`, `validation` or `device_session`; a run of another workspace using
+the same login shows as `other_workspace`, without ids) or `cooling_down` (until when, and why: `blocked`,
 `rate_limited`, `logged_out`, `verification_failed`). An account of a persona without
 exclusive use can have several holders (`holderCount`). `persona list` and `persona get`
 carry the same counts (`freeCount`, `inUseCount`, `coolingDownCount`, `accountCount`).

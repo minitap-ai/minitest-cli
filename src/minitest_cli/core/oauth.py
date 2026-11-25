@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
 import importlib.resources
-import secrets
-import sys
 import time
 import urllib.parse
 import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 from threading import Event
 from typing import Any
 
@@ -18,17 +14,24 @@ import httpx
 
 from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import Credentials
+from minitest_cli.core.oauth_client import (
+    announce_authorize_url,
+    bind_callback_server,
+    pkce_pair,
+    redirect_uri_for,
+    resolve_client_id,
+)
 from minitest_cli.core.token_exchange import (
     SessionRevokedError,
     auth_error,
     parse_and_save_token_response,
     parse_token_response,
-    register_oauth_client,
 )
 
 _ASSETS = importlib.resources.files("minitest_cli.assets")
 REFRESH_ATTEMPTS = 3
 REFRESH_RETRY_DELAY_SECONDS = 1.0
+DEFAULT_LOGIN_TIMEOUT_SECONDS = 120
 
 
 def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
@@ -78,16 +81,17 @@ def refresh_token(settings: Settings, creds: Credentials) -> Credentials | None:
     return None
 
 
-def oauth_pkce_login(settings: Settings) -> Credentials:
+def oauth_pkce_login(
+    settings: Settings,
+    *,
+    open_browser: bool = True,
+    timeout: int = DEFAULT_LOGIN_TIMEOUT_SECONDS,
+    json_mode: bool = False,
+) -> Credentials:
     """Run the full OAuth PKCE login flow via Supabase's OAuth2 server."""
     supabase_url = settings.supabase_url.rstrip("/")
 
-    # PKCE challenge: base64url(sha256(verifier)) without padding
-    code_verifier = secrets.token_urlsafe(64)
-    digest = hashlib.sha256(code_verifier.encode()).digest()
-    code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
-
-    # Start callback server
+    code_verifier, code_challenge = pkce_pair()
     auth_code_holder: dict[str, str | None] = {"code": None, "error": None}
     ready_event = Event()
 
@@ -121,14 +125,11 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             pass  # silence HTTP logs
 
-    server = HTTPServer(("127.0.0.1", 0), _CallbackHandler)
+    server = bind_callback_server(_CallbackHandler)
     port = server.server_address[1]
-    redirect_uri = f"http://127.0.0.1:{port}/callback"
+    redirect_uri = redirect_uri_for(port)
+    client_id = resolve_client_id(settings, supabase_url, port)
 
-    # Register OAuth client with Supabase (dynamic client registration)
-    client_id = register_oauth_client(supabase_url, redirect_uri)
-
-    # Build authorize URL — Supabase's OAuth2 server shows its hosted sign-in page
     authorize_params = urllib.parse.urlencode(
         {
             "client_id": client_id,
@@ -141,17 +142,17 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     )
     authorize_url = f"{supabase_url}/auth/v1/oauth/authorize?{authorize_params}"
 
-    print("Opening browser for authentication...", file=sys.stderr)  # noqa: T201
-    print(f"If the browser doesn't open, visit:\n{authorize_url}", file=sys.stderr)  # noqa: T201
-    webbrowser.open(authorize_url)
+    announce_authorize_url(authorize_url, open_browser=open_browser, json_mode=json_mode)
+    if open_browser:
+        webbrowser.open(authorize_url)
 
-    # Wait for callback with absolute deadline
-    deadline = time.time() + 120
-    server.timeout = 5  # poll interval; overall limit enforced by deadline
+    deadline = time.time() + timeout
     while not ready_event.is_set():
-        if time.time() >= deadline:
+        remaining = deadline - time.time()
+        if remaining <= 0:
             server.server_close()
-            auth_error("OAuth login timed out after 2 minutes.")
+            auth_error(f"OAuth login timed out after {timeout} seconds.")
+        server.timeout = min(5.0, remaining)
         server.handle_request()
 
     server.server_close()
@@ -163,8 +164,6 @@ def oauth_pkce_login(settings: Settings) -> Credentials:
     if not auth_code:
         auth_error("No authorization code received.")
 
-    # Exchange code for tokens at Supabase's OAuth2 token endpoint
-    assert auth_code is not None  # for type narrowing
     try:
         token_response = httpx.post(
             f"{supabase_url}/auth/v1/oauth/token",

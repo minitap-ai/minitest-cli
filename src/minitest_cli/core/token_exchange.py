@@ -96,7 +96,7 @@ def _decode_jwt_claims(token: str) -> dict[str, Any]:
         return {}
 
 
-def register_oauth_client(supabase_url: str, redirect_uri: str) -> str:
+def register_oauth_client(supabase_url: str, redirect_uris: list[str]) -> str:
     """Dynamically register an OAuth2 client with Supabase and return the client_id."""
     register_url = f"{supabase_url}/auth/v1/oauth/clients/register"
     try:
@@ -104,7 +104,7 @@ def register_oauth_client(supabase_url: str, redirect_uri: str) -> str:
             register_url,
             json={
                 "client_name": "minitest-cli",
-                "redirect_uris": [redirect_uri],
+                "redirect_uris": redirect_uris,
                 "grant_types": ["authorization_code", "refresh_token"],
                 "response_types": ["code"],
                 "token_endpoint_auth_method": "none",

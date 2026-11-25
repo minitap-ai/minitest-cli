@@ -78,6 +78,7 @@ class AuthStatus(TypedDict):
     user_id: str | None
     email: str | None
     expires_at: str | None
+    refreshable: bool
 
 
 def load_or_refresh_credentials(settings: Settings) -> Credentials | None:

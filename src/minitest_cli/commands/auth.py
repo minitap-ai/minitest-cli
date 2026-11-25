@@ -121,7 +121,11 @@ def logout() -> None:
 
 @app.command()
 def status() -> None:
-    """Show current authentication status."""
+    """Show current authentication status.
+
+    expires_at is when the current access token expires. An OAuth login with
+    refreshable=true renews that token by itself, so it lasts until logout.
+    """
     settings = _get_settings()
     json_mode = _is_json_mode()
     method = get_auth_method(settings)
@@ -132,41 +136,72 @@ def status() -> None:
             expires_at_iso = datetime.fromtimestamp(int(claims["exp"]), tz=UTC).isoformat()
         except (KeyError, ValueError, TypeError, OverflowError, OSError):
             expires_at_iso = None
-        data: AuthStatus = {
-            "token_configured": True,
-            "method": "env_token",
-            "user_id": claims.get("sub"),
-            "email": claims.get("email"),
-            "expires_at": expires_at_iso,
-        }
-        output(data, json_mode=json_mode)
+        _print_status(
+            {
+                "token_configured": True,
+                "method": "env_token",
+                "user_id": claims.get("sub"),
+                "email": claims.get("email"),
+                "expires_at": expires_at_iso,
+                "refreshable": False,
+            },
+            json_mode=json_mode,
+        )
+        return
+
+    if method == "api_key":
+        _print_status(
+            {
+                "token_configured": True,
+                "method": "api_key",
+                "user_id": None,
+                "email": None,
+                "expires_at": None,
+                "refreshable": False,
+            },
+            json_mode=json_mode,
+        )
         return
 
     if method == "oauth":
         # get_auth_method already validated/refreshed credentials, so this is safe
         creds = load_or_refresh_credentials(settings)
         assert creds is not None  # guaranteed by get_auth_method returning "oauth"
-        expires_at_iso = datetime.fromtimestamp(creds.expires_at, tz=UTC).isoformat()
-        data: AuthStatus = {
-            "token_configured": True,
-            "method": "oauth",
-            "user_id": creds.user_id,
-            "email": creds.email,
-            "expires_at": expires_at_iso,
-        }
-        output(data, json_mode=json_mode)
+        _print_status(
+            {
+                "token_configured": True,
+                "method": "oauth",
+                "user_id": creds.user_id,
+                "email": creds.email,
+                "expires_at": datetime.fromtimestamp(creds.expires_at, tz=UTC).isoformat(),
+                "refreshable": bool(creds.refresh_token),
+            },
+            json_mode=json_mode,
+        )
         return
 
-    # Not authenticated
     data: AuthStatus = {
         "token_configured": False,
         "method": "none",
         "user_id": None,
         "email": None,
         "expires_at": None,
+        "refreshable": False,
     }
     if json_mode:
         output(data, json_mode=True)
     else:
         print_error("Not authenticated. Run `minitest auth login` or set MINITEST_TOKEN.")
     raise typer.Exit(code=2)
+
+
+def _print_status(data: AuthStatus, *, json_mode: bool) -> None:
+    if json_mode:
+        output(data, json_mode=True)
+        return
+    human = {k: v for k, v in data.items() if k not in ("expires_at", "refreshable")}
+    if data["expires_at"]:
+        human["access_token_expires_at"] = data["expires_at"]
+    output(human, json_mode=False)
+    if data["refreshable"]:
+        print_info("This login renews itself: the CLI refreshes the access token as needed.")

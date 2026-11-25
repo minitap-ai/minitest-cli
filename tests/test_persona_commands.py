@@ -6,7 +6,7 @@ import pytest
 from click import unstyle
 from typer.testing import CliRunner
 
-from minitest_cli.commands import persona, test_account, user_story_bindings
+from minitest_cli.commands import persona, test_account, test_account_list, user_story_bindings
 from tests._commit_transport import cli_context, make_settings, routed
 from tests._persona_server import STORY, FakePersonaApi
 
@@ -266,3 +266,88 @@ class TestTestAccounts:
         assert result.exit_code == 0, result.output
         assert "Test account updated" in _stderr(result)
         assert server.secrets[account]["password"] == "s3cret"
+
+
+def _add(server: FakePersonaApi, tmp_path, persona_ref: str, username: str) -> str:
+    added = _invoke(
+        server, tmp_path, "test-account", "add", "--persona", persona_ref, "--username", username
+    )
+    return json.loads(added.stdout)["id"]
+
+
+def _defaults(server: FakePersonaApi) -> list[str]:
+    return [a["username"] for a in server.accounts.values() if a["isDefault"]]
+
+
+class TestDefaultPersona:
+    def test_default_is_set_on_the_personas_oldest_account_then_cleared(self, server, tmp_path):
+        buyer = server.persona("Denmark buyer")
+        server.persona("Seller")
+        _add(server, tmp_path, buyer, "t7@qa.minitap.ai")
+        _add(server, tmp_path, buyer, "t15@qa.minitap.ai")
+        _add(server, tmp_path, "Seller", "s1@qa.minitap.ai")
+
+        set_ = _invoke(server, tmp_path, "persona", "default", "denmark buyer")
+        listed = _invoke(server, tmp_path, "test-account", "list", json_mode=False)
+        cleared = _invoke(server, tmp_path, "persona", "default", "--clear")
+
+        assert set_.exit_code == 0, set_.output
+        assert json.loads(set_.stdout)["personaId"] == buyer
+        assert listed.exit_code == 0, listed.output
+        rows = [line for line in unstyle(listed.stdout).splitlines() if "@qa.minitap.ai" in line]
+        assert [("★" in row, "Denmark buyer" in row) for row in rows] == [
+            (True, True),
+            (False, True),
+            (False, False),
+        ]
+        assert cleared.exit_code == 0, cleared.output
+        assert json.loads(cleared.stdout) == {"cleared": True}
+        assert _defaults(server) == []
+
+    def test_a_persona_without_account_cannot_be_the_default(self, server, tmp_path):
+        server.persona("Seller")
+
+        result = _invoke(server, tmp_path, "persona", "default", "Seller", json_mode=False)
+
+        assert result.exit_code == 1
+        assert "has no test account yet" in _stderr(result)
+        assert server.writes == []
+
+    @pytest.mark.parametrize("args", [[], ["Seller", "--clear"]])
+    def test_default_needs_exactly_a_persona_or_clear(self, server, tmp_path, args):
+        result = _invoke(server, tmp_path, "persona", "default", *args, json_mode=False)
+
+        assert result.exit_code == 1
+        assert "Give a persona, or --clear." in _stderr(result)
+        assert server.writes == []
+
+
+class TestListTestAccounts:
+    def test_shared_lists_minitap_logins_with_their_persona(self, server, tmp_path):
+        google = server.shared_login("Google account", "google-1@qa.minitap.ai")
+
+        table = _invoke(server, tmp_path, "test-account", "list", "--shared", json_mode=False)
+        data = _invoke(server, tmp_path, "test-account", "list", "--shared")
+
+        assert table.exit_code == 0, table.output
+        out = " ".join(unstyle(table.stdout).split())
+        assert "Shared by Minitap (1)" in out
+        assert f"google-1@qa.minitap.ai │ {google['personaId']}" in out
+        assert [a["personaId"] for a in json.loads(data.stdout)] == [google["personaId"]]
+
+    def test_list_reads_every_page_and_leaves_shared_logins_out(
+        self, server, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(test_account_list, "PAGE_SIZE", 1)
+        seller = server.persona("Seller")
+        _add(server, tmp_path, seller, "a@qa.minitap.ai")
+        _add(server, tmp_path, seller, "b@qa.minitap.ai")
+        server.shared_login("Google account", "google-1@qa.minitap.ai")
+
+        result = _invoke(server, tmp_path, "test-account", "list")
+
+        assert result.exit_code == 0, result.output
+        assert [(a["username"], a["personaName"]) for a in json.loads(result.stdout)] == [
+            ("a@qa.minitap.ai", "Seller"),
+            ("b@qa.minitap.ai", "Seller"),
+        ]

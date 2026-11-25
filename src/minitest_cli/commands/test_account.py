@@ -5,7 +5,7 @@ from typing import Annotated, Any
 import typer
 
 from minitest_cli.api.client import ApiClient
-from minitest_cli.commands import test_account_update
+from minitest_cli.commands import test_account_list, test_account_update
 from minitest_cli.commands.persona_helpers import (
     current_app_id,
     accounts_path,
@@ -40,6 +40,7 @@ app = typer.Typer(
     help="Manage test accounts: the real logins of a persona (`minitest persona`). "
     "Mini signs in with one of a persona's accounts, spreading runs across them.",
 )
+test_account_list.register(app)
 test_account_update.register(app)
 
 PersonaOption = Annotated[str, typer.Option("--persona", help="Persona ID or name.")]

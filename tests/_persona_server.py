@@ -21,6 +21,7 @@ class FakePersonaApi:
         self.accounts: dict[str, dict[str, Any]] = {}
         self.bindings: dict[tuple[str, str | None], list[str]] = {}
         self.secrets: dict[str, dict[str, Any]] = {}
+        self.shared: list[dict[str, Any]] = []
         self.writes: list[tuple[str, str, Any]] = []
 
     def persona(self, name: str, *, kind: str = "standard", exclusive: bool = False) -> str:
@@ -34,7 +35,21 @@ class FakePersonaApi:
         }
         return pid
 
+    def shared_login(self, name: str, username: str) -> dict[str, Any]:
+        login = {
+            "id": str(uuid.uuid4()),
+            "personaId": str(uuid.uuid4()),
+            "name": name,
+            "username": username,
+            "source": "shared",
+            "isDefault": False,
+        }
+        self.shared.append(login)
+        return login
+
     def handle(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v1/test-profiles/shared":
+            return httpx.Response(200, json={"items": self.shared, "total": len(self.shared)})
         method, path = request.method, request.url.path.removeprefix(BASE)
         body: Any = json.loads(request.content) if request.content else None
         if method != "GET":
@@ -44,6 +59,8 @@ class FakePersonaApi:
             return self._personas(method, parts[1:], body)
         if parts[0] == "test-accounts":
             return self._accounts(method, parts[1:], body)
+        if parts[0] == "test-profiles" and method != "PATCH":
+            return self._profiles(method, parts[1:], request)
         if parts[0] == "test-profiles" and method == "PATCH":
             account = self.accounts[parts[1]]
             for key in ("password", "username"):
@@ -120,6 +137,8 @@ class FakePersonaApi:
             "state": "free",
             "cooldownUntil": None,
             "cooldownReason": None,
+            "source": "user",
+            "isDefault": False,
         }
         self.secrets[aid] = {k: v for k, v in body.items() if k in ("password", "staticOtpCode")}
         return httpx.Response(201, json=self._account(self.accounts[aid]))
@@ -136,6 +155,18 @@ class FakePersonaApi:
             del self.accounts[account["id"]]
             return httpx.Response(204)
         return httpx.Response(200, json=self._account(account))
+
+    def _profiles(self, method: str, rest: list[str], request: httpx.Request) -> httpx.Response:
+        if method == "GET":
+            listed = [self._account(a) for a in self.accounts.values()] + self.shared
+            page, size = int(request.url.params["page"]), int(request.url.params["page_size"])
+            items = listed[(page - 1) * size : page * size]
+            return httpx.Response(200, json={"items": items, "total": len(listed)})
+        for account in self.accounts.values():
+            account["isDefault"] = method == "PUT" and account["id"] == rest[0]
+        if method == "DELETE":
+            return httpx.Response(204)
+        return httpx.Response(200, json=self._account(self.accounts[rest[0]]))
 
     def _story(self, method: str, story: str, request: httpx.Request, body: Any) -> httpx.Response:
         draft = body["draftFeatureId"] if body else request.url.params.get("draftFeatureId")

@@ -397,7 +397,7 @@ or browser).
 > fields keep their `story` names (`userStoryId`, `storyRuns`); flags say
 > `--scenario`.
 
-`--persona <persona>` (ID or name) is optional and repeatable: a scenario can play several personas (one per role it needs, e.g. a buyer and a seller on two devices). A scenario that plays no persona runs as "New user".
+`--persona <persona>` (ID or name) is optional and repeatable: a scenario can play several personas (one per role it needs, e.g. a buyer and a seller on two devices). Without `--persona`, a scenario plays the app's default persona (`persona default <persona>`), else "New user".
 
 ```bash
 minitest --json --app <app_id> scenario create \
@@ -474,6 +474,9 @@ Which command for what:
 | Regroup accounts | `test-account move <account_id> --persona <persona>` |
 | Retire a login | `test-account remove <account_id> --force` |
 | Put a cooled-down account back into rotation | `test-account clear-cooldown <account_id>` |
+| Choose who a scenario created without `--persona` plays | `persona default <persona>` (`--clear`: New user) |
+| See every login with its persona and the default | `test-account list` |
+| Use a login Minitap provides (e.g. Google sign-in) | `test-account list --shared`, then `--persona <its Persona ID>` |
 
 Commands take a persona ID or its name (case-insensitive; names are unique per app). A persona needs at least one test account before a scenario can play it, and is deleted only once no scenario plays it and it has no account left. Exclusive use belongs to the persona, never to one account. Credentials are never printed back: reads show `hasPassword`, `hasStaticOtpCode`, `hasTestCard`. Full reference: [`commands/personas.md`](commands/personas.md).
 
@@ -527,7 +530,7 @@ On `update`, the options you pass change those fields and keep the rest of the s
 
 Fill the persona's `--about` with what makes it distinct (e.g. "Pro subscription active, has saved items, payment method on file"). This context is injected into the tester agent's prompt at run time.
 
-If the app uses a third-party auth provider (e.g. Google OAuth), a shared Minitap account covers that flow: do not create a persona for it. Those shared pool addresses are also `@qa.minitap.ai`, so their inboxes are readable the same way.
+If the app uses a third-party auth provider (e.g. Google OAuth), a shared Minitap account covers that flow: do not create a persona for it. `test-account list --shared` lists them (the webapp's "Shared by Minitap"); a scenario plays one with `--persona <its personaId>`. Those shared pool addresses are also `@qa.minitap.ai`, so their inboxes are readable the same way.
 
 Bind every story that requires authentication to its personas at creation time with `scenario create --persona <persona>` (repeatable), or right after with `scenario-binding set-personas <scenario_id> --persona <persona>`.
 
@@ -1759,6 +1762,8 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Add a test account  | `minitest --json --app ID test-account add --persona <id\|name> --username "..." [--password-stdin]` |
 | Update / move / remove a test account | `test-account update <id> ...` / `test-account move <id> --persona <id\|name>` / `test-account remove <id> --force` |
 | Clear a cooldown    | `minitest --json --app ID test-account clear-cooldown <id>` |
+| Default persona     | `minitest --json --app ID persona default <id\|name>` / `persona default --clear` |
+| List test accounts  | `minitest --json --app ID test-account list` (persona, default) / `test-account list --shared` (Minitap's, with their persona ID) |
 | Bind personas to a scenario | `minitest --json --app ID scenario-binding set-personas <scenario_id> --persona <id\|name> [--draft-feature <df_id>]` / `list-personas <scenario_id>` |
 | Add a phone-OTP test account | `minitest --json --app ID test-account add --persona <id\|name> --phone-number "+1..." --static-otp-code-stdin` |
 | Set a test account's card | `minitest --json --app ID test-account update <id> [--test-card-number ...] [--test-card-expiry MM/YY] [--test-card-cvc ...] [--test-card-holder-name ...] [--test-card-postal-code ...]` |

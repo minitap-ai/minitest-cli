@@ -44,6 +44,21 @@ On a draft feature branch, pass `--draft-feature <df_id>` with the scenario's **
 In a changeset (`df apply`), `story.create` and `story.edit` ops take
 `"personaIds": ["…"]`; `df show --view diff` reports them as `persona_ids`.
 
+## Default persona
+
+`persona default <persona>` sets the persona a scenario plays when `scenario create` gets no
+`--persona`; `persona default --clear` removes it, and such scenarios play New user. The
+backend stores the default on one test account (the persona's oldest), so `test-account list`
+marks that account `★` in its Default column. The persona needs a test account first.
+
+## Shared by Minitap
+
+`test-account list --shared` lists the logins Minitap maintains for every app (Google
+sign-in accounts, 2-Step Verification included), with their `personaId`. A scenario plays
+one like any persona: `--persona <personaId>`. They are read-only: no `test-account` or
+`persona` command changes them. `test-account list` (no flag) lists the app's own accounts
+with their persona.
+
 ## Changing accounts
 
 - `test-account update <id>`: credentials, login, label, notes; `--clear-*` removes one.

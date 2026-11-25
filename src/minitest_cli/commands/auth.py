@@ -1,9 +1,7 @@
 """Authentication commands: login, logout, status."""
 
-import json
-import shutil
-import subprocess
 from datetime import UTC, datetime
+from typing import Annotated
 
 import typer
 
@@ -17,39 +15,13 @@ from minitest_cli.core.auth import (
     oauth_pkce_login,
 )
 from minitest_cli.core.config import Settings
+from minitest_cli.core.oauth import DEFAULT_LOGIN_TIMEOUT_SECONDS
+from minitest_cli.utils import skill_bundle
+from minitest_cli.utils.skill_refresh import find_conventional_skill_path
 from minitest_cli.utils.output import output, print_error, print_info, print_success
 
 app = typer.Typer(name="auth", help="Authentication management.")
 app.add_typer(api_key_app, name="api-key")
-
-SKILL_NAME = "minitest-cli"
-SKILL_INSTALL_ARGS = ["skills", "add", "minitap-ai/agent-skills", "--skill", "minitest-cli"]
-SKILL_INSTALL_DISPLAY = "npx " + " ".join(SKILL_INSTALL_ARGS)
-
-
-def _find_npx() -> str | None:
-    return shutil.which("npx")
-
-
-def _is_skill_installed() -> bool:
-    npx = _find_npx()
-    if npx is None:
-        return False
-    for flags in (["--json"], ["--json", "-g"]):
-        try:
-            result = subprocess.run(
-                [npx, "skills", "ls", *flags],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            if result.returncode == 0:
-                skills = json.loads(result.stdout)
-                if any(s.get("name") == SKILL_NAME for s in skills):
-                    return True
-        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError, OSError):
-            pass
-    return False
 
 
 def _get_settings() -> Settings:
@@ -63,45 +35,42 @@ def _is_json_mode() -> bool:
 
 
 @app.command()
-def login() -> None:
-    """Authenticate with the Minitest platform via OAuth PKCE."""
+def login(
+    no_browser: Annotated[
+        bool,
+        typer.Option("--no-browser", help="Print the sign-in URL instead of opening a browser."),
+    ] = False,
+    timeout: Annotated[
+        int,
+        typer.Option("--timeout", min=1, help="Seconds to wait for the browser sign-in."),
+    ] = DEFAULT_LOGIN_TIMEOUT_SECONDS,
+) -> None:
+    """Authenticate with the Minitest platform via OAuth PKCE.
+
+    With --json, the sign-in URL is printed on stdout as a JSON line
+    ({"authorize_url": ...}) before waiting, then the result as a second JSON line.
+    """
     settings = _get_settings()
+    json_mode = _is_json_mode()
 
     if settings.token:
         print_error("MINITEST_TOKEN environment variable is set. Unset it to use OAuth login.")
         raise typer.Exit(code=2)
 
-    creds = oauth_pkce_login(settings)
+    creds = oauth_pkce_login(
+        settings, open_browser=not no_browser, timeout=timeout, json_mode=json_mode
+    )
+    if json_mode:
+        output(
+            {"authenticated": True, "email": creds.email, "user_id": creds.user_id}, json_mode=True
+        )
+        return
     print_success(f"Authenticated as {creds.email}")
-
-    # Check if the minitest-cli agent skill is installed
-    if not _is_skill_installed():
-        print_info("")
-        print_info("💡 The minitest-cli agent skill is not installed in this project.")
-        print_info("   Your AI agent needs it to know how to use minitest.")
-        print_info("")
-        try:
-            answer = input("   Install it now? [Y/n] ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            answer = "n"
-            print()  # newline after ^C / ^D
-        if answer in ("", "y", "yes"):
-            npx = _find_npx()
-            if npx is None:
-                print_info("")
-                print_error("   npx not found on PATH. Install Node.js, then run:")
-                print_info(f"   {SKILL_INSTALL_DISPLAY}")
-                print_info("")
-            else:
-                print_info("")
-                print_info(f"   Running: {SKILL_INSTALL_DISPLAY}")
-                print_info("")
-                subprocess.run([npx, *SKILL_INSTALL_ARGS], check=False)
-        else:
-            print_info("")
-            print_info("   You can install it later with:")
-            print_info(f"   {SKILL_INSTALL_DISPLAY}")
-            print_info("")
+    if find_conventional_skill_path() is None:
+        print_info(
+            "Tip: `minitest skill` prints the agent skill for this CLI version; install it with "
+            f"`{' '.join(skill_bundle.install_command())}`."
+        )
 
 
 @app.command()

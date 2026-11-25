@@ -67,6 +67,11 @@ def _conventional_paths() -> list[str]:
     ]
 
 
+def find_conventional_skill_path() -> str | None:
+    """First copy of the skill in a conventional directory, found without running npx."""
+    return next((p for p in _conventional_paths() if (Path(p) / "SKILL.md").is_file()), None)
+
+
 def find_skill_paths() -> list[str]:
     """Every installed copy of the skill, deduplicated by real path (symlinks collapse)."""
     seen: dict[Path, str] = {}

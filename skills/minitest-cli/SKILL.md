@@ -66,6 +66,11 @@ value by design:
 
 - Install: `uv tool install minitest-cli` (needs `uv`; if missing, install it
   first: https://docs.astral.sh/uv/getting-started/installation/)
+- Check the command before the first use: `minitest --version` must print
+  `minitest-cli <version>`. If it prints anything else (Ruby's test runner
+  prints `minitest 6.x`, and answers every other command with `Run options:
+  --seed …` and exit 0 while doing nothing), another program owns the name:
+  run every command of this skill as `minitest-cli …` instead, same arguments.
 - Authenticate: `minitest auth login` (opens browser for OAuth), check with
   `minitest --json auth status`
 - Set target app: `export MINITEST_APP_ID=<uuid>` or pass `--app <uuid>` before

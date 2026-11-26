@@ -20,6 +20,10 @@ powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/min
 
 Both scripts use `uv` if available, or install it automatically.
 
+The CLI installs two commands that do the same thing: `minitest` and
+`minitest-cli`. Scripts and CI jobs should call `minitest-cli`, which no other
+tool installs (see [Troubleshooting](#troubleshooting)).
+
 ### Other methods
 
 **uv** (all platforms):
@@ -476,6 +480,29 @@ minitest --app <app-id> run all --web \
 | 4    | Resource not found                                 |
 | 5    | Build rejected as invalid                          |
 | 6    | Conflict — re-read, rebuild, retry once            |
+
+## Troubleshooting
+
+### `minitest` runs Ruby's test runner
+
+`minitest auth login` prints `Run options: --seed 61234` and `# Running:`,
+then exits 0 without doing anything. Ruby 4 ships the `minitest` gem 6, which
+installs its own `minitest` command, and it comes before ours in your PATH
+(Homebrew Ruby, rbenv, asdf or mise shims). `minitest --version` tells you which
+one runs: ours prints `minitest-cli <version>`, Ruby's prints `minitest 6.x`.
+The installer and `minitest-cli upgrade` warn when this happens.
+
+Either fix works:
+
+- Run `minitest-cli` instead of `minitest`. It takes the same commands.
+- Put the uv tool folder first in PATH, at the end of your `~/.zshrc` or
+  `~/.bashrc`, then open a new terminal:
+
+  ```bash
+  export PATH="$HOME/.local/bin:$PATH"
+  ```
+
+  (`uv tool dir --bin` prints the folder if yours is not `~/.local/bin`.)
 
 ## Using the Dev Environment
 

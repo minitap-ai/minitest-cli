@@ -5,6 +5,7 @@ on:
     paths:
       - "install.sh"
       - "install.ps1"
+      - ".github/workflows/install-scripts.yml"
   push:
     branches:
       - main
@@ -30,6 +31,15 @@ jobs:
       - name: Verify minitest is usable
         run: minitest --help
 
+      - name: Warn when another minitest comes first in PATH
+        run: |
+          fake="$RUNNER_TEMP/ruby/bin"
+          mkdir -p "$fake"
+          printf '#!/bin/sh\necho "minitest 6.0.0"\n' > "$fake/minitest"
+          chmod +x "$fake/minitest"
+          PATH="$fake:$PATH" bash install.sh | tee install.log
+          grep -F "'minitest' in your PATH runs $fake/minitest (minitest 6.0.0), not minitest-cli." install.log
+
   install-script-windows:
     strategy:
       fail-fast: false
@@ -49,3 +59,14 @@ jobs:
       - name: Verify minitest is usable
         shell: pwsh
         run: minitest --help
+
+      - name: Warn when another minitest comes first in PATH
+        shell: pwsh
+        run: |
+          $fake = Join-Path $env:RUNNER_TEMP "ruby\bin"
+          New-Item -ItemType Directory -Force $fake | Out-Null
+          Set-Content -Path (Join-Path $fake "minitest.bat") -Value "@echo minitest 6.0.0"
+          $env:PATH = "$fake;$env:PATH"
+          $out = .\install.ps1 *>&1 | Out-String
+          Write-Host $out
+          if (-not $out.Contains("not minitest-cli.")) { throw "install.ps1 did not report the foreign minitest" }

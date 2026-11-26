@@ -72,6 +72,9 @@ class Progress:
         self.state = "queued"
         self.finished = False
         self.superseded_by: int | None = None
+        # A stream replays the session from its start: an event without a push (an older
+        # server's question) is only ours once the stream has reached our push.
+        self._live = False
         self._seen: set[tuple[Any, ...]] = set()
         self._labels: dict[str, str] = {}
         self._results = 0
@@ -87,10 +90,14 @@ class Progress:
 
     def _fact(self, event: Event) -> None:
         push = event.data.get("push")
+        if push is None and not self._live:
+            return
         if push is not None and push != self.push:
             if push > self.push:
                 self.superseded_by, self.finished = push, True
             return
+        if event.id is not None:
+            self._live = True
         key = fact_key(event)
         if key in self._seen:
             return

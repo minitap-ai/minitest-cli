@@ -41,7 +41,7 @@ minitest-cli --app "$APP" pr check \
   --pr 1482 --title "Favourites on restaurant cards" \
   --context-file pr.md \
   --ios-build build/App.ipa --android-build build/app.aab \
-  [--commits-file commits.txt] [--sha "$SHA"] \
+  [--commits-file commits.txt] [--sha "$SHA"] [--ticket TIM-123] \
   [--attach 'design/*.png' --attach spec.pdf] \
   [--full] [--report-file pr-check.md] [--fail-on warning] \
   [--no-wait] [--timeout 1800]
@@ -55,6 +55,7 @@ minitest-cli --app "$APP" pr check \
   anything: shorten it yourself and keep the acceptance criteria.
 - `--commits-file`: the push's commit messages, one per line
   (`git log --format=%s base..head`). Mini re-tests the areas they name.
+- `--ticket`: the key of the ticket the PR implements, shown on the report.
 - `--attach` (repeatable glob): png, jpg, gif, webp or pdf of at most 10 MB.
   Other files are skipped with a warning; the check goes on.
 - `--no-wait`: start, print the check id and report link, exit 0. Follow it
@@ -91,8 +92,9 @@ minitest-cli --app "$APP" pr closed 1482   # discard them; the suite is unchange
 ```
 
 `pr wait` follows the PR's latest push and exits like `pr check`. `pr merged`
-applies edits and new scenarios at once; proposed deletions wait for a person
-to approve them in the webapp.
+applies the proven edits and new scenarios at once and drops unproven ones;
+proposed deletions wait for a person to approve them in the webapp. Both answer
+409 (exit 3) once the PR is already merged or closed.
 
 ## GitHub Actions
 

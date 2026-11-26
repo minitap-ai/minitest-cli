@@ -51,6 +51,9 @@ def register(app: typer.Typer) -> None:
             str | None,
             typer.Option("--commits-file", help="The push's commit messages, one per line."),
         ] = None,
+        ticket: Annotated[
+            str | None, typer.Option("--ticket", help="Ticket key the PR implements, e.g. TIM-123.")
+        ] = None,
         sha: Annotated[
             str | None, typer.Option("--sha", help="Head commit SHA of the push.")
         ] = None,
@@ -90,6 +93,8 @@ def register(app: typer.Typer) -> None:
             body["commits"] = commits
         if sha:
             body["sha"] = sha
+        if ticket:
+            body["ticketKey"] = ticket
         if files:
             body["expectedFiles"] = len(files)
         options = WaitOptions(fail_on, report_file, timeout)
@@ -113,7 +118,7 @@ async def _run(
         created = await request(
             client, target, "POST", PR_CHECKS_PATH, what="Starting the PR check", json=body
         )
-        url = report_url(target, created["reportUrl"])
+        url = report_url(target, created.get("reportUrl"), created["prNumber"])
         _announce_start(created, url, json_mode=target.json_mode)
         await send_attachments(client, target, created["id"], files)
         if no_wait:

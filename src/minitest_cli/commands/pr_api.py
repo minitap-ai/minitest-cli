@@ -59,8 +59,11 @@ def app_pr_path(target: DraftTarget, pr_number: int) -> str:
     return f"/api/v1/apps/{target.app_id}/pr-checks/{pr_number}"
 
 
-def report_url(target: DraftTarget, url: str) -> str:
-    return urljoin(target.settings.webapp_url, url)
+def report_url(target: DraftTarget, url: str | None, pr_number: int) -> str:
+    if url:
+        return urljoin(target.settings.webapp_url, url)
+    base = target.settings.webapp_url.rstrip("/")
+    return f"{base}/t/{target.tenant_id}/apps/{target.app_id}/test/pr-checks/{pr_number}"
 
 
 def conductor(target: DraftTarget) -> ApiClient:

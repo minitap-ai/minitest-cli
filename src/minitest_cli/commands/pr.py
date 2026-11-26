@@ -59,7 +59,7 @@ def wait(
     async def follow(target: DraftTarget) -> int:
         async with conductor(target) as client:
             report = await find_check(client, target, pr)
-            url = report_url(target, report["reportUrl"])
+            url = report_url(target, report.get("reportUrl"), pr)
             if not target.json_mode:
                 console.print(f"Report: {url}")
             options = WaitOptions(fail_on, report_file, timeout)
@@ -110,12 +110,15 @@ def _close(pr: int, outcome: str) -> None:
         print(json.dumps(body, indent=2))  # noqa: T201
         return
     changes = body.get("suiteChanges") or []
-    kinds = [c.get("kind") for c in changes]
-    console.print(f"PR #{pr} {outcome}: suite changes {body.get('state')}")
+    console.print(f"PR #{pr} {outcome}.")
     if outcome == "merged":
-        applied = kinds.count("edited") + kinds.count("new")
-        deleted = kinds.count("deleted")
-        console.print(f"{applied} change(s) applied; {deleted} deletion(s) wait for approval.")
+        deleted = sum(c.get("kind") == "deleted" for c in changes)
+        applied = sum(c.get("kind") != "deleted" and bool(c.get("proven")) for c in changes)
+        dropped = len(changes) - deleted - applied
+        console.print(
+            f"{applied} suite change(s) applied, {dropped} unproven dropped;"
+            f" {deleted} deletion(s) wait for approval."
+        )
     elif changes:
         console.print(f"{len(changes)} proposed change(s) discarded; the suite is unchanged.")
 

@@ -8,11 +8,13 @@ import pytest
 
 from tests.pr_backend import (
     ANDROID_BUILD,
+    APP_ID,
     CHECK_ID,
     CREATE,
     EVENTS,
     FILES,
     REPORT_URL,
+    created,
     happy,
     invoke,
     sse,
@@ -42,7 +44,8 @@ class TestStart:
         commits.write_text("fix(cart): totals\n\nfeat(home): favourites\n")
         backend = happy()
 
-        args = ["--ios-build", str(ipa), "--commits-file", str(commits), "--sha", "abc1234"]
+        args = ["--ios-build", str(ipa), "--commits-file", str(commits), "--sha", "abc1234",
+                "--ticket", "TIM-42"]  # fmt: skip
         result = invoke(backend, check_args(context, *args, "--full"))
 
         assert result.exit_code == 0, result.output
@@ -55,6 +58,7 @@ class TestStart:
         }
         assert body["commits"] == ["fix(cart): totals", "feat(home): favourites"]
         assert (body["prNumber"], body["sha"], body["full"]) == (1482, "abc1234", True)
+        assert body["ticketKey"] == "TIM-42"
         assert body["context"].startswith("## Favourites")
 
     def test_report_link_comes_before_any_progress(self, context: Path):
@@ -64,6 +68,17 @@ class TestStart:
         assert lines[0] == f"Report: {REPORT_URL}"
         assert lines.index("Plan: 2 check(s) (1 change, 1 impact)") > 0
         assert lines[-1] == f"Report: {REPORT_URL}"
+
+    def test_without_a_report_url_the_link_is_built_from_the_app(self, context: Path):
+        backend = happy().on(CREATE, httpx.Response(201, json={**created(), "reportUrl": None}))
+
+        result = invoke(backend, check_args(context, "--no-wait"))
+
+        assert result.exit_code == 0
+        tenant = "tttttttt-0000-0000-0000-000000000001"
+        assert (
+            f"https://app.minitap.ai/t/{tenant}/apps/{APP_ID}/test/pr-checks/1482" in result.stderr
+        )
 
     def test_no_build_exits_3_and_creates_nothing(self, context: Path):
         backend = happy()

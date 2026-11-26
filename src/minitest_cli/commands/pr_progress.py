@@ -34,11 +34,11 @@ def in_github_actions() -> bool:
 
 def snapshot_events(report: dict[str, Any]) -> Iterator[Event]:
     push, state = report["push"], report["state"]
-    if state not in TERMINAL_STATES:
-        yield Event("pr_check.state", {"state": state, "push": push})
     checks = report.get("checks") or []
     if checks:
         yield Event("pr_check.plan", {"checks": checks, "push": push})
+    if state not in TERMINAL_STATES:
+        yield Event("pr_check.state", {"state": state, "push": push})
     for check in checks:
         for platform, result in (check.get("platforms") or {}).items():
             if result and result.get("verdict"):

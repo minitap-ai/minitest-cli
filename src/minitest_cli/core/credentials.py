@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
+import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -16,6 +16,25 @@ from minitest_cli.core.config import Settings
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _lock(fd: int) -> None:
+        msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+
+    def _unlock(fd: int) -> None:
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+
+else:
+    import fcntl
+
+    def _lock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+
+    def _unlock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
 
 TOKEN_FILE_NAME = "credentials.json"
 LOCK_FILE_NAME = "credentials.lock"
@@ -78,10 +97,10 @@ def refresh_lock(settings: Settings) -> Iterator[None]:
         yield
         return
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        _lock(fd)
         yield
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        _unlock(fd)
         os.close(fd)
 
 

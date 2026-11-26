@@ -114,29 +114,45 @@ if (-not $InstalledVia) {
 # -------------------------------------------------------------------
 # Verify installation
 # -------------------------------------------------------------------
-if (Get-Command minitest -ErrorAction SilentlyContinue) {
-    Write-Ok "minitest-cli installed successfully!"
-    minitest --version
+$toolBinDir = Get-UvToolBinDir
+$uvBin = Join-Path $toolBinDir "minitest.exe"
+if (-not (Test-Path $uvBin)) {
+    Write-Err "Installation reported success, but 'minitest' binary was not found."
+    Write-Err "Please try reinstalling:"
+    Write-Err "  uv tool install $Package"
+    exit 1
+}
+
+Write-Ok "minitest-cli installed successfully!"
+& $uvBin --version
+
+# Ruby's minitest gem (6.x, bundled with Ruby 4) installs a `minitest` that ignores our
+# commands and exits 0, so check which program the name runs.
+$cli = "minitest"
+$resolved = Get-Command minitest -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $resolved) {
+    Write-Host ""
+    Write-Warn "minitest is not on your PATH in this session."
+    Write-Warn "Close and reopen your terminal, then run:"
+    Write-Host "  minitest --help"
+} else {
+    $resolvedVersion = ""
+    if ($resolved.Path -ine $uvBin) {
+        try { $resolvedVersion = "$(& $resolved.Path --version 2>$null | Select-Object -First 1)" } catch {}
+    }
+    if (($resolved.Path -ine $uvBin) -and -not $resolvedVersion.StartsWith("minitest-cli ")) {
+        Write-Host ""
+        Write-Warn "'minitest' in your PATH runs $($resolved.Path) ($resolvedVersion), not minitest-cli."
+        Write-Host "  It is probably Ruby's test runner: it ignores minitest-cli commands and still exits 0."
+        Write-Host "  Fix: move $toolBinDir before $(Split-Path $resolved.Path) in your Path environment variable."
+        if (Test-Path (Join-Path $toolBinDir "minitest-cli.exe")) {
+            Write-Host "  Or run 'minitest-cli' instead of 'minitest': it takes the same commands."
+            $cli = "minitest-cli"
+        }
+    }
     Write-Host ""
     Write-Info "Next steps:"
-    Write-Host "  minitest auth login       # authenticate"
-    Write-Host "  minitest apps list        # list your apps"
-    Write-Host "  minitest --help           # see all commands"
-} else {
-    # Check uv tool bin directory
-    $toolBinDir = Get-UvToolBinDir
-    $uvBin = Join-Path $toolBinDir "minitest.exe"
-    if (Test-Path $uvBin) {
-        Write-Ok "minitest-cli installed successfully!"
-        & $uvBin --version
-        Write-Host ""
-        Write-Warn "minitest is not on your PATH in this session."
-        Write-Warn "Close and reopen your terminal, then run:"
-        Write-Host "  minitest --help"
-    } else {
-        Write-Err "Installation reported success, but 'minitest' binary was not found."
-        Write-Err "Please try reinstalling:"
-        Write-Err "  uv tool install $Package"
-        exit 1
-    }
+    Write-Host "  $cli auth login       # authenticate"
+    Write-Host "  $cli apps list        # list your apps"
+    Write-Host "  $cli --help           # see all commands"
 }

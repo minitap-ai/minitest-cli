@@ -111,34 +111,36 @@ fi
 # -------------------------------------------------------------------
 # Verify installation
 # -------------------------------------------------------------------
-if command -v minitest &>/dev/null; then
-  ok "minitest-cli installed successfully!"
-  minitest --version
+uv_bin_dir="$(get_uv_bin_dir)"
+if [[ ! -x "${uv_bin_dir}/minitest" ]]; then
+  error "Installation reported success, but 'minitest' binary was not found."
+  error "Please try reinstalling:"
+  error "  uv tool install ${PACKAGE}"
+  exit 1
+fi
+
+ok "minitest-cli installed successfully!"
+"${uv_bin_dir}/minitest" --version
+
+# Ruby's minitest gem (6.x, bundled with Ruby 4) installs a `minitest` that ignores our
+# commands and exits 0, so check which program the name runs.
+cli="minitest"
+resolved="$(command -v minitest || true)"
+resolved_version="$(minitest --version 2>/dev/null | head -n 1 || true)"
+if [[ "${resolved}" != "${uv_bin_dir}/minitest" && "${resolved_version}" != "minitest-cli "* ]]; then
   echo ""
-  info "Next steps:"
-  echo "  minitest auth login       # authenticate"
-  echo "  minitest apps list        # list your apps"
-  echo "  minitest --help           # see all commands"
-else
-  # minitest binary exists but shell doesn't see it yet (current session)
-  uv_bin_dir="$(get_uv_bin_dir)"
-  if [[ -x "${uv_bin_dir}/minitest" ]]; then
-    ok "minitest-cli installed successfully!"
-    "${uv_bin_dir}/minitest" --version
-    echo ""
-    warn "Run this to use minitest in your current terminal:"
-    echo "  export PATH=\"${uv_bin_dir}:\$PATH\""
-    echo ""
-    info "It will work automatically in new terminals."
-    echo ""
-    info "Next steps:"
-    echo "  minitest auth login       # authenticate"
-    echo "  minitest apps list        # list your apps"
-    echo "  minitest --help           # see all commands"
-  else
-    error "Installation reported success, but 'minitest' binary was not found."
-    error "Please try reinstalling:"
-    error "  uv tool install ${PACKAGE}"
-    exit 1
+  warn "'minitest' in your PATH runs ${resolved}${resolved_version:+ (${resolved_version})}, not minitest-cli."
+  echo "  It is probably Ruby's test runner: it ignores minitest-cli commands and still exits 0."
+  echo "  Fix: put ${uv_bin_dir} first in PATH by adding this line at the end of $(get_shell_rc):"
+  echo "    export PATH=\"${uv_bin_dir/#${HOME}/\$HOME}:\$PATH\""
+  if [[ -x "${uv_bin_dir}/minitest-cli" ]]; then
+    echo "  Or run 'minitest-cli' instead of 'minitest': it takes the same commands."
+    cli="minitest-cli"
   fi
 fi
+
+echo ""
+info "Next steps:"
+echo "  ${cli} auth login       # authenticate"
+echo "  ${cli} apps list        # list your apps"
+echo "  ${cli} --help           # see all commands"

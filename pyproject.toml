@@ -44,6 +44,7 @@ dev = [
 
 [project.scripts]
 minitest = "minitest_cli.main:app"
+minitest-cli = "minitest_cli.main:app"
 
 [project.urls]
 "Homepage" = "https://minitap.ai/"

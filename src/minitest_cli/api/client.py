@@ -1,6 +1,7 @@
 """Async HTTP client with automatic auth and channel headers."""
 
 from collections.abc import Generator
+from contextlib import AbstractAsyncContextManager
 from http.cookiejar import Cookie, CookieJar
 from typing import Any
 
@@ -125,6 +126,11 @@ class ApiClient:
 
     async def request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         return await self._ensure_client().request(method, path, **kwargs)
+
+    def stream(
+        self, method: str, path: str, **kwargs: Any
+    ) -> AbstractAsyncContextManager[httpx.Response]:
+        return self._ensure_client().stream(method, path, **kwargs)
 
     async def upload_file(
         self,

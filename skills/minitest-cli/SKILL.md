@@ -236,6 +236,9 @@ Treat `MINITEST_API_KEY` as a credential. Never commit it; rotate on suspected l
 Credentials rejected on a normal command exit 1, not 2 — only the `auth`
 commands themselves use 2.
 
+`minitest pr` has its own codes, built for CI: 0 ready, 1 not ready, 2 needs an
+answer, 3 anything else (see [`commands/pr-checks.md`](commands/pr-checks.md)).
+
 Only 3 is worth a blind retry. 6 comes from `df` (explained in
 [`commands/draft-features.md`](commands/draft-features.md)), from `draft`
 (the draft's state does not allow it: `draft get` it, see
@@ -1798,6 +1801,8 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Answer Mini on a draft | `minitest --json --app ID draft ask list <id>`, `draft ask answer <id> <ask_id> --answer "..." \| --field K=V --field-file SECRET_KEY=-` |
 | Check / merge a draft | `minitest --json --app ID draft check\|build\|merge\|discard\|revert <id>`, `draft not-a-bug <id> <scenario_id>` |
 | Prove a draft on an open PR | `minitest --json --app ID draft link-pr <id> <pr_number>` then `draft check <id>` (`--again` after new pushes) |
+| Check a PR on its builds, without its code (CI) | `minitest-cli --app ID pr check --pr N --title "..." --context-file pr.md --ios-build FILE\|ID --android-build FILE\|ID` — exit 0/1/2/3, see [`commands/pr-checks.md`](commands/pr-checks.md) |
+| Follow / read / close a PR check | `minitest --app ID pr wait\|report\|merged\|closed <pr_number>` |
 | Branch the test suite yourself (low level) | `minitest --json --app ID df list\|create\|show\|apply\|delete` — see [`commands/draft-features.md`](commands/draft-features.md) |
 
 ## Personas, test files, and story bindings
@@ -1913,6 +1918,20 @@ payloads and safe retries.
 **`draft` vs `df`:** a draft's branch belongs to Mini. Never `df apply` into it
 (its `draftFeatureId`) — tell Mini instead. `df` is only for branches you write
 yourself, end to end.
+
+## PR checks (`minitest pr`)
+
+For teams whose CI can send builds but not code: `minitest pr check` takes the
+PR number, title, a Markdown context file (PR description + ticket, ≤10,000
+characters), optional commit messages and images, and an iOS and/or Android build
+(a file or a build id). Mini plans `change` and `impact` checks, verifies them on
+the devices and gives a verdict: exit 0 ready (warnings too, unless `--fail-on
+warning`), 1 not ready, 2 needs an answer, 3 anything else. Progress streams live
+(report link first), `--report-file` writes the Markdown report, and on GitHub
+Actions it groups the log, annotates criticals and fills the step summary. Report
+the PR's fate with `pr merged` / `pr closed` so Mini's suite changes are applied
+or discarded. Read [`commands/pr-checks.md`](commands/pr-checks.md) before wiring
+it into CI.
 
 ## Draft features (`minitest df`)
 

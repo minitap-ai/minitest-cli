@@ -19,17 +19,15 @@ from minitest_cli.commands.build_helpers import (
     print_validation_warnings,
     resolve_app,
     run_api_call,
-    upload_status_message,
 )
-from minitest_cli.commands.build_bundle import PHYSICAL_AAB_NOTE, print_uploaded_build
+from minitest_cli.commands.build_bundle import print_uploaded_build
 from minitest_cli.commands.build_commit import from_commit
-from minitest_cli.commands.build_conversion import wait_for_conversion
 from minitest_cli.commands.build_get import get
 from minitest_cli.commands.build_signing import signing_certificate
+from minitest_cli.commands.build_upload import upload_build
 from minitest_cli.commands.build_fix_prompts import print_fix_prompts, redacted_payload
 from minitest_cli.models import BuildListResponse, BuildResponse
 from minitest_cli.utils.output import (
-    err_console,
     output,
     print_info,
     print_success,
@@ -98,30 +96,12 @@ def upload(
     settings, app_id, json_mode = resolve_app()
     resolved_platform = platform.value if platform else detect_platform(file)
     is_bundle = file.suffix.lower() == ".aab"
-    form = {"platform": resolved_platform}
-    if physical:
-        # Still sent for an .aab: older backends use it to pick the bundle's ABI.
-        form["backend"] = "physical"
-        if is_bundle:
-            print_info(PHYSICAL_AAB_NOTE)
 
     async def _run() -> BuildResponse:
         async with ApiClient(settings) as client:
-            with (
-                file.open("rb") as f,
-                err_console.status(upload_status_message(file)),
-            ):
-                resp = await client.upload_file(
-                    f"{base_path(app_id)}/build",
-                    files={"file": (file.name, f, "application/octet-stream")},
-                    data=form,
-                )
-            handle_response_error(resp, physical=physical)
-            build = BuildResponse.model_validate(resp.json())
-            if wait and is_bundle:
-                with err_console.status("Converting the .aab into APKs..."):
-                    build = await wait_for_conversion(client, app_id, build)
-        return build
+            return await upload_build(
+                client, app_id, file, resolved_platform, physical=physical, wait=wait
+            )
 
     result = run_api_call(_run())
     result_dict = result.model_dump(mode="json", by_alias=True)

@@ -23,6 +23,7 @@ from minitest_cli.commands import (
     knowledge,
     knowledge_documents,
     persona,
+    pr,
     reference,
     run,
     schedules,
@@ -58,6 +59,7 @@ app.add_typer(user_story.legacy_app)
 app.add_typer(user_story_bindings.legacy_app)
 app.add_typer(draft.app)
 app.add_typer(draft_feature.app)
+app.add_typer(pr.app)
 app.add_typer(persona.app)
 app.add_typer(test_account.app)
 app.add_typer(test_file.app)

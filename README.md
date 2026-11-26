@@ -212,7 +212,7 @@ app defaults.
 | `MINITEST_APP_ID`             | Default app ID                                             | No (can use `--app` flag)          |
 | `MINITEST_API_URL`            | testing-service base URL                                   | No (defaults to production)        |
 | `MINITEST_APPS_MANAGER_URL`   | apps-manager base URL (used by `minitest apps create`)     | No (defaults to production)        |
-| `MINITEST_CONDUCTOR_URL`      | Conductor base URL (used by `minitest draft`)              | No (defaults to production)        |
+| `MINITEST_CONDUCTOR_URL`      | Conductor base URL (used by `minitest draft` and `pr`)     | No (defaults to production)        |
 | `MINITEST_INTEGRATIONS_URL`   | minihands-integrations base URL (used to list tenants)     | No (defaults to production)        |
 | `MINITEST_WEBAPP_URL`         | Minitest webapp base URL (used for review links)            | No (defaults to production)        |
 | `MINITEST_SUPABASE_URL`       | Supabase project URL used for OAuth login                  | No (defaults to production)        |
@@ -264,6 +264,7 @@ tenant API key (`MINITEST_API_KEY`).
 | `minitest scenario-binding` | Bind personas, test files or app skills to scenarios |
 | `minitest draft` | Ask Mini for a suite change, follow it, check and merge it (drafts in the webapp) |
 | `minitest df` | Low-level suite branches Mini writes (draft features) |
+| `minitest pr` | Check a pull request on its builds from CI, without its code: `check`, `wait`, `report`, `merged`, `closed` (exit 0 ready, 1 not ready, 2 needs an answer, 3 error) |
 | `minitest persona` | Personas: who Mini plays in a scenario (Test accounts in the webapp) |
 | `minitest test-account` | A persona's test accounts and their credentials (Logins in the webapp) |
 | `minitest tags`  | List, create, update and delete scenario tags |

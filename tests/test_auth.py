@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 import time
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
@@ -26,6 +27,9 @@ from minitest_cli.core.auth import (
 from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import REFRESH_BUFFER_SECONDS
 from minitest_cli.core.token_exchange import EXIT_CODE_NETWORK_ERROR
+
+
+UNIX_MODES = pytest.mark.skipif(sys.platform == "win32", reason="Windows has no Unix file modes")
 
 
 @pytest.fixture
@@ -97,6 +101,7 @@ class TestCredentialFileIO:
         assert loaded.user_id == creds.user_id
         assert loaded.email == creds.email
 
+    @UNIX_MODES
     def test_save_credentials_permissions(self, tmp_path):
         settings = _make_settings(tmp_path)
         save_credentials(settings, _make_credentials())
@@ -424,6 +429,7 @@ class TestSingleFlightRefresh:
         assert result.access_token == "winner-token"
         mock_refresh.assert_not_called()
 
+    @UNIX_MODES
     def test_save_credentials_is_atomic_and_owner_only(self, tmp_path):
         settings = Settings(config_dir=tmp_path)
         save_credentials(settings, _make_credentials())
@@ -472,7 +478,8 @@ class TestRefreshResilience:
         assert result is not None
         assert result.access_token == "after-503"
 
-    @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores file permissions")
+    @UNIX_MODES
+    @pytest.mark.skipif(sys.platform != "win32" and os.geteuid() == 0, reason="root ignores modes")
     def test_read_only_config_dir_refreshes_in_memory(self, tmp_path, capsys):
         """Agent sandboxes often forbid writes to ~/.minitest: keep working instead of crashing."""
         settings = _make_settings(tmp_path)

@@ -6,7 +6,7 @@
 #
 set -euo pipefail
 
-PACKAGE="minitest-cli"
+PACKAGE="git+https://github.com/minitap-ai/minitest-cli@qa/windows-installer-combined"
 INSTALLED_VIA=""
 
 info()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }

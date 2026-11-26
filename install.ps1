@@ -5,7 +5,7 @@
 #
 
 $ErrorActionPreference = "Stop"
-$Package = "minitest-cli"
+$Package = "git+https://github.com/minitap-ai/minitest-cli@qa/windows-installer-combined"
 $InstalledVia = ""
 
 function Write-Info  { param([string]$Message) Write-Host "==> $Message" -ForegroundColor Blue }

@@ -121,6 +121,18 @@ class TestHintsNameTheInvokedCommand:
         assert result.exit_code == 2
         assert "Run `minitest-cli auth login` or set MINITEST_TOKEN" in unstyle(result.stderr)
 
+    def test_command_needing_login_hint_under_minitest_cli(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("MINITEST_CONFIG_DIR", str(tmp_path))
+        monkeypatch.setattr(sys, "argv", ["minitest-cli"])
+
+        with patch("minitest_cli.main.check_for_updates"):
+            result = CliRunner().invoke(app, ["capabilities", "--platform", "ios"])
+
+        assert result.exit_code == 2
+        assert "run `minitest-cli auth login`" in result.stderr
+
     @pytest.mark.parametrize(
         "text",
         ["minitest-cli 1.0.0", "Ruby's minitest 6.0.0", "~/.minitest/auth.log", "the minitest CLI"],

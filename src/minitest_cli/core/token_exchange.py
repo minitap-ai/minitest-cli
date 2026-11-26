@@ -12,6 +12,7 @@ import httpx
 
 from minitest_cli.core.config import Settings
 from minitest_cli.core.credentials import Credentials, save_credentials
+from minitest_cli.utils.invoked_name import as_invoked
 
 EXIT_CODE_AUTH_ERROR = 2
 EXIT_CODE_NETWORK_ERROR = 3
@@ -134,7 +135,7 @@ def register_oauth_client(supabase_url: str, redirect_uris: list[str]) -> str:
 
 def auth_error(message: str) -> NoReturn:
     """Print auth error to stderr and exit with code 2."""
-    print(f"Error: {message}", file=sys.stderr)  # noqa: T201
+    print(f"Error: {as_invoked(message)}", file=sys.stderr)  # noqa: T201
     raise SystemExit(EXIT_CODE_AUTH_ERROR)
 
 

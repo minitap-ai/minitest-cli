@@ -4,7 +4,6 @@ from enum import StrEnum
 from typing import Annotated, Any
 
 import typer
-from rich.console import Console
 
 from minitest_cli.commands.user_story_helpers import is_json_mode
 from minitest_cli.core.config import Settings, get_settings
@@ -15,7 +14,7 @@ from minitest_cli.utils.auto_update_state import (
     save_auto_update_enabled,
     section,
 )
-from minitest_cli.utils.output import print_json, print_success
+from minitest_cli.utils.output import CliConsole, print_json, print_success
 
 
 class Switch(StrEnum):
@@ -40,7 +39,7 @@ def _status(settings: Settings) -> dict[str, Any]:
 
 
 def _print_status(status: dict[str, Any]) -> None:
-    console = Console()
+    console = CliConsole()
     reason = f" ({status['reason']})" if status["reason"] else ""
     console.print(f"Auto-update: [bold]{status['autoUpdate']}[/bold]{reason}")
     if status["autoUpdate"] == "on" and not status["installCanUpdate"]:

@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from rich.console import Console
 from rich.table import Table
 
+from minitest_cli.utils.invoked_name import as_invoked
+
 
 def _to_jsonable(data: Any) -> Any:
     """Recursively convert Pydantic models to camelCase-aliased dicts."""
@@ -25,8 +27,15 @@ def _to_jsonable(data: Any) -> Any:
     return data
 
 
+class CliConsole(Console):
+    """A console whose command hints name the CLI the way it was run."""
+
+    def print(self, *objects: Any, **kwargs: Any) -> None:
+        super().print(*(as_invoked(o) if isinstance(o, str) else o for o in objects), **kwargs)
+
+
 # stderr console for diagnostics – never captured by pipes
-err_console = Console(stderr=True)
+err_console = CliConsole(stderr=True)
 
 
 def _display(value: Any) -> str:

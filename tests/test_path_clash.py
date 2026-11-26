@@ -5,11 +5,15 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from click import unstyle
+from typer.testing import CliRunner
 
 from minitest_cli import __version__
+from minitest_cli.main import app
+from minitest_cli.utils.invoked_name import as_invoked
 from minitest_cli.utils.path_clash import PathClash, find_path_clash, warn_if_shadowed
 
 VENV_BIN = Path(sys.executable).parent
@@ -81,3 +85,49 @@ class TestPathClash:
         assert str(tmp_path / "minitest") in warning
         assert "Run `minitest-cli` instead" in warning
         assert f"put {VENV_BIN} first in PATH" in warning
+
+
+class TestHintsNameTheInvokedCommand:
+    @pytest.mark.parametrize(
+        ("prog_name", "hint"),
+        [
+            ("minitest-cli", "`minitest-cli upgrade` still updates by hand"),
+            ("minitest", "`minitest upgrade` still updates by hand"),
+        ],
+    )
+    def test_upgrade_auto_off_hint(
+        self, prog_name: str, hint: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("MINITEST_CONFIG_DIR", str(tmp_path))
+        monkeypatch.setenv("COLUMNS", "500")
+        monkeypatch.setattr(sys, "argv", [f"/home/me/.local/bin/{prog_name}"])
+
+        with patch("minitest_cli.main.check_for_updates"):
+            result = CliRunner().invoke(app, ["upgrade", "auto", "off"])
+
+        assert result.exit_code == 0, result.output
+        assert hint in unstyle(result.stderr)
+
+    def test_not_authenticated_hint_under_minitest_cli(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("MINITEST_CONFIG_DIR", str(tmp_path))
+        monkeypatch.setenv("COLUMNS", "500")
+        monkeypatch.setattr(sys, "argv", ["minitest-cli.exe"])
+
+        with patch("minitest_cli.main.check_for_updates"):
+            result = CliRunner().invoke(app, ["auth", "status"])
+
+        assert result.exit_code == 2
+        assert "Run `minitest-cli auth login` or set MINITEST_TOKEN" in unstyle(result.stderr)
+
+    @pytest.mark.parametrize(
+        "text",
+        ["minitest-cli 1.0.0", "Ruby's minitest 6.0.0", "~/.minitest/auth.log", "the minitest CLI"],
+    )
+    def test_as_invoked_leaves_non_commands_alone(
+        self, text: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(sys, "argv", ["minitest-cli"])
+
+        assert as_invoked(text) == text

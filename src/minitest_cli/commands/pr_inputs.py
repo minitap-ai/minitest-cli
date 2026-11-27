@@ -74,15 +74,19 @@ def check_build_values(builds: dict[str, str | None], *, web: bool) -> dict[str,
     return given
 
 
-def check_web(url: str | None, browser: WebBrowser | None) -> dict[str, str] | None:
+def check_web(
+    url: str | None, browser: WebBrowser | None, persona: str | None
+) -> dict[str, str] | None:
     if url is None:
-        if browser is not None:
-            raise fail("--web-browser needs --web-url.")
+        for flag, value in (("--web-browser", browser), ("--web-persona", persona)):
+            if value is not None:
+                raise fail(f"{flag} needs --web-url.")
         return None
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise fail(f"--web-url: '{url}' is not an http(s) URL.")
-    return {"url": url} | ({"browser": browser.value} if browser else {})
+    web = {"url": url} | ({"browser": browser.value} if browser else {})
+    return web | ({"persona": persona} if persona else {})
 
 
 async def resolve_builds(client: ApiClient, app_id: str, builds: dict[str, str]) -> dict[str, str]:

@@ -41,7 +41,7 @@ minitest-cli --app "$APP" pr check \
   --pr 1482 --title "Favourites on restaurant cards" \
   --context-file pr.md \
   --ios-build build/App.ipa --android-build build/app.aab \
-  [--web-url https://preview.example.com/pr-1482 [--web-browser chrome|firefox|safari|edge]] \
+  [--web-url https://preview.example.com/pr-1482 [--web-browser chrome|firefox|safari|edge] [--web-persona NAME|ID]] \
   [--commits-file commits.txt] [--sha "$SHA"] [--ticket TIM-123] \
   [--attach 'design/*.png' --attach spec.pdf] \
   [--full] [--report-file pr-check.md] [--fail-on warning] \
@@ -52,8 +52,9 @@ minitest-cli --app "$APP" pr check \
   `.aab` is converted) or the id of an uploaded build. `--web-url` is the
   http(s) URL of the PR's web build (a preview deployment), checked in
   `--web-browser` (Chrome by default). At least one of the three is required; a
-  platform you don't pass is simply not checked. Web test accounts and personas
-  come from the app's settings, as for any web run.
+  platform you don't pass is simply not checked. `--web-persona` (a persona id
+  or name, see `minitest persona list`) is who Mini signs in as on the web; its
+  test accounts and secrets come from the app, as for any web run.
 - `--context-file` is Markdown with the PR description and the ticket, at most
   10,000 characters (`-` reads stdin). A longer file exits 3 without sending
   anything: shorten it yourself and keep the acceptance criteria.

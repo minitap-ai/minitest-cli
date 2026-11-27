@@ -108,4 +108,6 @@ def announce(report: dict[str, Any], code: int, url: str, *, json_mode: bool) ->
             "Mini has a question: clarify it in the PR text and run `minitest pr check` again"
             " (the next push re-tests every check that asked), or answer it in the session."
         )
+    if report.get("state") == "cancelled":
+        console.print(f"A newer push replaced this one; `minitest pr wait {pr}` follows it.")
     console.print(f"Report: {url}")

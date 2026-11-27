@@ -28,7 +28,7 @@ command needs the app: `--app ID` or `MINITEST_APP_ID`.
 | ---- | ------- |
 | 0 | `ready`, or `ready_with_warnings` (unless `--fail-on warning`) |
 | 1 | `not_ready`: a check is critical (or `ready_with_warnings` with `--fail-on warning`) |
-| 2 | `needs_answer`: Mini asked a question; answer it in the report |
+| 2 | `needs_answer`: Mini asked a question. Clarify it in the PR text and run `pr check` again (the next push re-tests every check that asked), or answer it in the session |
 | 3 | Anything else: errored on our side, invalid input or flags, rejected key, network, `--timeout` reached, or the push was replaced by a newer one |
 
 `known` (matches an open issue) and `not_tested` results never fail a check.

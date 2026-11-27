@@ -9,26 +9,27 @@ from contextlib import contextmanager
 from typing import Any
 from urllib.parse import urljoin
 
-import click
 import httpx
 import typer
 from typer.core import TyperGroup
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.draft_helpers import DraftTarget, resolve_target
-from minitest_cli.commands.run_helpers import extract_detail
 from minitest_cli.commands.pr_render import error
+from minitest_cli.commands.run_helpers import extract_detail
 
 EXIT_ERRORED = 3
 PR_CHECKS_PATH = "/api/v1/pr-checks"
+# click's UsageError without importing click: typer >=0.25 vendors it and click is no dependency.
+USAGE_ERROR: type[Exception] = typer.BadParameter.__mro__[1]
 
 
 class PrGroup(TyperGroup):
-    def invoke(self, ctx: click.Context) -> Any:
+    def invoke(self, ctx: Any) -> Any:
         try:
             return super().invoke(ctx)
-        except click.UsageError as exc:
-            exc.exit_code = EXIT_ERRORED
+        except USAGE_ERROR as exc:
+            exc.exit_code = EXIT_ERRORED  # pyright: ignore[reportAttributeAccessIssue]
             raise
 
 
@@ -36,7 +37,7 @@ class PrGroup(TyperGroup):
 def errors_exit_3() -> Iterator[None]:
     try:
         yield
-    except click.exceptions.Exit as exc:
+    except typer.Exit as exc:
         if exc.exit_code:
             raise typer.Exit(code=EXIT_ERRORED) from exc
         raise

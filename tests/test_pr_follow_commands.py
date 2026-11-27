@@ -148,7 +148,7 @@ class TestFollowUps:
 
         assert result.exit_code == 2
         assert backend.sent(EVENTS) == []
-        assert "Answer Mini's question in the report" in result.stderr
+        assert "clarify it in the PR text and run `minitest pr check` again" in result.stderr
 
     def test_wait_for_an_unknown_pr_exits_3(self):
         missing = httpx.Response(404, json={"detail": "No PR check for PR #1482."})

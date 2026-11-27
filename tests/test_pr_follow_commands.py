@@ -139,6 +139,40 @@ class TestMachineOutput:
         assert summary.read_text() == f"# Earlier step\n## Verdict: not_ready\n\n{REPORT_URL}\n"
 
 
+LONG_SEEN = "Tapping the heart on Burger Barn\nleft it outlined. " + "Profile still shows 0. " * 12
+
+
+class TestShortOutput:
+    def test_seen_is_one_short_line_and_known_shows_none(self, context, monkeypatch):
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        critical = {"checkId": "c1", "platform": "ios", "verdict": "critical", "seen": LONG_SEEN}
+        known = {"checkId": "c2", "platform": "ios", "verdict": "known", "seen": "Same as FOOD-12"}
+        story = sse(
+            ("pr_check.state", {"state": "exploring", "push": 1}),
+            ("pr_check.plan", {"checks": PLAN, "push": 1}),
+            ("pr_check.item", {**critical, "push": 1}),
+            ("pr_check.item", {**known, "push": 1}),
+            ("pr_check.verdict", {"push": 1, "verdict": "not_ready", "counts": {}}),
+        )
+        checks = [
+            {**PLAN[0], "platforms": {"ios": {"verdict": "critical", "seen": LONG_SEEN}}},
+            {**PLAN[1], "platforms": {"ios": {"verdict": "known", "seen": "Same as FOOD-12"}}},
+        ]
+        done = httpx.Response(200, json=report("not_ready", checks=checks))
+        backend = happy("not_ready").on(EVENTS, stream(story)).on(REPORT, done)
+
+        result = invoke(backend, check_args(context))
+
+        line = next(x for x in result.stderr.splitlines() if "critical   Favourite" in x)
+        seen = line.split(" — ", 1)[1]
+        assert len(seen) == 120 and seen.endswith("…") and "\n" not in seen
+        assert seen.startswith("Tapping the heart on Burger Barn left it outlined.")
+        assert "Same as FOOD-12" not in result.stderr
+        annotation = next(x for x in result.stdout.splitlines() if x.startswith("::error"))
+        assert annotation.split("::", 2)[2] == seen
+
+
 class TestFollowUps:
     def test_wait_on_a_finished_check_exits_with_its_verdict_at_once(self):
         answer = httpx.Response(200, json=report("needs_answer"))

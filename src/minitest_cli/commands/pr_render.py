@@ -30,7 +30,14 @@ VERDICT_STYLES = {
     "not_tested": ("-", "dim"),
     "errored": ("✗", "magenta"),
 }
+SEEN_CHARS = 120
 COUNT_ORDER = ("passed", "warning", "critical", "known", "not_tested", "errored")
+
+
+def one_line(text: str, limit: int = SEEN_CHARS) -> str:
+    """Mini's account of a result, cut to one short line: the report holds the rest."""
+    flat = " ".join(text.split())
+    return flat if len(flat) <= limit else flat[: limit - 1].rstrip() + "…"
 
 
 def timestamp(seconds: float | int | None) -> str:
@@ -58,7 +65,8 @@ def item_line(item: dict[str, Any], label: str) -> str:
     mark, style = VERDICT_STYLES.get(verdict, ("?", "white"))
     platform = f"[{item.get('platform')}]"
     head = f"[{style}]{mark} {escape(f'{platform:<10}')} {verdict:<10}[/{style}] {escape(label)}"
-    seen = f" — {escape(str(item['seen']))}" if item.get("seen") and verdict != "passed" else ""
+    shows_seen = item.get("seen") and verdict not in ("passed", "known")
+    seen = f" — {escape(one_line(str(item['seen'])))}" if shows_seen else ""
     carried = " [dim](carried)[/dim]" if item.get("tag") == "carried" else ""
     return f"{head}{timestamp(item.get('at'))}{seen}{carried}"
 
@@ -86,6 +94,6 @@ def critical_annotations(report: dict[str, Any]) -> list[str]:
         for platform, result in (check.get("platforms") or {}).items():
             if result and result.get("verdict") == "critical":
                 title = gha_property(f"{check.get('label')} ({platform})")
-                body = gha_escape(str(result.get("seen") or check.get("expected") or ""))
+                body = gha_escape(one_line(str(result.get("seen") or check.get("expected") or "")))
                 lines.append(f"::error title={title}::{body}")
     return lines

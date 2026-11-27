@@ -159,6 +159,21 @@ class TestFollowUps:
         assert result.exit_code == 3
         assert "A newer push replaced this one; `minitest pr wait 1482`" in result.stderr
 
+    def test_wait_mid_run_never_prints_an_older_state_the_stream_replays(self):
+        exploring = httpx.Response(200, json=report(None, state="exploring"))
+        replay = sse(
+            ("pr_check.state", {"state": "preparing", "push": 1}),
+            ("pr_check.state", {"state": "exploring", "push": 1}),
+            ("pr_check.verdict", {"push": 1, "verdict": "ready", "counts": {}}),
+        )
+        backend = happy().on(BY_PR, exploring).on(EVENTS, stream(replay))
+
+        result = invoke(backend, ["pr", "wait", "1482"])
+
+        assert result.exit_code == 0, result.output
+        assert "Preparing" not in result.stderr
+        assert result.stderr.count("Exploring and verifying") == 1
+
     def test_wait_for_an_unknown_pr_exits_3(self):
         missing = httpx.Response(404, json={"detail": "No PR check for PR #1482."})
 

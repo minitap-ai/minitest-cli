@@ -26,6 +26,11 @@ STATE_LINES = {
     "errored": "[red]The check errored on our side[/red]",
 }
 GROUPS = {"preparing": "Prepare", "exploring": "Explore & verify"}
+STATE_ORDER = ("queued", "preparing", "exploring")
+
+
+def _rank(state: str) -> int:
+    return STATE_ORDER.index(state) if state in STATE_ORDER else len(STATE_ORDER)
 
 
 def in_github_actions() -> bool:
@@ -110,6 +115,9 @@ class Progress:
     def _apply(self, event: Event) -> None:
         data = event.data
         if event.type == "pr_check.state":
+            # A replayed event can be older than the report a poll already showed.
+            if _rank(data["state"]) < _rank(self.state):
+                return
             self.state = data["state"]
             self._open_group(GROUPS.get(self.state))
             if self.state in STATE_LINES:

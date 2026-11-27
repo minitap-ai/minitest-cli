@@ -142,10 +142,24 @@ class TestWeb:
         assert body["builds"] == {}
         assert not [r for r in backend.requests if r.url.path.endswith("/build")]
 
+    def test_web_persona_name_is_sent_as_its_id(self, context: Path):
+        personas = {"items": [{"id": "pppppppp-0000-0000-0000-000000000001", "name": "Bob"}]}
+        backend = happy().on(
+            f"GET /api/v1/apps/{APP_ID}/personas", httpx.Response(200, json=personas)
+        )
+        url = "https://preview.example.com"
+
+        result = invoke(backend, check_args(context, "--web-url", url, "--web-persona", "bob"))
+
+        assert result.exit_code == 0, result.output
+        web = json.loads(backend.sent(CREATE)[0].content)["web"]
+        assert web == {"url": url, "persona": "pppppppp-0000-0000-0000-000000000001"}
+
     @pytest.mark.parametrize(
         ("extra", "says"),
         [
             (["--web-browser", "chrome"], "--web-browser needs --web-url."),
+            (["--web-persona", "Bob"], "--web-persona needs --web-url."),
             (["--web-url", "preview.example.com"], "is not an http(s) URL"),
         ],
     )

@@ -20,6 +20,7 @@ from minitest_cli.commands.pr_inputs import (
     WebBrowser,
     check_build_values,
     check_web,
+    pr_url,
     expand_attachments,
     read_commits,
     read_context,
@@ -45,6 +46,13 @@ def register(app: typer.Typer) -> None:
                 help="Markdown: the PR description and its ticket (≤10,000 chars); - is stdin.",
             ),
         ],
+        pr_url_flag: Annotated[
+            str | None,
+            typer.Option(
+                "--pr-url",
+                help="The PR's page, linked from the report (default on GitHub Actions/GitLab CI).",
+            ),
+        ] = None,
         ios_build: Annotated[str | None, typer.Option("--ios-build", help=BUILD_HELP)] = None,
         android_build: Annotated[
             str | None, typer.Option("--android-build", help=BUILD_HELP)
@@ -87,6 +95,7 @@ def register(app: typer.Typer) -> None:
         """Check a PR on its builds or web app: exit 0 ready, 1 not ready, 2 question, 3 error."""
         context = read_context(context_file)
         commits = read_commits(commits_file)
+        link = pr_url(pr_url_flag, pr)
         web = check_web(web_url, web_browser)
         builds = check_build_values(
             {"ios": ios_build, "android": android_build}, web=web is not None
@@ -101,6 +110,8 @@ def register(app: typer.Typer) -> None:
             "context": context,
             "full": full,
         }
+        if link is not None:
+            body["prUrl"] = link
         if web is not None:
             body["web"] = web
         if commits is not None:

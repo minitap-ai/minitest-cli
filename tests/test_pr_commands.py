@@ -174,6 +174,45 @@ class TestWeb:
         assert "✓ [web]      passed     Favourite heart on each card @ 0:09" in result.stderr
 
 
+CI_VARS = ("GITHUB_ACTIONS", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY",
+           "CI_MERGE_REQUEST_PROJECT_URL", "CI_MERGE_REQUEST_IID")  # fmt: skip
+
+
+class TestPrUrl:
+    @pytest.mark.parametrize(
+        ("env", "extra", "sent"),
+        [
+            ({}, ["--pr-url", "https://git.example/acme/shop/pull/1482"],
+             "https://git.example/acme/shop/pull/1482"),
+            ({"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com",
+              "GITHUB_REPOSITORY": "acme/shop"}, [], "https://github.com/acme/shop/pull/1482"),
+            ({"CI_MERGE_REQUEST_PROJECT_URL": "https://gitlab.com/acme/shop",
+              "CI_MERGE_REQUEST_IID": "77"}, [], "https://gitlab.com/acme/shop/-/merge_requests/77"),
+            ({}, [], None),
+        ],
+    )  # fmt: skip
+    def test_pr_url_is_sent_or_derived_from_ci(self, context, monkeypatch, env, extra, sent):
+        for name in CI_VARS:
+            monkeypatch.delenv(name, raising=False)
+        for name, value in env.items():
+            monkeypatch.setenv(name, value)
+        backend = happy()
+
+        result = invoke(backend, check_args(context, *extra, "--no-wait"))
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(backend.sent(CREATE)[0].content).get("prUrl") == sent
+
+    def test_invalid_pr_url_exits_3_and_sends_nothing(self, context: Path):
+        backend = happy()
+
+        result = invoke(backend, check_args(context, "--pr-url", "acme/shop#1482"))
+
+        assert result.exit_code == 3
+        assert "--pr-url: 'acme/shop#1482' is not an http(s) URL." in result.output
+        assert backend.requests == []
+
+
 class TestAttachments:
     def test_sends_supported_files_and_skips_the_rest(self, context: Path, tmp_path: Path):
         shots = tmp_path / "ctx"

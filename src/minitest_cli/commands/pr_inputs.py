@@ -2,6 +2,7 @@
 
 import glob
 import mimetypes
+import os
 import sys
 from enum import StrEnum
 from pathlib import Path
@@ -17,7 +18,7 @@ from minitest_cli.commands.run_helpers import extract_detail, is_uuid
 from minitest_cli.commands.pr_render import error, info, warn
 
 MAX_CONTEXT_CHARS = 10_000
-MAX_WEB_URL_CHARS = 2_000
+MAX_URL_CHARS = 2_000
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 ATTACHMENT_TYPES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf"})
 
@@ -74,17 +75,34 @@ def check_build_values(builds: dict[str, str | None], *, web: bool) -> dict[str,
     return given
 
 
+def check_url(url: str, flag: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise fail(f"{flag}: '{url}' is not an http(s) URL.")
+    if len(url) > MAX_URL_CHARS:
+        raise fail(f"{flag} has {len(url):,} characters, the limit is {MAX_URL_CHARS:,}.")
+    return url
+
+
 def check_web(url: str | None, browser: WebBrowser | None) -> dict[str, str] | None:
     if url is None:
         if browser is not None:
             raise fail("--web-browser needs --web-url.")
         return None
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise fail(f"--web-url: '{url}' is not an http(s) URL.")
-    if len(url) > MAX_WEB_URL_CHARS:
-        raise fail(f"--web-url has {len(url):,} characters, the limit is {MAX_WEB_URL_CHARS:,}.")
-    return {"url": url} | ({"browser": browser.value} if browser else {})
+    web = {"url": check_url(url, "--web-url")}
+    return web | ({"browser": browser.value} if browser else {})
+
+
+def pr_url(given: str | None, pr_number: int) -> str | None:
+    """--pr-url, else the PR's page as GitHub Actions or GitLab CI know it."""
+    if given is not None:
+        return check_url(given, "--pr-url")
+    env = os.environ
+    if env.get("GITHUB_ACTIONS") == "true" and env.get("GITHUB_SERVER_URL"):
+        repo = env.get("GITHUB_REPOSITORY")
+        return f"{env['GITHUB_SERVER_URL']}/{repo}/pull/{pr_number}" if repo else None
+    project, iid = env.get("CI_MERGE_REQUEST_PROJECT_URL"), env.get("CI_MERGE_REQUEST_IID")
+    return f"{project}/-/merge_requests/{iid}" if project and iid else None
 
 
 async def resolve_builds(client: ApiClient, app_id: str, builds: dict[str, str]) -> dict[str, str]:

@@ -13,6 +13,7 @@ from tests.pr_backend import (
     CREATE,
     EVENTS,
     FILES,
+    PLAN,
     REPORT_URL,
     created,
     happy,
@@ -89,7 +90,7 @@ class TestStart:
         result = invoke(backend, args)
 
         assert result.exit_code == 3
-        assert "at least one build" in result.output
+        assert "at least one platform" in result.output
         assert backend.requests == []
 
     def test_context_over_the_limit_exits_3_and_sends_nothing(self, tmp_path: Path):
@@ -124,6 +125,51 @@ class TestStart:
         assert result.exit_code == 0
         assert CHECK_ID in result.stderr and REPORT_URL in result.stderr
         assert backend.sent(EVENTS) == []
+
+
+class TestWeb:
+    def test_web_only_check_sends_the_url_and_uploads_nothing(self, context: Path):
+        backend = happy()
+        args = check_args(context, "--web-url", "https://preview.example.com/pr-1482")
+        args.remove("--android-build")
+        args.remove(ANDROID_BUILD)
+
+        result = invoke(backend, [*args, "--web-browser", "firefox", "--no-wait"])
+
+        assert result.exit_code == 0, result.output
+        body = json.loads(backend.sent(CREATE)[0].content)
+        assert body["web"] == {"url": "https://preview.example.com/pr-1482", "browser": "firefox"}
+        assert body["builds"] == {}
+        assert not [r for r in backend.requests if r.url.path.endswith("/build")]
+
+    @pytest.mark.parametrize(
+        ("extra", "says"),
+        [
+            (["--web-browser", "chrome"], "--web-browser needs --web-url."),
+            (["--web-url", "preview.example.com"], "is not an http(s) URL"),
+        ],
+    )
+    def test_invalid_web_flags_exit_3_and_send_nothing(self, context: Path, extra, says):
+        backend = happy()
+
+        result = invoke(backend, check_args(context, *extra))
+
+        assert result.exit_code == 3
+        assert says in result.output
+        assert backend.requests == []
+
+    def test_web_results_show_as_their_own_platform(self, context: Path):
+        web_story = sse(
+            ("pr_check.state", {"state": "exploring", "push": 1}),
+            ("pr_check.plan", {"checks": PLAN, "push": 1}),
+            ("pr_check.item", {"checkId": "c1", "platform": "web", "verdict": "passed", "at": 9}),
+            ("pr_check.verdict", {"push": 1, "verdict": "ready", "counts": {}}),
+        )
+
+        result = invoke(happy().on(EVENTS, stream(web_story)), check_args(context))
+
+        assert result.exit_code == 0, result.output
+        assert "✓ [web]      passed     Favourite heart on each card @ 0:09" in result.stderr
 
 
 class TestAttachments:

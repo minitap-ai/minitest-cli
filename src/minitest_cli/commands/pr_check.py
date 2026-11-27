@@ -17,7 +17,9 @@ from minitest_cli.commands.pr_api import (
     request,
 )
 from minitest_cli.commands.pr_inputs import (
+    WebBrowser,
     check_build_values,
+    check_web,
     expand_attachments,
     read_commits,
     read_context,
@@ -47,6 +49,13 @@ def register(app: typer.Typer) -> None:
         android_build: Annotated[
             str | None, typer.Option("--android-build", help=BUILD_HELP)
         ] = None,
+        web_url: Annotated[
+            str | None, typer.Option("--web-url", help="URL of the web app build to check.")
+        ] = None,
+        web_browser: Annotated[
+            WebBrowser | None,
+            typer.Option("--web-browser", help="Browser for --web-url (default: Chrome)."),
+        ] = None,
         commits_file: Annotated[
             str | None,
             typer.Option("--commits-file", help="The push's commit messages, one per line."),
@@ -75,10 +84,13 @@ def register(app: typer.Typer) -> None:
         ] = False,
         timeout: TimeoutOpt = None,
     ) -> None:
-        """Check a PR on its builds: exit 0 ready, 1 not ready, 2 needs an answer, 3 error."""
+        """Check a PR on its builds or web app: exit 0 ready, 1 not ready, 2 question, 3 error."""
         context = read_context(context_file)
         commits = read_commits(commits_file)
-        builds = check_build_values({"ios": ios_build, "android": android_build})
+        web = check_web(web_url, web_browser)
+        builds = check_build_values(
+            {"ios": ios_build, "android": android_build}, web=web is not None
+        )
         files = expand_attachments(attach or [])
         target = pr_target()
         body: dict[str, object] = {
@@ -89,6 +101,8 @@ def register(app: typer.Typer) -> None:
             "context": context,
             "full": full,
         }
+        if web is not None:
+            body["web"] = web
         if commits is not None:
             body["commits"] = commits
         if sha:

@@ -8,7 +8,6 @@ import typer
 
 from minitest_cli.api.client import ApiClient
 from minitest_cli.commands.draft_helpers import DraftTarget, run_conductor
-from minitest_cli.commands.persona_helpers import resolve_persona_id
 from minitest_cli.commands.pr_api import (
     PR_CHECKS_PATH,
     conductor,
@@ -57,10 +56,6 @@ def register(app: typer.Typer) -> None:
             WebBrowser | None,
             typer.Option("--web-browser", help="Browser for --web-url (default: Chrome)."),
         ] = None,
-        web_persona: Annotated[
-            str | None,
-            typer.Option("--web-persona", help="Persona (id or name) Mini signs in as on the web."),
-        ] = None,
         commits_file: Annotated[
             str | None,
             typer.Option("--commits-file", help="The push's commit messages, one per line."),
@@ -92,7 +87,7 @@ def register(app: typer.Typer) -> None:
         """Check a PR on its builds or web app: exit 0 ready, 1 not ready, 2 question, 3 error."""
         context = read_context(context_file)
         commits = read_commits(commits_file)
-        web = check_web(web_url, web_browser, web_persona)
+        web = check_web(web_url, web_browser)
         builds = check_build_values(
             {"ios": ios_build, "android": android_build}, web=web is not None
         )
@@ -133,11 +128,6 @@ async def _run(
 ) -> int:
     async with ApiClient(target.settings) as testing_service:
         body["builds"] = await resolve_builds(testing_service, target.app_id, builds)
-        web = body.get("web")
-        if isinstance(web, dict) and "persona" in web:
-            web["persona"] = await resolve_persona_id(
-                testing_service, target.app_id, web["persona"]
-            )
     async with conductor(target) as client:
         created = await request(
             client, target, "POST", PR_CHECKS_PATH, what="Starting the PR check", json=body

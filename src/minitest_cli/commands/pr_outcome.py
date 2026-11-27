@@ -104,5 +104,8 @@ def announce(report: dict[str, Any], code: int, url: str, *, json_mode: bool) ->
     style = {EXIT_READY: "green", EXIT_NEEDS_ANSWER: "yellow"}.get(code, "red")
     console.print(f"[bold {style}]{summary}[/bold {style}]")
     if code == EXIT_NEEDS_ANSWER:
-        console.print(f"Answer Mini's question in the report; `minitest pr wait {pr}` follows.")
+        console.print(
+            "Mini has a question: clarify it in the PR text and run `minitest pr check` again"
+            " (the next push re-tests every check that asked), or answer it in the session."
+        )
     console.print(f"Report: {url}")

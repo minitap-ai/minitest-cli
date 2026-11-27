@@ -57,7 +57,6 @@ def read_commits(path: str | None) -> list[str] | None:
 class WebBrowser(StrEnum):
     CHROME = "chrome"
     FIREFOX = "firefox"
-    SAFARI = "safari"
     EDGE = "edge"
 
 

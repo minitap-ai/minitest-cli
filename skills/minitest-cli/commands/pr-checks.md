@@ -41,7 +41,7 @@ minitest-cli --app "$APP" pr check \
   --pr 1482 --title "Favourites on restaurant cards" \
   --context-file pr.md \
   --ios-build build/App.ipa --android-build build/app.aab \
-  [--web-url https://preview.example.com/pr-1482 [--web-browser chrome|firefox|safari|edge] [--web-persona NAME|ID]] \
+  [--web-url https://preview.example.com/pr-1482 [--web-browser chrome|firefox|edge] [--web-persona NAME|ID]] \
   [--commits-file commits.txt] [--sha "$SHA"] [--ticket TIM-123] \
   [--attach 'design/*.png' --attach spec.pdf] \
   [--full] [--report-file pr-check.md] [--fail-on warning] \

@@ -27,6 +27,19 @@ jobs:
       - name: Check the wheel and sdist carry the agent skill
         run: python3 scripts/check-dist-skill.py
 
+      # Users install without the lockfile, so they get the newest typer (which vendors click).
+      - name: Run the wheel on the newest dependencies
+        run: |
+          uvx --isolated --from dist/*.whl minitest-cli --version
+          uvx --isolated --from dist/*.whl minitest-cli pr --help > /dev/null
+
+      - name: Test `minitest pr` on the newest dependencies
+        env:
+          MINITEST_NO_AUTO_UPDATE: "1"
+        run: >-
+          uv run --isolated --no-project --with . --with pytest
+          pytest tests/test_pr_commands.py tests/test_pr_follow_commands.py tests/test_code_quality.py
+
   pyright:
     runs-on: ubuntu-latest
     steps:

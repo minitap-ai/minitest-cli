@@ -150,6 +150,15 @@ class TestFollowUps:
         assert backend.sent(EVENTS) == []
         assert "clarify it in the PR text and run `minitest pr check` again" in result.stderr
 
+    def test_a_cancelled_push_exits_3_and_points_at_the_newer_one(self):
+        cancelled = httpx.Response(200, json=report(None, state="cancelled"))
+        backend = happy().on(BY_PR, cancelled).on(REPORT, cancelled)
+
+        result = invoke(backend, ["pr", "wait", "1482"])
+
+        assert result.exit_code == 3
+        assert "A newer push replaced this one; `minitest pr wait 1482`" in result.stderr
+
     def test_wait_for_an_unknown_pr_exits_3(self):
         missing = httpx.Response(404, json={"detail": "No PR check for PR #1482."})
 

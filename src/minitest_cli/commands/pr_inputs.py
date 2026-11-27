@@ -3,7 +3,9 @@
 import glob
 import mimetypes
 import sys
+from enum import StrEnum
 from pathlib import Path
+from urllib.parse import urlparse
 
 import typer
 
@@ -52,14 +54,35 @@ def read_commits(path: str | None) -> list[str] | None:
     return [line.strip() for line in lines if line.strip()]
 
 
-def check_build_values(builds: dict[str, str | None]) -> dict[str, str]:
+class WebBrowser(StrEnum):
+    CHROME = "chrome"
+    FIREFOX = "firefox"
+    SAFARI = "safari"
+    EDGE = "edge"
+
+
+def check_build_values(builds: dict[str, str | None], *, web: bool) -> dict[str, str]:
     given = {platform: value for platform, value in builds.items() if value}
-    if not given:
-        raise fail("Pass at least one build: --ios-build or --android-build (a file or an id).")
+    if not given and not web:
+        raise fail(
+            "Pass at least one platform: --ios-build or --android-build (a file or an id),"
+            " or --web-url."
+        )
     for platform, value in given.items():
         if not Path(value).is_file() and not is_uuid(value):
             raise fail(f"--{platform}-build: '{value}' is neither a build file nor a build id.")
     return given
+
+
+def check_web(url: str | None, browser: WebBrowser | None) -> dict[str, str] | None:
+    if url is None:
+        if browser is not None:
+            raise fail("--web-browser needs --web-url.")
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise fail(f"--web-url: '{url}' is not an http(s) URL.")
+    return {"url": url} | ({"browser": browser.value} if browser else {})
 
 
 async def resolve_builds(client: ApiClient, app_id: str, builds: dict[str, str]) -> dict[str, str]:

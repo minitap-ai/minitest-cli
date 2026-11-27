@@ -1801,7 +1801,7 @@ the runs. Use `run verdicts <batch_id>` when you actually want the outcomes.
 | Answer Mini on a draft | `minitest --json --app ID draft ask list <id>`, `draft ask answer <id> <ask_id> --answer "..." \| --field K=V --field-file SECRET_KEY=-` |
 | Check / merge a draft | `minitest --json --app ID draft check\|build\|merge\|discard\|revert <id>`, `draft not-a-bug <id> <scenario_id>` |
 | Prove a draft on an open PR | `minitest --json --app ID draft link-pr <id> <pr_number>` then `draft check <id>` (`--again` after new pushes) |
-| Check a PR on its builds, without its code (CI) | `minitest-cli --app ID pr check --pr N --title "..." --context-file pr.md --ios-build FILE\|ID --android-build FILE\|ID` — exit 0/1/2/3, see [`commands/pr-checks.md`](commands/pr-checks.md) |
+| Check a PR on its builds, without its code (CI) | `minitest-cli --app ID pr check --pr N --title "..." --context-file pr.md --ios-build FILE\|ID --android-build FILE\|ID --web-url URL` (any of the three) — exit 0/1/2/3, see [`commands/pr-checks.md`](commands/pr-checks.md) |
 | Follow / read / close a PR check | `minitest --app ID pr wait\|report\|merged\|closed <pr_number>` |
 | Branch the test suite yourself (low level) | `minitest --json --app ID df list\|create\|show\|apply\|delete` — see [`commands/draft-features.md`](commands/draft-features.md) |
 
@@ -1924,7 +1924,8 @@ yourself, end to end.
 For teams whose CI can send builds but not code: `minitest pr check` takes the
 PR number, title, a Markdown context file (PR description + ticket, ≤10,000
 characters), optional commit messages and images, and an iOS and/or Android build
-(a file or a build id). Mini plans `change` and `impact` checks, verifies them on
+(a file or a build id) and/or `--web-url` (the PR's web preview, `--web-browser`
+to pick the browser). Mini plans `change` and `impact` checks, verifies them on
 the devices and gives a verdict: exit 0 ready (warnings too, unless `--fail-on
 warning`), 1 not ready, 2 needs an answer, 3 anything else. Progress streams live
 (report link first), `--report-file` writes the Markdown report, and on GitHub

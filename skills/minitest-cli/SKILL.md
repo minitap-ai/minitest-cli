@@ -1925,7 +1925,8 @@ For teams whose CI can send builds but not code: `minitest pr check` takes the
 PR number, title, a Markdown context file (PR description + ticket, ≤10,000
 characters), optional commit messages and images, and an iOS and/or Android build
 (a file or a build id) and/or `--web-url` (the PR's web preview, `--web-browser`
-to pick the browser). Mini plans `change` and `impact` checks, verifies them on
+to pick the browser). The report links to the PR (`--pr-url`, derived automatically
+on GitHub Actions and GitLab CI). Mini plans `change` and `impact` checks, verifies them on
 the devices and gives a verdict: exit 0 ready (warnings too, unless `--fail-on
 warning`), 1 not ready, 2 needs an answer, 3 anything else. Progress streams live
 (report link first), `--report-file` writes the Markdown report, and on GitHub

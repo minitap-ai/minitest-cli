@@ -42,7 +42,7 @@ minitest-cli --app "$APP" pr check \
   --context-file pr.md \
   --ios-build build/App.ipa --android-build build/app.aab \
   [--web-url https://preview.example.com/pr-1482 [--web-browser chrome|firefox|edge]] \
-  [--commits-file commits.txt] [--sha "$SHA"] [--ticket TIM-123] \
+  [--commits-file commits.txt] [--sha "$SHA"] [--ticket TIM-123] [--pr-url URL] \
   [--attach 'design/*.png' --attach spec.pdf] \
   [--full] [--report-file pr-check.md] [--fail-on warning] \
   [--no-wait] [--timeout 1800]
@@ -60,6 +60,10 @@ minitest-cli --app "$APP" pr check \
 - `--commits-file`: the push's commit messages, one per line
   (`git log --format=%s base..head`). Mini re-tests the areas they name.
 - `--ticket`: the key of the ticket the PR implements, shown on the report.
+- `--pr-url`: the PR's page; the report links "PR #N" to it. On GitHub Actions
+  it defaults to `$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/<--pr>`, on GitLab CI
+  to the merge request (`$CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID`),
+  so CI needs no extra flag. Elsewhere pass it, or the report shows the number only.
 - `--attach` (repeatable glob): png, jpg, gif, webp or pdf of at most 10 MB.
   Other files are skipped with a warning; the check goes on.
 - `--no-wait`: start, print the check id and report link, exit 0. Follow it

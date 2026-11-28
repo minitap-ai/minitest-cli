@@ -171,7 +171,7 @@ class TestWeb:
         result = invoke(happy().on(EVENTS, stream(web_story)), check_args(context))
 
         assert result.exit_code == 0, result.output
-        assert "✓ [web]      passed     Favourite heart on each card @ 0:09" in result.stderr
+        assert "✓ [web]      passed     Favourite heart on each card" in result.stderr
 
 
 CI_VARS = ("GITHUB_ACTIONS", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY",
@@ -264,7 +264,7 @@ class TestVerdict:
 
         assert result.exit_code == 1
         assert out.read_text() == f"## Verdict: not_ready\n\n{REPORT_URL}\n"
-        assert "✗ [ios]      critical   Favourite heart on each card @ 1:12" in result.stderr
+        assert "✗ [ios]      critical   Favourite heart on each card" in result.stderr
 
     def test_a_newer_push_ends_the_wait_with_3(self, context: Path):
         newer = sse(

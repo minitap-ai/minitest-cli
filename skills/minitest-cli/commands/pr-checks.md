@@ -72,9 +72,9 @@ minitest-cli --app "$APP" pr check \
 ## What it prints
 
 The report link comes first, then one line per step: the plan (each check with
-its group), each result (`[ios] passed …  @ 1:12`, `[web] …`: the moment in
-that platform's recording, plus one line of at most 120 characters on what Mini saw
-when it isn't passed or known; the report has the full account), Mini's
+its group), each result (`[ios] passed …`, `[web] …`, plus one line of at most
+120 characters on what Mini saw when it isn't passed or known; the report has the
+full account and each check's moment in the recording), Mini's
 questions, and the verdict with the link again.
 A heartbeat line appears at least every 60 s. No colours outside a terminal.
 

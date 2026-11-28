@@ -40,13 +40,6 @@ def one_line(text: str, limit: int = SEEN_CHARS) -> str:
     return flat if len(flat) <= limit else flat[: limit - 1].rstrip() + "…"
 
 
-def timestamp(seconds: float | int | None) -> str:
-    if seconds is None:
-        return ""
-    total = int(seconds)
-    return f" @ {total // 60}:{total % 60:02d}"
-
-
 def plan_lines(checks: list[dict[str, Any]]) -> list[str]:
     groups = [c.get("group") for c in checks]
     head = (
@@ -68,7 +61,7 @@ def item_line(item: dict[str, Any], label: str) -> str:
     shows_seen = item.get("seen") and verdict not in ("passed", "known")
     seen = f" — {escape(one_line(str(item['seen'])))}" if shows_seen else ""
     carried = " [dim](carried)[/dim]" if item.get("tag") == "carried" else ""
-    return f"{head}{timestamp(item.get('at'))}{seen}{carried}"
+    return f"{head}{seen}{carried}"
 
 
 def counts_line(counts: dict[str, dict[str, int]] | None) -> str:

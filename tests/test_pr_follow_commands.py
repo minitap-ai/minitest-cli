@@ -36,7 +36,7 @@ SECOND_HALF = sse(
     ("pr_check.verdict", {"push": 1, "verdict": "not_ready", "counts": {}}),
     start=3,
 )
-RESTAURANTS_LINE = "✓ [ios]      passed     Home still lists restaurants @ 0:10"
+RESTAURANTS_LINE = "✓ [ios]      passed     Home still lists restaurants"
 
 
 @pytest.fixture
